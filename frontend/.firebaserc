@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "content-auto-post": {
+      "hosting": {
+        "aicreators-vip": [
+          "aicreators-vip"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
