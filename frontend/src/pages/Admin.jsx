@@ -844,12 +844,15 @@ const Admin = () => {
                                     <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
                                         <ArrowUpRight className="text-green-400" size={18} />
                                     </div>
-                                    รอดำเนินการ - ฝากเงิน
+                                    รอดำเนินการ - Payments
                                 </h3>
                                 <div className="text-center py-8">
-                                    <p className="text-6xl font-black text-yellow-400 animate-pulse">{stats.pendingDeposits}</p>
+                                    <p className="text-6xl font-black text-yellow-400 animate-pulse">{stats.pendingDeposits + stats.pendingSubscriptions}</p>
                                     <p className="text-slate-400 mt-2 font-medium">รายการรอตรวจสอบ</p>
-                                    {stats.pendingDeposits > 0 && (
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        (ฝากเงิน {stats.pendingDeposits} + Subscription {stats.pendingSubscriptions})
+                                    </p>
+                                    {(stats.pendingDeposits + stats.pendingSubscriptions) > 0 && (
                                         <button 
                                             onClick={() => { setActiveTab('credit'); setCreditSubTab('deposits'); }}
                                             className="mt-4 px-6 py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-xl hover:from-yellow-500/30 hover:to-orange-500/30 transition-all font-semibold border border-yellow-500/30 hover:scale-105"
@@ -1267,15 +1270,15 @@ const Admin = () => {
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-3 text-center">
                                                             <div>
-                                                                <p className="text-lg font-bold text-purple-300">{req.limits?.projects || 1}</p>
+                                                                <p className="text-lg font-bold text-purple-300">{req.extraProjects || 0}</p>
                                                                 <p className="text-xs text-slate-400">Projects</p>
                                                             </div>
                                                             <div>
-                                                                <p className="text-lg font-bold text-blue-300">{req.limits?.modes || 2}</p>
+                                                                <p className="text-lg font-bold text-blue-300">{(req.extraProjects || 0) * 2}</p>
                                                                 <p className="text-xs text-slate-400">Modes</p>
                                                             </div>
                                                             <div>
-                                                                <p className="text-lg font-bold text-green-300">{req.limits?.extenders || 2}</p>
+                                                                <p className="text-lg font-bold text-green-300">{(req.extraProjects || 0) * 2}</p>
                                                                 <p className="text-xs text-slate-400">Extenders</p>
                                                             </div>
                                                         </div>

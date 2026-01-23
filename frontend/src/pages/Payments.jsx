@@ -1082,7 +1082,9 @@ const Payments = () => {
                                                 <div>
                                                     <p className="text-sm text-white font-semibold">{formatPrice(payment.amount)}</p>
                                                     <p className="text-xs text-slate-500">
-                                                        {payment.type === 'subscription_with_projects' ? `Pro + ${payment.extraProjects} Project` : 'Pro Plan'}
+                                                        {payment.type === 'subscription_with_projects' 
+                                                            ? `${payment.extraProjects} Project + ${payment.extraProjects * 2} Mode + ${payment.extraProjects * 2} Extender` 
+                                                            : 'Pro Plan'}
                                                     </p>
                                                     <p className="text-xs text-slate-600">{payment.createdAt?.toDate ? payment.createdAt.toDate().toLocaleString('th-TH') : '-'}</p>
                                                 </div>
