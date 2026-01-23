@@ -721,7 +721,8 @@ const Marketplace = () => {
                 thumbnail: item.thumbnail || item.coverImage || '',
                 // Video URLs - ติดไปกับผู้ซื้อ (จะหายเมื่อเพิ่ม/ลบ Block)
                 videoUrls: item.videoUrls || [],
-                // Source tracking
+                // Source tracking - สำคัญ! เพื่อไม่นับรวมใน limit
+                source: 'purchased',
                 fromMarketplace: true,
                 receivedFree: item.isFree || price === 0, // บอกว่าได้มาฟรีหรือไม่
                 originalExpanderId: item.originalId || item.id,
@@ -806,6 +807,8 @@ const Marketplace = () => {
                 thumbnail: item.thumbnail || item.coverImage,
                 // Video URLs - ติดไปกับผู้ทดลองใช้
                 videoUrls: item.videoUrls || [],
+                // Source tracking - สำคัญ! เพื่อไม่นับรวมใน limit
+                source: 'purchased',
                 // Trial flags - ห้ามแก้ไข
                 isTrial: true,
                 trialExpiresAt: expiresAt,

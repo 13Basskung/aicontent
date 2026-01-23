@@ -867,12 +867,24 @@ const ExpanderCreator = () => {
                 await updateDoc(doc(db, 'users', user.uid, 'expanders', editingExpander.id), expanderData);
             } else {
                 // ตรวจสอบ subscription limit ก่อนสร้าง Expander ใหม่
-                const limitCheck = canCreate('extender', savedExpanders.length);
+                // นับเฉพาะ Expander ที่สร้างเอง: ไม่รวมที่มาจาก Marketplace (ทั้งเก่าและใหม่)
+                const createdExpanders = savedExpanders.filter(exp => 
+                    exp.source !== 'purchased' && 
+                    !exp.fromMarketplace && 
+                    !exp.isTrial &&
+                    !exp.originalExpanderId &&  // Expander เก่าจาก Marketplace
+                    !exp.purchasedAt &&         // มี field นี้แสดงว่าซื้อมา
+                    !exp.receivedFree           // ได้มาฟรีจาก Marketplace
+                );
+                const limitCheck = canCreate('extender', createdExpanders.length);
                 if (!limitCheck.allowed) {
                     alert(`⚠️ ${limitCheck.reason}\n\nกรุณาอัพเกรด Subscription เพื่อสร้าง Expander เพิ่มเติม`);
                     setSaving(false);
                     return;
                 }
+                
+                // เพิ่ม source: 'created' เพื่อแยกจาก Expander ที่ซื้อมา
+                expanderData.source = 'created';
                 
                 // Create new expander first to get ID
                 docRef = await addDoc(collection(db, 'users', user.uid, 'expanders'), expanderData);

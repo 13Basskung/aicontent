@@ -1005,9 +1005,11 @@ const Payments = () => {
                                         </div>
                                     )}
                                     {extraProjects > 0 && (
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-300">เพิ่ม {extraProjects} Project</span>
-                                            <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-300">เพิ่ม {extraProjects} Project + {extraProjects * 2} Mode + {extraProjects * 2} Extender</span>
+                                                <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
+                                            </div>
                                         </div>
                                     )}
                                     {subscriptionPriceInfo.prorate && subscriptionPriceInfo.prorate.daysRemaining && (

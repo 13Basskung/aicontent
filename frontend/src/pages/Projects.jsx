@@ -836,16 +836,30 @@ export default function Projects() {
                                     <span>{modes.length}/{subStatus.limits.modes || 0}</span>
                                     <span className="text-white/60">Modes</span>
                                 </div>
-                                {/* Extenders Box */}
-                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
-                                    expanders.length >= (subStatus.limits.extenders || 0) 
-                                        ? 'bg-red-500/20 text-red-300 border-red-500/30' 
-                                        : 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                                }`}>
-                                    <Zap size={14} />
-                                    <span>{expanders.length}/{subStatus.limits.extenders || 0}</span>
-                                    <span className="text-white/60">Extenders</span>
-                                </div>
+                                {/* Extenders Box - นับเฉพาะที่สร้างเอง (ไม่รวมที่ซื้อมา/ทดลอง) */}
+                                {(() => {
+                                    // นับเฉพาะ Expander ที่สร้างเอง: ไม่รวมที่มาจาก Marketplace (ทั้งเก่าและใหม่)
+                                    const createdExtenders = expanders.filter(exp => 
+                                        exp.source !== 'purchased' && 
+                                        !exp.fromMarketplace && 
+                                        !exp.isTrial &&
+                                        !exp.originalExpanderId &&  // Expander เก่าจาก Marketplace
+                                        !exp.purchasedAt &&         // มี field นี้แสดงว่าซื้อมา
+                                        !exp.receivedFree           // ได้มาฟรีจาก Marketplace
+                                    );
+                                    const extenderLimit = subStatus.limits.extenders || 0;
+                                    return (
+                                        <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
+                                            createdExtenders.length >= extenderLimit 
+                                                ? 'bg-red-500/20 text-red-300 border-red-500/30' 
+                                                : 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                                        }`}>
+                                            <Zap size={14} />
+                                            <span>{createdExtenders.length}/{extenderLimit}</span>
+                                            <span className="text-white/60">Extenders</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {subStatus.isBlocked && (
