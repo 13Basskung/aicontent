@@ -43,6 +43,13 @@ const Admin = () => {
     const [activityTypeFilter, setActivityTypeFilter] = useState('all');
     const [activityApproverFilter, setActivityApproverFilter] = useState('all');
 
+    // Stats Time Period Filters (1D, 7D, 1M, All)
+    const [depositsPeriod, setDepositsPeriod] = useState('all');
+    const [withdrawalsPeriod, setWithdrawalsPeriod] = useState('all');
+    const [usersPeriod, setUsersPeriod] = useState('all');
+    const [creditsPeriod, setCreditsPeriod] = useState('all');
+    const [subscriptionsPeriod, setSubscriptionsPeriod] = useState('all');
+
     // Storage Dashboard
     const [storageStats, setStorageStats] = useState(null);
     const [loadingStorage, setLoadingStorage] = useState(false);
@@ -156,22 +163,48 @@ const Admin = () => {
         return () => unsubscribe();
     }, [currentUser]);
 
+    // Helper: Filter by time period
+    const filterByPeriod = (items, period, dateField = 'createdAt') => {
+        if (period === 'all') return items;
+        const now = new Date();
+        let cutoff;
+        switch (period) {
+            case '1d': cutoff = new Date(now - 24 * 60 * 60 * 1000); break;
+            case '7d': cutoff = new Date(now - 7 * 24 * 60 * 60 * 1000); break;
+            case '1m': cutoff = new Date(now - 30 * 24 * 60 * 60 * 1000); break;
+            default: return items;
+        }
+        return items.filter(item => {
+            const itemDate = item[dateField]?.toDate ? item[dateField].toDate() : new Date(item[dateField]);
+            return itemDate >= cutoff;
+        });
+    };
+
     // Dashboard Statistics
     const stats = useMemo(() => {
         const approvedDeposits = paymentLogs.filter(l => l.status === 'approved' && l.type !== 'withdrawal' && l.type !== 'subscription');
         const approvedWithdrawals = withdrawalRequests.filter(w => w.status === 'approved');
         const approvedSubscriptions = subscriptionPayments.filter(s => s.status === 'approved');
-        const totalDeposits = approvedDeposits.reduce((sum, l) => sum + Math.abs(l.amount || 0), 0);
-        const totalWithdrawals = approvedWithdrawals.reduce((sum, w) => sum + Math.abs(w.amount || 0), 0);
-        const totalSubscriptions = approvedSubscriptions.reduce((sum, s) => sum + Math.abs(s.amount || 0), 0);
+        
+        // Filter by time period
+        const filteredDeposits = filterByPeriod(approvedDeposits, depositsPeriod);
+        const filteredWithdrawals = filterByPeriod(approvedWithdrawals, withdrawalsPeriod);
+        const filteredSubscriptions = filterByPeriod(approvedSubscriptions, subscriptionsPeriod);
+        const filteredUsers = filterByPeriod(allUsers, usersPeriod);
+        
+        const totalDeposits = filteredDeposits.reduce((sum, l) => sum + Math.abs(l.amount || 0), 0);
+        const totalWithdrawals = filteredWithdrawals.reduce((sum, w) => sum + Math.abs(w.amount || 0), 0);
+        const totalSubscriptions = filteredSubscriptions.reduce((sum, s) => sum + Math.abs(s.amount || 0), 0);
         const pendingDeposits = paymentRequests.filter(r => r.status === 'pending').length;
         const pendingWithdrawals = withdrawalRequests.filter(w => w.status === 'pending').length;
         const pendingSubscriptions = subscriptionPayments.filter(s => s.status === 'pending').length;
-        const totalUsers = allUsers.length;
-        const totalBalance = allUsers.reduce((sum, u) => sum + (u.walletBalance || 0), 0);
+        const totalUsers = filteredUsers.length;
+        const totalBalance = creditsPeriod === 'all' 
+            ? allUsers.reduce((sum, u) => sum + (u.walletBalance || 0), 0)
+            : filteredUsers.reduce((sum, u) => sum + (u.walletBalance || 0), 0);
 
         return { totalDeposits, totalWithdrawals, totalSubscriptions, pendingDeposits, pendingWithdrawals, pendingSubscriptions, totalUsers, totalBalance };
-    }, [paymentLogs, withdrawalRequests, subscriptionPayments, paymentRequests, allUsers]);
+    }, [paymentLogs, withdrawalRequests, subscriptionPayments, paymentRequests, allUsers, depositsPeriod, withdrawalsPeriod, subscriptionsPeriod, usersPeriod, creditsPeriod]);
 
     // Filtered Activities
     const filteredActivities = useMemo(() => {
@@ -778,64 +811,99 @@ const Admin = () => {
                     <div className="space-y-6">
                         {/* Stats Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
-                            <div className="group relative bg-gradient-to-br from-green-600/30 to-green-900/20 backdrop-blur-xl rounded-3xl border border-green-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                            <div className="group relative bg-gradient-to-br from-green-600/30 to-green-900/20 backdrop-blur-xl rounded-3xl border border-green-500/30 p-4 hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:animate-bounce">
-                                        <TrendingUp className="text-white" size={28} />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                                        <TrendingUp className="text-white" size={20} />
                                     </div>
-                                    <span className="text-green-400 text-sm font-bold uppercase tracking-wider">ยอดฝากรวม</span>
+                                    <span className="text-green-400 text-xs font-bold uppercase tracking-wider">ยอดฝากรวม</span>
                                 </div>
-                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalDeposits.toLocaleString()}</p>
-                                <p className="text-sm text-green-300/80 font-medium">TOKEN</p>
+                                <div className="flex gap-1 mb-2">
+                                    {['1d', '7d', '1m', 'all'].map(p => (
+                                        <button key={p} onClick={() => setDepositsPeriod(p)} className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${depositsPeriod === p ? 'bg-green-500 text-white' : 'bg-white/10 text-green-300 hover:bg-white/20'}`}>
+                                            {p === 'all' ? 'All' : p.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-3xl font-black text-white mb-0.5 tracking-tight">{stats.totalDeposits.toLocaleString()}</p>
+                                <p className="text-xs text-green-300/80 font-medium">TOKEN</p>
                             </div>
 
-                            <div className="group relative bg-gradient-to-br from-red-600/30 to-red-900/20 backdrop-blur-xl rounded-3xl border border-red-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-red-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                            <div className="group relative bg-gradient-to-br from-red-600/30 to-red-900/20 backdrop-blur-xl rounded-3xl border border-red-500/30 p-4 hover:shadow-2xl hover:shadow-red-500/20 transition-all duration-500 overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/5 to-red-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:animate-bounce">
-                                        <TrendingDown className="text-white" size={28} />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30">
+                                        <TrendingDown className="text-white" size={20} />
                                     </div>
-                                    <span className="text-red-400 text-sm font-bold uppercase tracking-wider">ยอดถอนรวม</span>
+                                    <span className="text-red-400 text-xs font-bold uppercase tracking-wider">ยอดถอนรวม</span>
                                 </div>
-                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalWithdrawals.toLocaleString()}</p>
-                                <p className="text-sm text-red-300/80 font-medium">TOKEN</p>
+                                <div className="flex gap-1 mb-2">
+                                    {['1d', '7d', '1m', 'all'].map(p => (
+                                        <button key={p} onClick={() => setWithdrawalsPeriod(p)} className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${withdrawalsPeriod === p ? 'bg-red-500 text-white' : 'bg-white/10 text-red-300 hover:bg-white/20'}`}>
+                                            {p === 'all' ? 'All' : p.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-3xl font-black text-white mb-0.5 tracking-tight">{stats.totalWithdrawals.toLocaleString()}</p>
+                                <p className="text-xs text-red-300/80 font-medium">TOKEN</p>
                             </div>
 
-                            <div className="group relative bg-gradient-to-br from-blue-600/30 to-blue-900/20 backdrop-blur-xl rounded-3xl border border-blue-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                            <div className="group relative bg-gradient-to-br from-blue-600/30 to-blue-900/20 backdrop-blur-xl rounded-3xl border border-blue-500/30 p-4 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:animate-bounce">
-                                        <Users className="text-white" size={28} />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                        <Users className="text-white" size={20} />
                                     </div>
-                                    <span className="text-blue-400 text-sm font-bold uppercase tracking-wider">ผู้ใช้ทั้งหมด</span>
+                                    <span className="text-blue-400 text-xs font-bold uppercase tracking-wider">ผู้ใช้ทั้งหมด</span>
                                 </div>
-                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalUsers}</p>
-                                <p className="text-sm text-blue-300/70">คน</p>
+                                <div className="flex gap-1 mb-2">
+                                    {['1d', '7d', '1m', 'all'].map(p => (
+                                        <button key={p} onClick={() => setUsersPeriod(p)} className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${usersPeriod === p ? 'bg-blue-500 text-white' : 'bg-white/10 text-blue-300 hover:bg-white/20'}`}>
+                                            {p === 'all' ? 'All' : p.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-3xl font-black text-white mb-0.5 tracking-tight">{stats.totalUsers}</p>
+                                <p className="text-xs text-blue-300/70">คน</p>
                             </div>
 
-                            <div className="group relative bg-gradient-to-br from-purple-600/30 to-purple-900/20 backdrop-blur-xl rounded-3xl border border-purple-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                            <div className="group relative bg-gradient-to-br from-purple-600/30 to-purple-900/20 backdrop-blur-xl rounded-3xl border border-purple-500/30 p-4 hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-500 overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 via-purple-500/5 to-purple-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30 group-hover:animate-bounce">
-                                        <Wallet className="text-white" size={28} />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                        <Wallet className="text-white" size={20} />
                                     </div>
-                                    <span className="text-purple-400 text-sm font-bold uppercase tracking-wider">เครดิตรวม</span>
+                                    <span className="text-purple-400 text-xs font-bold uppercase tracking-wider">เครดิตรวม</span>
                                 </div>
-                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalBalance.toLocaleString()}</p>
-                                <p className="text-sm text-purple-300/80 font-medium">TOKEN</p>
+                                <div className="flex gap-1 mb-2">
+                                    {['1d', '7d', '1m', 'all'].map(p => (
+                                        <button key={p} onClick={() => setCreditsPeriod(p)} className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${creditsPeriod === p ? 'bg-purple-500 text-white' : 'bg-white/10 text-purple-300 hover:bg-white/20'}`}>
+                                            {p === 'all' ? 'All' : p.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-3xl font-black text-white mb-0.5 tracking-tight">{stats.totalBalance.toLocaleString()}</p>
+                                <p className="text-xs text-purple-300/80 font-medium">TOKEN</p>
                             </div>
 
-                            <div className="group relative bg-gradient-to-br from-amber-600/30 to-orange-900/20 backdrop-blur-xl rounded-3xl border border-amber-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                            <div className="group relative bg-gradient-to-br from-amber-600/30 to-orange-900/20 backdrop-blur-xl rounded-3xl border border-amber-500/30 p-4 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 group-hover:animate-bounce">
-                                        <Crown className="text-white" size={28} />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                                        <Crown className="text-white" size={20} />
                                     </div>
-                                    <span className="text-amber-400 text-sm font-bold uppercase tracking-wider">Subscription</span>
+                                    <span className="text-amber-400 text-xs font-bold uppercase tracking-wider">Subscription</span>
                                 </div>
-                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalSubscriptions.toLocaleString()}</p>
-                                <p className="text-sm text-amber-300/80 font-medium">THB</p>
+                                <div className="flex gap-1 mb-2">
+                                    {['1d', '7d', '1m', 'all'].map(p => (
+                                        <button key={p} onClick={() => setSubscriptionsPeriod(p)} className={`px-1.5 py-0.5 text-[10px] rounded font-bold transition-all ${subscriptionsPeriod === p ? 'bg-amber-500 text-white' : 'bg-white/10 text-amber-300 hover:bg-white/20'}`}>
+                                            {p === 'all' ? 'All' : p.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-3xl font-black text-white mb-0.5 tracking-tight">{stats.totalSubscriptions.toLocaleString()}</p>
+                                <p className="text-xs text-amber-300/80 font-medium">THB</p>
                             </div>
                         </div>
 
