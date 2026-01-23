@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Upload, Image as ImageIcon, Loader2, CheckCircle, Clock, XCircle, Wallet, ArrowUpRight, ArrowDownRight, Building2, Plus, Trash2, CreditCard, Crown, Star, Zap, Calendar, AlertTriangle, Sparkles } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, CheckCircle, Clock, XCircle, Wallet, ArrowUpRight, ArrowDownRight, Building2, Plus, Trash2, CreditCard, Crown, Star, Zap, Calendar, AlertTriangle, Sparkles, Hash, User } from 'lucide-react';
 import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
 import GlassDropdown from '../components/ui/GlassDropdown';
@@ -981,37 +981,71 @@ const Payments = () => {
                                 </div>
                             </div>
 
-                            {/* Billing Month Selector - แสดงเมื่อเหลือ ≤7 วันก่อนสิ้นเดือน */}
+                            {/* Billing Month Selector - Enhanced UI */}
                             {showBillingMonthSelector && (
-                                <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-xl p-4 mb-6 border border-blue-500/30">
-                                    <p className="text-white font-medium mb-3 flex items-center gap-2">
-                                        📅 เลือกเดือนที่ต้องการจ่าย
-                                    </p>
-                                    <p className="text-xs text-slate-400 mb-3">เหลือ {daysUntilEndOfMonth} วันก่อนสิ้นเดือน - คุณสามารถเลือกจ่ายสำหรับเดือนนี้หรือเดือนหน้าได้</p>
-                                    <div className="grid grid-cols-2 gap-3">
+                                <div className="relative bg-gradient-to-br from-indigo-900/40 via-blue-900/30 to-cyan-900/40 rounded-2xl p-5 mb-6 border border-blue-500/30 overflow-hidden shadow-lg shadow-blue-500/10">
+                                    {/* Decorative */}
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400" />
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl" />
+                                    
+                                    <div className="flex items-center gap-3 mb-4 relative">
+                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                            <Calendar className="text-white" size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="text-white font-bold text-lg">เลือกเดือนที่ต้องการจ่าย</p>
+                                            <p className="text-xs text-cyan-300/80">⏰ เหลือ <span className="font-bold text-cyan-200">{daysUntilEndOfMonth}</span> วันก่อนสิ้นเดือน</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 relative">
                                         <button
                                             onClick={() => setBillingMonth('current')}
-                                            className={`p-3 rounded-xl border-2 transition-all ${
+                                            className={`p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${
                                                 billingMonth === 'current'
-                                                    ? 'bg-blue-500/30 border-blue-400 text-blue-200'
-                                                    : 'bg-black/20 border-white/10 text-slate-400 hover:border-white/30'
+                                                    ? 'bg-gradient-to-br from-blue-600/40 to-blue-700/40 border-blue-400 text-blue-100 shadow-lg shadow-blue-500/20'
+                                                    : 'bg-black/30 border-white/10 text-slate-400 hover:border-blue-400/50 hover:bg-blue-500/10'
                                             }`}
                                         >
-                                            <p className="font-bold text-sm">📅 เดือนนี้</p>
-                                            <p className="text-xs mt-1 opacity-70">Prorate {daysUntilEndOfMonth} วัน</p>
-                                            <p className="text-xs mt-1 opacity-70">หมดอายุสิ้นเดือนนี้</p>
+                                            <div className="flex items-center justify-center gap-2 mb-2">
+                                                <Clock size={18} className={billingMonth === 'current' ? 'text-blue-300' : 'text-slate-500'} />
+                                                <p className="font-bold">เดือนนี้</p>
+                                            </div>
+                                            <div className={`text-xs space-y-1 ${billingMonth === 'current' ? 'text-blue-200' : 'text-slate-500'}`}>
+                                                <p className="flex items-center justify-center gap-1">
+                                                    <Sparkles size={12} /> Prorate {daysUntilEndOfMonth} วัน
+                                                </p>
+                                                <p className="font-semibold text-xs opacity-80">หมดอายุสิ้นเดือนนี้</p>
+                                            </div>
+                                            {billingMonth === 'current' && (
+                                                <div className="mt-2 flex justify-center">
+                                                    <CheckCircle size={16} className="text-blue-300" />
+                                                </div>
+                                            )}
                                         </button>
                                         <button
                                             onClick={() => setBillingMonth('next')}
-                                            className={`p-3 rounded-xl border-2 transition-all ${
+                                            className={`p-4 rounded-xl border-2 transition-all hover:scale-[1.02] ${
                                                 billingMonth === 'next'
-                                                    ? 'bg-green-500/30 border-green-400 text-green-200'
-                                                    : 'bg-black/20 border-white/10 text-slate-400 hover:border-white/30'
+                                                    ? 'bg-gradient-to-br from-green-600/40 to-emerald-700/40 border-green-400 text-green-100 shadow-lg shadow-green-500/20'
+                                                    : 'bg-black/30 border-white/10 text-slate-400 hover:border-green-400/50 hover:bg-green-500/10'
                                             }`}
                                         >
-                                            <p className="font-bold text-sm">📅 เดือนหน้า</p>
-                                            <p className="text-xs mt-1 opacity-70">ราคาเต็มเดือน</p>
-                                            <p className="text-xs mt-1 opacity-70">หมดอายุสิ้นเดือนหน้า</p>
+                                            <div className="flex items-center justify-center gap-2 mb-2">
+                                                <Calendar size={18} className={billingMonth === 'next' ? 'text-green-300' : 'text-slate-500'} />
+                                                <p className="font-bold">เดือนหน้า</p>
+                                            </div>
+                                            <div className={`text-xs space-y-1 ${billingMonth === 'next' ? 'text-green-200' : 'text-slate-500'}`}>
+                                                <p className="flex items-center justify-center gap-1">
+                                                    <Star size={12} /> ราคาเต็มเดือน
+                                                </p>
+                                                <p className="font-semibold text-xs opacity-80">หมดอายุสิ้นเดือนหน้า</p>
+                                            </div>
+                                            {billingMonth === 'next' && (
+                                                <div className="mt-2 flex justify-center">
+                                                    <CheckCircle size={16} className="text-green-300" />
+                                                </div>
+                                            )}
                                         </button>
                                     </div>
                                 </div>
@@ -1168,17 +1202,32 @@ const Payments = () => {
                 </div>
             )}
 
-            {/* Add Bank Modal */}
+            {/* Add Bank Modal - Enhanced UI */}
             {showAddBankModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 w-full max-w-md">
-                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <CreditCard className="text-blue-400" /> เพิ่มบัญชีธนาคาร
-                        </h3>
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl shadow-blue-500/10 relative overflow-hidden">
+                        {/* Decorative Elements */}
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                         
-                        <div className="space-y-4">
+                        {/* Header */}
+                        <div className="flex items-center gap-4 mb-6 relative">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                <CreditCard className="text-white" size={28} />
+                            </div>
                             <div>
-                                <label className="text-sm text-slate-300 mb-2 block">ธนาคาร</label>
+                                <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-cyan-300">
+                                    เพิ่มบัญชีธนาคาร
+                                </h3>
+                                <p className="text-sm text-slate-400">กรอกข้อมูลบัญชีสำหรับรับเงิน</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-5 relative">
+                            <div>
+                                <label className="text-sm font-semibold text-blue-300 mb-2 block flex items-center gap-2">
+                                    <Building2 size={14} /> ธนาคาร
+                                </label>
                                 <div className="glass-dropdown-wrapper w-full">
                                     <GlassDropdown
                                         value={newBank.bankCode}
@@ -1192,41 +1241,46 @@ const Payments = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm text-slate-300 mb-2 block">เลขบัญชี</label>
+                                <label className="text-sm font-semibold text-blue-300 mb-2 block flex items-center gap-2">
+                                    <Hash size={14} /> เลขบัญชี
+                                </label>
                                 <input
                                     type="text"
                                     value={newBank.accountNumber}
                                     onChange={(e) => setNewBank(prev => ({ ...prev, accountNumber: e.target.value.replace(/\D/g, '') }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 font-mono"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 font-mono text-lg tracking-wider transition-all"
                                     placeholder="1234567890"
                                     maxLength={15}
                                 />
                             </div>
                             <div>
-                                <label className="text-sm text-slate-300 mb-2 block">ชื่อบัญชี (ตามที่ปรากฏในธนาคาร)</label>
+                                <label className="text-sm font-semibold text-blue-300 mb-2 block flex items-center gap-2">
+                                    <User size={14} /> ชื่อบัญชี
+                                </label>
                                 <input
                                     type="text"
                                     value={newBank.accountName}
                                     onChange={(e) => setNewBank(prev => ({ ...prev, accountName: e.target.value }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500"
-                                    placeholder="นายสมชาย ใจดี"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                    placeholder="ชื่อตามที่ปรากฏในธนาคาร"
                                 />
+                                <p className="text-xs text-slate-500 mt-1.5">* กรอกชื่อให้ตรงกับบัญชีธนาคาร</p>
                             </div>
                         </div>
 
-                        <div className="flex gap-3 mt-6">
+                        <div className="flex gap-3 mt-8">
                             <button
                                 onClick={() => { setShowAddBankModal(false); setNewBank({ bankCode: '', accountNumber: '', accountName: '' }); }}
-                                className="flex-1 py-3 rounded-xl border border-white/20 text-white hover:bg-white/10 transition-all"
+                                className="flex-1 py-3.5 rounded-xl border border-white/20 text-slate-300 hover:bg-white/10 hover:text-white transition-all font-medium"
                             >
                                 ยกเลิก
                             </button>
                             <button
                                 onClick={handleAddBank}
-                                disabled={savingBank}
-                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold hover:from-blue-500 hover:to-blue-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                disabled={savingBank || !newBank.bankCode || !newBank.accountNumber || !newBank.accountName}
+                                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold hover:from-blue-500 hover:to-cyan-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02]"
                             >
-                                {savingBank ? <><Loader2 size={16} className="animate-spin" /> กำลังบันทึก...</> : '✓ บันทึกบัญชี'}
+                                {savingBank ? <><Loader2 size={18} className="animate-spin" /> กำลังบันทึก...</> : <><CheckCircle size={18} /> บันทึกบัญชี</>}
                             </button>
                         </div>
                     </div>
