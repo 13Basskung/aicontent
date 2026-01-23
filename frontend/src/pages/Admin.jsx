@@ -158,17 +158,20 @@ const Admin = () => {
 
     // Dashboard Statistics
     const stats = useMemo(() => {
-        const approvedDeposits = paymentLogs.filter(l => l.status === 'approved' && l.type !== 'withdrawal');
+        const approvedDeposits = paymentLogs.filter(l => l.status === 'approved' && l.type !== 'withdrawal' && l.type !== 'subscription');
         const approvedWithdrawals = withdrawalRequests.filter(w => w.status === 'approved');
+        const approvedSubscriptions = subscriptionPayments.filter(s => s.status === 'approved');
         const totalDeposits = approvedDeposits.reduce((sum, l) => sum + Math.abs(l.amount || 0), 0);
         const totalWithdrawals = approvedWithdrawals.reduce((sum, w) => sum + Math.abs(w.amount || 0), 0);
+        const totalSubscriptions = approvedSubscriptions.reduce((sum, s) => sum + Math.abs(s.amount || 0), 0);
         const pendingDeposits = paymentRequests.filter(r => r.status === 'pending').length;
         const pendingWithdrawals = withdrawalRequests.filter(w => w.status === 'pending').length;
+        const pendingSubscriptions = subscriptionPayments.filter(s => s.status === 'pending').length;
         const totalUsers = allUsers.length;
         const totalBalance = allUsers.reduce((sum, u) => sum + (u.walletBalance || 0), 0);
 
-        return { totalDeposits, totalWithdrawals, pendingDeposits, pendingWithdrawals, totalUsers, totalBalance };
-    }, [paymentLogs, withdrawalRequests, paymentRequests, allUsers]);
+        return { totalDeposits, totalWithdrawals, totalSubscriptions, pendingDeposits, pendingWithdrawals, pendingSubscriptions, totalUsers, totalBalance };
+    }, [paymentLogs, withdrawalRequests, subscriptionPayments, paymentRequests, allUsers]);
 
     // Filtered Activities
     const filteredActivities = useMemo(() => {
@@ -659,7 +662,7 @@ const Admin = () => {
     // Tab Components - Main tabs only
     const tabs = [
         { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-        { id: 'credit', label: 'เครดิต', icon: CreditCard },
+        { id: 'credit', label: 'Payments', icon: CreditCard },
         { id: 'storage', label: 'Storage', icon: Database }
     ];
 
@@ -712,7 +715,7 @@ const Admin = () => {
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.id;
-                            const pendingCount = tab.id === 'credit' ? (stats.pendingDeposits + stats.pendingWithdrawals) : 0;
+                            const pendingCount = tab.id === 'credit' ? (stats.pendingDeposits + stats.pendingWithdrawals + stats.pendingSubscriptions) : 0;
                             return (
                                 <button
                                     key={tab.id}
@@ -771,7 +774,7 @@ const Admin = () => {
                 {activeTab === 'dashboard' && (
                     <div className="space-y-6">
                         {/* Stats Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
                             <div className="group relative bg-gradient-to-br from-green-600/30 to-green-900/20 backdrop-blur-xl rounded-3xl border border-green-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
                                 <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                                 <div className="flex items-center justify-between mb-4">
@@ -819,6 +822,18 @@ const Admin = () => {
                                 <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalBalance.toLocaleString()}</p>
                                 <p className="text-sm text-purple-300/80 font-medium">TOKEN</p>
                             </div>
+
+                            <div className="group relative bg-gradient-to-br from-amber-600/30 to-orange-900/20 backdrop-blur-xl rounded-3xl border border-amber-500/30 p-6 hover:scale-105 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-500 cursor-pointer overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 group-hover:animate-bounce">
+                                        <Crown className="text-white" size={28} />
+                                    </div>
+                                    <span className="text-amber-400 text-sm font-bold uppercase tracking-wider">Subscription</span>
+                                </div>
+                                <p className="text-4xl font-black text-white mb-1 tracking-tight">{stats.totalSubscriptions.toLocaleString()}</p>
+                                <p className="text-sm text-amber-300/80 font-medium">THB</p>
+                            </div>
                         </div>
 
                         {/* Pending Summary */}
@@ -836,7 +851,7 @@ const Admin = () => {
                                     <p className="text-slate-400 mt-2 font-medium">รายการรอตรวจสอบ</p>
                                     {stats.pendingDeposits > 0 && (
                                         <button 
-                                            onClick={() => setActiveTab('deposits')}
+                                            onClick={() => { setActiveTab('credit'); setCreditSubTab('deposits'); }}
                                             className="mt-4 px-6 py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-xl hover:from-yellow-500/30 hover:to-orange-500/30 transition-all font-semibold border border-yellow-500/30 hover:scale-105"
                                         >
                                             ดูรายการ →
@@ -858,7 +873,7 @@ const Admin = () => {
                                     <p className="text-slate-400 mt-2 font-medium">รายการรอตรวจสอบ</p>
                                     {stats.pendingWithdrawals > 0 && (
                                         <button 
-                                            onClick={() => setActiveTab('withdrawals')}
+                                            onClick={() => { setActiveTab('credit'); setCreditSubTab('withdrawals'); }}
                                             className="mt-4 px-6 py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-xl hover:from-yellow-500/30 hover:to-orange-500/30 transition-all font-semibold border border-yellow-500/30 hover:scale-105"
                                         >
                                             ดูรายการ →
@@ -911,31 +926,42 @@ const Admin = () => {
                             </div>
 
                             <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
-                                {filteredActivities.map((log, index) => (
-                                    <div 
-                                        key={log.id} 
-                                        className="group flex items-center justify-between bg-black/30 rounded-xl p-4 border border-white/5 hover:bg-black/50 hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 ${
-                                                log.type === 'withdrawal' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-green-500 to-green-700'
-                                            }`}>
-                                                {log.type === 'withdrawal' ? <ArrowDownRight className="text-white" size={20} /> : <ArrowUpRight className="text-white" size={20} />}
+                                {filteredActivities.map((log, index) => {
+                                    const getActivityType = () => {
+                                        if (log.type === 'subscription') return { label: 'Subscription', color: 'text-amber-400 bg-amber-500/20', icon: Crown };
+                                        if (log.type === 'withdrawal') return { label: 'ถอนเครดิต', color: 'text-red-400 bg-red-500/20', icon: ArrowDownRight };
+                                        return { label: 'เติมเครดิต', color: 'text-green-400 bg-green-500/20', icon: ArrowUpRight };
+                                    };
+                                    const activityType = getActivityType();
+                                    const ActivityIcon = activityType.icon;
+                                    return (
+                                        <div 
+                                            key={log.id} 
+                                            className="group flex items-center justify-between bg-black/30 rounded-xl p-4 border border-white/5 hover:bg-black/50 hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                                            style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 ${
+                                                    log.type === 'subscription' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
+                                                    log.type === 'withdrawal' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-green-500 to-green-700'
+                                                }`}>
+                                                    <ActivityIcon className="text-white" size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-white">{log.userEmail}</p>
+                                                    <p className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-white">{log.userEmail}</p>
-                                                <p className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</p>
+                                            <div className="text-right">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activityType.color}`}>{activityType.label}</span>
+                                                <p className={`font-bold mt-1 ${log.type === 'subscription' ? 'text-amber-400' : log.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'}`}>
+                                                    {log.type === 'withdrawal' ? '-' : '+'}{Math.abs(log.amount)} {log.type === 'subscription' ? 'THB' : 'TOKEN'}
+                                                </p>
+                                                <p className="text-xs text-slate-500">โดย <span className="text-purple-300">{formatApprover(log.reviewedByEmail)}</span></p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className={`font-bold ${log.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'}`}>
-                                                {log.type === 'withdrawal' ? '-' : '+'}{Math.abs(log.amount)} TOKEN
-                                            </p>
-                                            <p className="text-xs text-slate-500">โดย <span className="text-purple-300">{formatApprover(log.reviewedByEmail)}</span></p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                                 {filteredActivities.length === 0 && <p className="text-slate-500 text-center py-4">ไม่พบกิจกรรม</p>}
                             </div>
                         </div>
@@ -1027,7 +1053,7 @@ const Admin = () => {
                                     ) : paymentLogs.filter(l => l.type !== 'withdrawal').length === 0 ? (
                                         <div className="text-slate-500 text-sm text-center py-8">ยังไม่มีประวัติ</div>
                                     ) : (
-                                        paymentLogs.filter(l => l.type !== 'withdrawal').map((log, index) => (
+                                        paymentLogs.filter(l => l.type !== 'withdrawal' && l.type !== 'subscription').map((log, index) => (
                                             <div key={log.id} className="group border border-white/10 rounded-xl p-4 bg-black/30 hover:bg-black/50 hover:border-white/20 transition-all duration-300">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <p className="text-sm font-semibold text-white">{log.userEmail}</p>
@@ -1040,6 +1066,11 @@ const Admin = () => {
                                                 <p className="text-xl font-black text-green-400">+{log.amount} TOKEN</p>
                                                 <p className="text-xs text-slate-500 mt-1">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</p>
                                                 <p className="text-xs text-slate-400 mt-1">โดย: <span className="text-purple-300 font-medium">{formatApprover(log.reviewedByEmail)}</span></p>
+                                                {log.status === 'rejected' && log.note && (
+                                                    <p className="text-xs text-red-400 mt-2 bg-red-500/10 rounded-lg p-2 border border-red-500/20">
+                                                        <span className="font-semibold">เหตุผล:</span> {log.note}
+                                                    </p>
+                                                )}
                                                 {log.slipUrl && (
                                                     <a href={log.slipUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-red-300 inline-flex items-center gap-1 mt-2 hover:text-red-200">
                                                         🧾 ดูสลิป <ExternalLink size={10} />
@@ -1156,6 +1187,11 @@ const Admin = () => {
                                                 <p className="text-xs text-slate-400 mt-1">{req.bankName} • {req.accountNumber}</p>
                                                 <p className="text-xs text-slate-500 mt-1">{req.reviewedAt?.toDate?.().toLocaleString('th-TH')}</p>
                                                 <p className="text-xs text-slate-400 mt-1">โดย: <span className="text-purple-300 font-medium">{formatApprover(req.reviewedByEmail)}</span></p>
+                                                {req.status === 'rejected' && req.rejectReason && (
+                                                    <p className="text-xs text-red-400 mt-2 bg-red-500/10 rounded-lg p-2 border border-red-500/20">
+                                                        <span className="font-semibold">เหตุผล:</span> {req.rejectReason}
+                                                    </p>
+                                                )}
                                             </div>
                                         ))
                                     )}
@@ -1292,8 +1328,16 @@ const Admin = () => {
                                                     }`}>{req.tier}</span>
                                                     <span className="text-lg font-bold text-purple-400">{formatPrice(req.amount)}</span>
                                                 </div>
+                                                {req.extraProjects > 0 && (
+                                                    <p className="text-xs text-amber-300">+{req.extraProjects} Projects เพิ่มเติม</p>
+                                                )}
                                                 <p className="text-xs text-slate-500 mt-1">{req.reviewedAt?.toDate?.().toLocaleString('th-TH')}</p>
                                                 <p className="text-xs text-slate-400 mt-1">โดย: <span className="text-purple-300 font-medium">{formatApprover(req.reviewedByEmail)}</span></p>
+                                                {req.status === 'rejected' && req.rejectReason && (
+                                                    <p className="text-xs text-red-400 mt-2 bg-red-500/10 rounded-lg p-2 border border-red-500/20">
+                                                        <span className="font-semibold">เหตุผล:</span> {req.rejectReason}
+                                                    </p>
+                                                )}
                                             </div>
                                         ))
                                     )}

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Upload, Image as ImageIcon, Loader2, CheckCircle, Clock, XCircle, Wallet, ArrowUpRight, ArrowDownRight, Building2, Plus, Trash2, CreditCard, Crown, Star, Zap, Calendar, AlertTriangle, Sparkles } from 'lucide-react';
+import generatePayload from 'promptpay-qr';
+import { QRCodeSVG } from 'qrcode.react';
 import GlassDropdown from '../components/ui/GlassDropdown';
 import { auth, db, storage } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -19,12 +21,23 @@ import {
 const PROMPTPAY_NUMBER = '0986967282';
 const PROMPTPAY_MASKED = '098-***-7282';
 
-// Helper function to generate PromptPay QR URL with amount
-const getPromptPayQRUrl = (amount = null) => {
-    if (amount && amount > 0) {
-        return `https://promptpay.io/${PROMPTPAY_NUMBER}/${amount}.png`;
-    }
-    return `https://promptpay.io/${PROMPTPAY_NUMBER}.png`;
+// PromptPay QR Component - สร้าง QR Code ที่มียอดเงินฝังอยู่จริง
+const PromptPayQR = ({ amount, size = 224, className = '' }) => {
+    const payload = useMemo(() => {
+        // สร้าง PromptPay payload string พร้อมยอดเงิน
+        return generatePayload(PROMPTPAY_NUMBER, { amount: amount || undefined });
+    }, [amount]);
+
+    return (
+        <div className={`bg-white p-3 rounded-xl ${className}`}>
+            <QRCodeSVG 
+                value={payload} 
+                size={size} 
+                level="M"
+                includeMargin={false}
+            />
+        </div>
+    );
 };
 
 const THAI_BANKS = [
@@ -550,7 +563,7 @@ const Payments = () => {
                         </div>
 
                         <div className="bg-black/40 rounded-2xl border border-green-500/20 p-5 flex flex-col items-center group hover:border-green-500/40 transition-all duration-300">
-                            <img src={getPromptPayQRUrl(Number(amount) || null)} alt="PromptPay QR" className="w-56 h-56 rounded-xl border-2 border-green-500/30 shadow-lg group-hover:scale-105 transition-transform duration-300" />
+                            <PromptPayQR amount={Number(amount) || null} size={200} className="shadow-lg group-hover:scale-105 transition-transform duration-300 border-2 border-green-500/30" />
                             {amount && Number(amount) > 0 && (
                                 <p className="text-lg font-bold text-green-400 mt-3">฿{Number(amount).toLocaleString()}</p>
                             )}
@@ -994,7 +1007,7 @@ const Payments = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="bg-black/30 rounded-xl p-4 flex flex-col items-center">
                                     <p className="text-sm text-slate-400 mb-3">สแกน QR เพื่อชำระเงิน</p>
-                                    <img src={getPromptPayQRUrl(subscriptionPriceInfo.total)} alt="PromptPay QR" className="w-40 h-40 rounded-xl border border-purple-500/30" />
+                                    <PromptPayQR amount={subscriptionPriceInfo.total} size={150} className="border border-purple-500/30" />
                                     <p className="text-lg font-bold text-purple-400 mt-2">฿{subscriptionPriceInfo.total.toLocaleString()}</p>
                                     <p className="text-xs text-slate-500 mt-1">{PROMPTPAY_MASKED}</p>
                                 </div>
