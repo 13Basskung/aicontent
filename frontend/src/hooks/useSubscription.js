@@ -13,6 +13,7 @@ import {
     calculateLimits,
     SUBSCRIPTION_TIERS,
     FREE_TRIAL_LIMITS,
+    EXPIRED_LIMITS,
 } from '../utils/subscriptionUtils';
 
 export const useSubscription = (userId) => {
@@ -116,14 +117,30 @@ export const useSubscription = (userId) => {
             }
         }
 
+        // ถ้า Subscription หมดอายุและถูก Block -> สถานะ EXPIRED (Limit = 0)
+        if (blockCheck.shouldBlock) {
+            return {
+                isActive: false,
+                isBlocked: true,
+                isExpired: true,
+                isInTrial: false,
+                tier: SUBSCRIPTION_TIERS.EXPIRED,
+                limits: { projects: EXPIRED_LIMITS.PROJECTS, modes: EXPIRED_LIMITS.MODES, extenders: EXPIRED_LIMITS.EXTENDERS },
+                daysRemaining: 0,
+                gracePeriodDays: blockCheck.gracePeriodDays,
+                blockReason: blockCheck.reason,
+            };
+        }
+
         // คำนวณ limits ใหม่เสมอ (ไม่ใช้ค่าเก่าที่เก็บใน Firestore)
         // extraProjects = totalProjects - 1 (เพราะ base plan ได้ 1 project แล้ว)
         const extraProjects = Math.max(0, (subscription.extraProjects || 0));
         const calculatedLimits = calculateLimits(extraProjects);
 
         return {
-            isActive: subscription.status === 'active' && !blockCheck.shouldBlock,
-            isBlocked: blockCheck.shouldBlock,
+            isActive: subscription.status === 'active',
+            isBlocked: false,
+            isExpired: false,
             isInTrial: false,
             tier: subscription.tier || SUBSCRIPTION_TIERS.VIP,
             limits: calculatedLimits, // คำนวณใหม่เสมอ ไม่ใช้ค่าเก่า

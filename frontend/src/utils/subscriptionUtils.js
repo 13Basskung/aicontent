@@ -35,6 +35,14 @@ export const SUBSCRIPTION_TIERS = {
     FREE: 'Free',
     VIP: 'VIP',           // Subscription ปกติ
     PREMIUM: 'Premium',   // Subscription + เพิ่ม Project
+    EXPIRED: 'Expired',   // Subscription หมดอายุ (ไม่ต่ออายุ) - Limit = 0
+};
+
+// Expired Limits (เมื่อ Subscription หมดอายุและไม่ต่ออายุ)
+export const EXPIRED_LIMITS = {
+    PROJECTS: 0,
+    MODES: 0,
+    EXTENDERS: 0,
 };
 
 /**

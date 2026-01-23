@@ -826,13 +826,19 @@ export default function Projects() {
                             
                             {/* Premium Status Badge */}
                             <div className={`ml-4 px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm shadow-lg ${
-                                subStatus.tier === 'Premium' 
+                                subStatus.tier === 'Expired'
+                                    ? 'bg-gradient-to-r from-red-600/40 to-red-700/40 text-red-200 border border-red-500/60 shadow-red-500/30'
+                                    : subStatus.tier === 'Premium' 
                                     ? 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 text-amber-200 border border-amber-400/50 shadow-amber-500/20' 
                                     : subStatus.tier === 'VIP' 
                                     ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/50 shadow-purple-500/20' 
                                     : 'bg-gradient-to-r from-slate-500/30 to-slate-600/30 text-slate-300 border border-slate-400/50 shadow-slate-500/20'
                             }`}>
-                                <Crown size={18} className={subStatus.tier === 'Premium' ? 'text-amber-300' : subStatus.tier === 'VIP' ? 'text-purple-300' : 'text-slate-400'} />
+                                {subStatus.tier === 'Expired' ? (
+                                    <AlertTriangle size={18} className="text-red-300" />
+                                ) : (
+                                    <Crown size={18} className={subStatus.tier === 'Premium' ? 'text-amber-300' : subStatus.tier === 'VIP' ? 'text-purple-300' : 'text-slate-400'} />
+                                )}
                                 <span>{subStatus.tier}</span>
                             </div>
 
