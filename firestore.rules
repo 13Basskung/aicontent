@@ -123,6 +123,20 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Subscription Payments (User สร้างได้, Admin อ่าน/อัปเดตได้)
+    match /subscription_payments/{paymentId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Withdrawal Requests (User สร้างได้, Admin อ่าน/อัปเดตได้)
+    match /withdrawal_requests/{requestId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
     // 🟢 EXTENSION: Root Projects & Recipes (for Content Auto Post Agent)
     match /projects/{projectId} {
        allow read, write: if true; // Allow Anonymous Agent

@@ -18,7 +18,14 @@ import {
 
 const PROMPTPAY_NUMBER = '0986967282';
 const PROMPTPAY_MASKED = '098-***-7282';
-const PROMPTPAY_QR_URL = `https://promptpay.io/${PROMPTPAY_NUMBER}.png`;
+
+// Helper function to generate PromptPay QR URL with amount
+const getPromptPayQRUrl = (amount = null) => {
+    if (amount && amount > 0) {
+        return `https://promptpay.io/${PROMPTPAY_NUMBER}/${amount}.png`;
+    }
+    return `https://promptpay.io/${PROMPTPAY_NUMBER}.png`;
+};
 
 const THAI_BANKS = [
     { code: 'kbank', name: 'ธนาคารกสิกรไทย', color: '#138f2d' },
@@ -543,8 +550,11 @@ const Payments = () => {
                         </div>
 
                         <div className="bg-black/40 rounded-2xl border border-green-500/20 p-5 flex flex-col items-center group hover:border-green-500/40 transition-all duration-300">
-                            <img src={PROMPTPAY_QR_URL} alt="PromptPay QR" className="w-56 h-56 rounded-xl border-2 border-green-500/30 shadow-lg group-hover:scale-105 transition-transform duration-300" />
-                            <p className="text-xs text-slate-400 mt-4">สแกนด้วยแอปธนาคารเพื่อโอนเงิน</p>
+                            <img src={getPromptPayQRUrl(Number(amount) || null)} alt="PromptPay QR" className="w-56 h-56 rounded-xl border-2 border-green-500/30 shadow-lg group-hover:scale-105 transition-transform duration-300" />
+                            {amount && Number(amount) > 0 && (
+                                <p className="text-lg font-bold text-green-400 mt-3">฿{Number(amount).toLocaleString()}</p>
+                            )}
+                            <p className="text-xs text-slate-400 mt-2">สแกนด้วยแอปธนาคารเพื่อโอนเงิน</p>
                         </div>
 
                         <div className="mt-6 p-5 bg-gradient-to-br from-green-600/10 to-green-900/10 border border-green-500/20 rounded-2xl text-sm text-slate-300 leading-relaxed">
@@ -984,8 +994,9 @@ const Payments = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="bg-black/30 rounded-xl p-4 flex flex-col items-center">
                                     <p className="text-sm text-slate-400 mb-3">สแกน QR เพื่อชำระเงิน</p>
-                                    <img src={PROMPTPAY_QR_URL} alt="PromptPay QR" className="w-40 h-40 rounded-xl border border-purple-500/30" />
-                                    <p className="text-xs text-slate-500 mt-2">{PROMPTPAY_MASKED}</p>
+                                    <img src={getPromptPayQRUrl(subscriptionPriceInfo.total)} alt="PromptPay QR" className="w-40 h-40 rounded-xl border border-purple-500/30" />
+                                    <p className="text-lg font-bold text-purple-400 mt-2">฿{subscriptionPriceInfo.total.toLocaleString()}</p>
+                                    <p className="text-xs text-slate-500 mt-1">{PROMPTPAY_MASKED}</p>
                                 </div>
                                 <div className="space-y-3">
                                     <label className="block">
