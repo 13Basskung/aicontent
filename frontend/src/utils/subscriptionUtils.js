@@ -9,11 +9,11 @@ export const SUBSCRIPTION_PRICES = {
     EXTRA_PROJECT: 250,      // เพิ่ม Project ละ 250 บาท/เดือน (Add-on)
 };
 
-// Limits พื้นฐานของแพลน 199 (ได้ 1 Project, 1 Mode, 1 Extender)
+// Limits พื้นฐานของแพลน 199 (ได้ 1 Project, 2 Mode, 2 Extender)
 export const BASE_PLAN_LIMITS = {
     PROJECTS: 1,
-    MODES: 1,
-    EXTENDERS: 1,
+    MODES: 2,
+    EXTENDERS: 2,
 };
 
 // Limits ที่เพิ่มต่อ 1 Project ที่ซื้อเพิ่ม (Add-on)

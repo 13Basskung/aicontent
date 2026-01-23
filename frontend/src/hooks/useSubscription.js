@@ -116,12 +116,17 @@ export const useSubscription = (userId) => {
             }
         }
 
+        // คำนวณ limits ใหม่เสมอ (ไม่ใช้ค่าเก่าที่เก็บใน Firestore)
+        // extraProjects = totalProjects - 1 (เพราะ base plan ได้ 1 project แล้ว)
+        const extraProjects = Math.max(0, (subscription.extraProjects || 0));
+        const calculatedLimits = calculateLimits(extraProjects);
+
         return {
             isActive: subscription.status === 'active' && !blockCheck.shouldBlock,
             isBlocked: blockCheck.shouldBlock,
             isInTrial: false,
             tier: subscription.tier || SUBSCRIPTION_TIERS.VIP,
-            limits: subscription.limits || calculateLimits(subscription.totalProjects || 1),
+            limits: calculatedLimits, // คำนวณใหม่เสมอ ไม่ใช้ค่าเก่า
             daysRemaining,
             gracePeriodDays: blockCheck.gracePeriodDays,
             blockReason: blockCheck.reason,

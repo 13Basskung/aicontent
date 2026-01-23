@@ -203,7 +203,11 @@ const Payments = () => {
             const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
             setSubscriptionPayments(data);
             setLoadingSubPayments(false);
-        }, () => setLoadingSubPayments(false));
+        }, (error) => {
+            console.error('Subscription payments fetch error:', error);
+            // ถ้าเป็น index error จะมี link ให้สร้าง index ใน console
+            setLoadingSubPayments(false);
+        });
         return () => unsubscribe();
     }, [currentUser]);
 
