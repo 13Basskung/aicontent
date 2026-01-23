@@ -1339,26 +1339,36 @@ const Admin = () => {
                                                             </span>
                                                             {req.isProrate && <span className="px-2 py-1 rounded-lg text-xs bg-blue-500/20 text-blue-300">Prorate</span>}
                                                         </div>
-                                                        <div className="grid grid-cols-3 gap-3 text-center">
-                                                            <div>
-                                                                <p className="text-lg font-bold text-purple-300">
-                                                                    {req.limits?.projects || req.totalProjects || (1 + (req.totalExtraProjects ?? req.extraProjects ?? 0))}
+                                                        {/* แสดง Add-on ที่ซื้อเพิ่ม (ไม่ใช่ Total Limits) */}
+                                                        {req.breakdown?.isAlreadySubscribed ? (
+                                                            <div className="text-center">
+                                                                <p className="text-xs text-green-400 mb-1">✓ คุณเป็นสมาชิกอยู่แล้ว</p>
+                                                                <p className="text-sm text-slate-300">
+                                                                    เพิ่ม <span className="text-purple-300 font-bold">{req.newExtraProjects ?? req.extraProjects ?? 0}</span> Project + <span className="text-blue-300 font-bold">{(req.newExtraProjects ?? req.extraProjects ?? 0) * 2}</span> Mode + <span className="text-green-300 font-bold">{(req.newExtraProjects ?? req.extraProjects ?? 0) * 2}</span> Extender
                                                                 </p>
-                                                                <p className="text-xs text-slate-400">Projects</p>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-lg font-bold text-blue-300">
-                                                                    {req.limits?.modes || ((req.totalExtraProjects ?? req.extraProjects ?? 0) + 1) * 2}
-                                                                </p>
-                                                                <p className="text-xs text-slate-400">Modes</p>
+                                                        ) : (
+                                                            <div className="grid grid-cols-3 gap-3 text-center">
+                                                                <div>
+                                                                    <p className="text-lg font-bold text-purple-300">
+                                                                        {req.limits?.projects || req.totalProjects || (1 + (req.totalExtraProjects ?? req.extraProjects ?? 0))}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400">Projects</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-lg font-bold text-blue-300">
+                                                                        {req.limits?.modes || ((req.totalExtraProjects ?? req.extraProjects ?? 0) + 1) * 2}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400">Modes</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-lg font-bold text-green-300">
+                                                                        {req.limits?.extenders || ((req.totalExtraProjects ?? req.extraProjects ?? 0) + 1) * 2}
+                                                                    </p>
+                                                                    <p className="text-xs text-slate-400">Extenders</p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <p className="text-lg font-bold text-green-300">
-                                                                    {req.limits?.extenders || ((req.totalExtraProjects ?? req.extraProjects ?? 0) + 1) * 2}
-                                                                </p>
-                                                                <p className="text-xs text-slate-400">Extenders</p>
-                                                            </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-white/10">
