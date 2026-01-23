@@ -813,7 +813,7 @@ export default function Projects() {
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                     projectLimit.allowed ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
                                 }`}>
-                                    {projects.length}/{subStatus.limits.projects} Projects
+                                    {projects.length}/{subStatus.limits.projects} Projects • {subStatus.limits.modes || 0} Mode • {subStatus.limits.extenders || 0} Extender
                                 </span>
                                 {subStatus.isBlocked && (
                                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">

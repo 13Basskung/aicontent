@@ -1270,15 +1270,21 @@ const Admin = () => {
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-3 text-center">
                                                             <div>
-                                                                <p className="text-lg font-bold text-purple-300">{req.extraProjects || 0}</p>
+                                                                <p className="text-lg font-bold text-purple-300">
+                                                                    {req.breakdown?.isAlreadySubscribed ? (req.extraProjects || 0) : (req.limits?.projects || 1)}
+                                                                </p>
                                                                 <p className="text-xs text-slate-400">Projects</p>
                                                             </div>
                                                             <div>
-                                                                <p className="text-lg font-bold text-blue-300">{(req.extraProjects || 0) * 2}</p>
+                                                                <p className="text-lg font-bold text-blue-300">
+                                                                    {req.breakdown?.isAlreadySubscribed ? ((req.extraProjects || 0) * 2) : (req.limits?.modes || 2)}
+                                                                </p>
                                                                 <p className="text-xs text-slate-400">Modes</p>
                                                             </div>
                                                             <div>
-                                                                <p className="text-lg font-bold text-green-300">{(req.extraProjects || 0) * 2}</p>
+                                                                <p className="text-lg font-bold text-green-300">
+                                                                    {req.breakdown?.isAlreadySubscribed ? ((req.extraProjects || 0) * 2) : (req.limits?.extenders || 2)}
+                                                                </p>
                                                                 <p className="text-xs text-slate-400">Extenders</p>
                                                             </div>
                                                         </div>
