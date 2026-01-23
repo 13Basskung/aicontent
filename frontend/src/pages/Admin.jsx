@@ -456,7 +456,9 @@ const Admin = () => {
             // สร้าง subscription ใหม่ - ใช้ totalExtraProjects (รวมของเดิม + ใหม่)
             // รองรับทั้ง format เก่า (extraProjects) และ format ใหม่ (totalExtraProjects)
             const totalExtra = payment.totalExtraProjects ?? payment.extraProjects ?? 0;
-            const newSub = createApprovedSubscription(currentSub, totalExtra);
+            // ใช้ expiryDate จาก payment record (กรณีลูกค้าเลือกเดือนหน้า)
+            const paymentExpiryDate = payment.billingPeriod?.end?.toDate?.() || payment.billingPeriod?.end || null;
+            const newSub = createApprovedSubscription(currentSub, totalExtra, new Date(), paymentExpiryDate);
             await setDoc(subRef, {
                 ...newSub,
                 updatedAt: serverTimestamp(),

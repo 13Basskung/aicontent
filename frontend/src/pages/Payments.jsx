@@ -89,6 +89,7 @@ const Payments = () => {
     const [submittingSub, setSubmittingSub] = useState(false);
     const [subscriptionPayments, setSubscriptionPayments] = useState([]);
     const [loadingSubPayments, setLoadingSubPayments] = useState(false);
+    const [billingMonth, setBillingMonth] = useState('current'); // 'current' | 'next' - เลือกเดือนที่จะจ่าย
     
     // Use Subscription Hook
     const { subscription, loading: loadingSub, getStatus } = useSubscription(currentUser?.uid);
@@ -217,10 +218,20 @@ const Payments = () => {
     const existingExtraProjects = subscription?.extraProjects || 0;
     const totalExtraProjects = existingExtraProjects + extraProjects;
     
+    // คำนวณวันที่เหลือก่อนสิ้นเดือน
+    const daysUntilEndOfMonth = useMemo(() => {
+        const now = new Date();
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return Math.ceil((endOfMonth - now) / (1000 * 60 * 60 * 24));
+    }, []);
+    
+    // แสดง UI เลือกเดือนเมื่อเหลือ ≤7 วันก่อนสิ้นเดือน
+    const showBillingMonthSelector = daysUntilEndOfMonth <= 7;
+    
     const subscriptionPriceInfo = useMemo(() => {
         const now = new Date();
         const dayOfMonth = now.getDate();
-        const isProrate = dayOfMonth > 1; // ถ้าไม่ใช่วันที่ 1 = prorate
+        const isProrate = dayOfMonth > 1 && billingMonth === 'current'; // ถ้าเลือกเดือนหน้า ไม่ prorate
         
         // ตรวจสอบว่าลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่
         const isAlreadySubscribed = subStatus.tier !== SUBSCRIPTION_TIERS.FREE && 
@@ -229,8 +240,8 @@ const Payments = () => {
         
         // คำนวณราคาจาก extraProjects ที่ซื้อใหม่ (สำหรับคิดเงิน)
         // แต่ limits จะคำนวณจาก totalExtraProjects (รวมของเดิม)
-        return calculateTotalPrice(extraProjects, isProrate, now, isAlreadySubscribed, totalExtraProjects);
-    }, [extraProjects, totalExtraProjects, subStatus.tier, subStatus.isInTrial, subscription?.status]);
+        return calculateTotalPrice(extraProjects, isProrate, now, isAlreadySubscribed, totalExtraProjects, billingMonth);
+    }, [extraProjects, totalExtraProjects, subStatus.tier, subStatus.isInTrial, subscription?.status, billingMonth]);
 
     const statusMeta = useMemo(() => ({
         pending: {
@@ -408,10 +419,14 @@ const Payments = () => {
 
         const priceInfo = subscriptionPriceInfo;
         const isAlreadySubscribed = priceInfo.breakdown.isAlreadySubscribed;
+        const billingMonthLabel = billingMonth === 'next' ? 'เดือนหน้า (ราคาเต็ม)' : 'เดือนนี้';
+        const expiryLabel = priceInfo.expiryDate ? priceInfo.expiryDate.toLocaleDateString('th-TH') : '';
         const confirmMsg = `ยืนยันชำระค่า Subscription\n\n` +
+            (showBillingMonthSelector ? `📅 สำหรับ: ${billingMonthLabel}\n` : '') +
             (isAlreadySubscribed ? `✓ คุณเป็นสมาชิกอยู่แล้ว (ไม่คิดค่าแพลนซ้ำ)\n` : `แพลน Pro: ${formatPrice(priceInfo.breakdown.proPlan)}\n`) +
             (extraProjects > 0 ? `เพิ่ม ${extraProjects} Project: ${formatPrice(priceInfo.breakdown.extraProjects)}\n` : '') +
             `\nรวมทั้งสิ้น: ${formatPrice(priceInfo.total)}\n` +
+            `หมดอายุ: ${expiryLabel}\n` +
             `\nLimits ที่จะได้รับ:\n` +
             `- Projects: ${priceInfo.limits.projects}\n` +
             `- Modes: ${priceInfo.limits.modes}\n` +
@@ -428,7 +443,7 @@ const Payments = () => {
             const slipUrl = await getDownloadURL(storageRef);
 
             const now = new Date();
-            const endOfMonth = getExpiryDate(now);
+            const expiryDate = priceInfo.expiryDate || getExpiryDate(now);
 
             await addDoc(collection(db, 'subscription_payments'), {
                 userId: currentUser.uid,
@@ -442,11 +457,12 @@ const Payments = () => {
                 totalProjects: 1 + totalExtraProjects,              // Base 1 + total extra
                 limits: priceInfo.limits,                           // Limits ที่คำนวณจาก totalExtraProjects
                 tier: priceInfo.tier,
-                isProrate: priceInfo.prorate !== null,
+                isProrate: priceInfo.prorate !== null && billingMonth === 'current',
                 prorateInfo: priceInfo.prorate,
+                billingMonth: billingMonth,                         // 'current' หรือ 'next'
                 billingPeriod: {
                     start: now,
-                    end: endOfMonth,
+                    end: expiryDate,
                 },
                 slipUrl,
                 slipPath: filePath,
@@ -459,6 +475,7 @@ const Payments = () => {
 
             setExtraProjects(0);
             setSubSlipFile(null);
+            setBillingMonth('current'); // Reset billing month selection
             alert('✅ แจ้งชำระค่า Subscription เรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน');
         } catch (error) {
             console.error('Subscription payment failed:', error);
@@ -963,6 +980,42 @@ const Payments = () => {
                                     <p className="text-xs text-slate-400">Extenders</p>
                                 </div>
                             </div>
+
+                            {/* Billing Month Selector - แสดงเมื่อเหลือ ≤7 วันก่อนสิ้นเดือน */}
+                            {showBillingMonthSelector && (
+                                <div className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 rounded-xl p-4 mb-6 border border-blue-500/30">
+                                    <p className="text-white font-medium mb-3 flex items-center gap-2">
+                                        📅 เลือกเดือนที่ต้องการจ่าย
+                                    </p>
+                                    <p className="text-xs text-slate-400 mb-3">เหลือ {daysUntilEndOfMonth} วันก่อนสิ้นเดือน - คุณสามารถเลือกจ่ายสำหรับเดือนนี้หรือเดือนหน้าได้</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            onClick={() => setBillingMonth('current')}
+                                            className={`p-3 rounded-xl border-2 transition-all ${
+                                                billingMonth === 'current'
+                                                    ? 'bg-blue-500/30 border-blue-400 text-blue-200'
+                                                    : 'bg-black/20 border-white/10 text-slate-400 hover:border-white/30'
+                                            }`}
+                                        >
+                                            <p className="font-bold text-sm">📅 เดือนนี้</p>
+                                            <p className="text-xs mt-1 opacity-70">Prorate {daysUntilEndOfMonth} วัน</p>
+                                            <p className="text-xs mt-1 opacity-70">หมดอายุสิ้นเดือนนี้</p>
+                                        </button>
+                                        <button
+                                            onClick={() => setBillingMonth('next')}
+                                            className={`p-3 rounded-xl border-2 transition-all ${
+                                                billingMonth === 'next'
+                                                    ? 'bg-green-500/30 border-green-400 text-green-200'
+                                                    : 'bg-black/20 border-white/10 text-slate-400 hover:border-white/30'
+                                            }`}
+                                        >
+                                            <p className="font-bold text-sm">📅 เดือนหน้า</p>
+                                            <p className="text-xs mt-1 opacity-70">ราคาเต็มเดือน</p>
+                                            <p className="text-xs mt-1 opacity-70">หมดอายุสิ้นเดือนหน้า</p>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Extra Projects */}
                             <div className="bg-black/30 rounded-xl p-4 mb-6">

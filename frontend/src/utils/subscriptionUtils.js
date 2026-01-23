@@ -108,9 +108,10 @@ export const calculateProrate = (fullPrice, purchaseDate = new Date()) => {
  * @param {Date} purchaseDate - วันที่ซื้อ
  * @param {boolean} isAlreadySubscribed - ลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่ (default: false = Free)
  * @param {number} totalExtraProjects - จำนวน Project รวมทั้งหมด (เดิม + ใหม่) สำหรับคำนวณ Limits
+ * @param {string} billingMonth - 'current' = เดือนนี้ (prorate), 'next' = เดือนหน้า (เต็มเดือน)
  * @returns {{ total: number, breakdown: object }}
  */
-export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false, totalExtraProjects = null) => {
+export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false, totalExtraProjects = null, billingMonth = 'current') => {
     // ถ้าไม่ได้ส่ง totalExtraProjects มา ให้ใช้ newExtraProjects (กรณี Free user)
     const effectiveTotalExtra = totalExtraProjects !== null ? totalExtraProjects : newExtraProjects;
     
@@ -121,8 +122,19 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
     
     let proPlanProrate = null;
     let extraProjectsProrate = null;
+    let expiryDate = null;
     
-    if (isProrate) {
+    // ถ้าเลือก "เดือนหน้า" → ไม่คิด prorate, คิดราคาเต็ม, หมดอายุสิ้นเดือนหน้า
+    if (billingMonth === 'next') {
+        // ราคาเต็ม (ไม่ prorate)
+        proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN;
+        extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
+        
+        // คำนวณวันหมดอายุ = สิ้นเดือนหน้า
+        const nextMonth = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 2, 0);
+        expiryDate = nextMonth;
+    } else if (isProrate) {
+        // เดือนนี้ + prorate
         // คำนวณ prorate สำหรับค่าแพลน (เฉพาะถ้าเป็น Free)
         if (!isAlreadySubscribed) {
             proPlanProrate = calculateProrate(SUBSCRIPTION_PRICES.PRO_PLAN, purchaseDate);
@@ -134,6 +146,12 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
             extraProjectsProrate = calculateProrate(SUBSCRIPTION_PRICES.EXTRA_PROJECT * newExtraProjects, purchaseDate);
             extraProjectsPrice = extraProjectsProrate.proratedPrice;
         }
+        
+        // วันหมดอายุ = สิ้นเดือนนี้
+        expiryDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 0);
+    } else {
+        // วันที่ 1 ของเดือน = ไม่ prorate
+        expiryDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 0);
     }
     
     const total = proPlanPrice + extraProjectsPrice;
@@ -149,13 +167,15 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
             totalExtraProjectsCount: effectiveTotalExtra,
             isAlreadySubscribed,
         },
-        prorate: isProrate ? {
+        prorate: (isProrate && billingMonth === 'current') ? {
             proPlan: proPlanProrate,
             extraProjects: extraProjectsProrate,
             daysRemaining: proPlanProrate?.daysRemaining || extraProjectsProrate?.daysRemaining,
         } : null,
         limits,
         tier: effectiveTotalExtra > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
+        billingMonth,
+        expiryDate,
     };
 };
 
@@ -278,9 +298,10 @@ export const createInitialSubscription = (userId) => {
  * @param {object} currentSub - Subscription ปัจจุบัน (ถ้ามี)
  * @param {number} totalExtraProjects - จำนวน Extra Projects รวมทั้งหมด (เดิม + ใหม่) จาก payment record
  * @param {Date} approvalDate - วันที่อนุมัติ
+ * @param {Date|null} paymentExpiryDate - วันหมดอายุจาก payment record (ถ้าลูกค้าเลือกเดือนหน้า)
  * @returns {object}
  */
-export const createApprovedSubscription = (currentSub, totalExtraProjects = 0, approvalDate = new Date()) => {
+export const createApprovedSubscription = (currentSub, totalExtraProjects = 0, approvalDate = new Date(), paymentExpiryDate = null) => {
     const now = approvalDate;
     const totalProjects = 1 + totalExtraProjects;  // Base 1 + total extra
     const limits = calculateLimits(totalExtraProjects);  // คำนวณจาก total extra
@@ -288,17 +309,23 @@ export const createApprovedSubscription = (currentSub, totalExtraProjects = 0, a
     // คำนวณวันหมดอายุ
     let expiryDate;
     
-    // ถ้าจ่ายก่อนสิ้นเดือน ให้หมดอายุสิ้นเดือนถัดไป
-    const endOfCurrentMonth = getExpiryDate(now);
-    const dayOfMonth = now.getDate();
-    
-    if (dayOfMonth <= 25) {
-        // จ่ายก่อนวันที่ 25 → หมดอายุสิ้นเดือนนี้
-        expiryDate = endOfCurrentMonth;
-    } else {
-        // จ่ายหลังวันที่ 25 → หมดอายุสิ้นเดือนถัดไป
-        expiryDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    // ถ้ามี expiryDate จาก payment record (กรณีลูกค้าเลือกเดือนหน้า) ให้ใช้ค่านั้น
+    if (paymentExpiryDate) {
+        expiryDate = new Date(paymentExpiryDate);
         expiryDate.setHours(23, 59, 59, 999);
+    } else {
+        // ถ้าจ่ายก่อนสิ้นเดือน ให้หมดอายุสิ้นเดือนถัดไป
+        const endOfCurrentMonth = getExpiryDate(now);
+        const dayOfMonth = now.getDate();
+        
+        if (dayOfMonth <= 25) {
+            // จ่ายก่อนวันที่ 25 → หมดอายุสิ้นเดือนนี้
+            expiryDate = endOfCurrentMonth;
+        } else {
+            // จ่ายหลังวันที่ 25 → หมดอายุสิ้นเดือนถัดไป
+            expiryDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+            expiryDate.setHours(23, 59, 59, 999);
+        }
     }
     
     return {
