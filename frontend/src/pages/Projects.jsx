@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Folder, LayoutGrid, List, ArrowRight, Loader2, Play, Square, Layers, AlignLeft, Pencil, Check, X, Terminal, Clock, Activity, Filter, Youtube, Facebook, Video, ChevronDown, Trash2, Sparkles, Camera, Key, FlaskConical, Copy, CheckCircle, Hash, FileText, Crown, AlertTriangle } from 'lucide-react';
+import { Plus, Folder, LayoutGrid, List, ArrowRight, Loader2, Play, Square, Layers, AlignLeft, Pencil, Check, X, Terminal, Clock, Activity, Filter, Youtube, Facebook, Video, ChevronDown, Trash2, Sparkles, Camera, Key, FlaskConical, Copy, CheckCircle, Hash, FileText, Crown, AlertTriangle, Zap } from 'lucide-react';
 import { db, auth, functions, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
@@ -801,26 +801,58 @@ export default function Projects() {
                                 <LayoutGrid size={20} className="text-white" />
                             </div>
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-red-200">Your Projects</span>
-                            {/* Subscription Status Badge */}
-                            <div className="flex items-center gap-2 ml-4">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
-                                    subStatus.tier === 'Premium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                                    subStatus.tier === 'VIP' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
-                                    'bg-slate-500/20 text-slate-300 border border-slate-500/30'
-                                }`}>
-                                    <Crown size={12} /> {subStatus.tier}
-                                </span>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                    projectLimit.allowed ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
-                                }`}>
-                                    {projects.length}/{subStatus.limits.projects} Projects • {subStatus.limits.modes || 0} Mode • {subStatus.limits.extenders || 0} Extender
-                                </span>
-                                {subStatus.isBlocked && (
-                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">
-                                        <AlertTriangle size={12} /> Blocked
-                                    </span>
-                                )}
+                            
+                            {/* Premium Status Badge */}
+                            <div className={`ml-4 px-4 py-2 rounded-xl flex items-center gap-2 font-bold text-sm shadow-lg ${
+                                subStatus.tier === 'Premium' 
+                                    ? 'bg-gradient-to-r from-amber-500/30 to-yellow-500/30 text-amber-200 border border-amber-400/50 shadow-amber-500/20' 
+                                    : subStatus.tier === 'VIP' 
+                                    ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-200 border border-purple-400/50 shadow-purple-500/20' 
+                                    : 'bg-gradient-to-r from-slate-500/30 to-slate-600/30 text-slate-300 border border-slate-400/50 shadow-slate-500/20'
+                            }`}>
+                                <Crown size={18} className={subStatus.tier === 'Premium' ? 'text-amber-300' : subStatus.tier === 'VIP' ? 'text-purple-300' : 'text-slate-400'} />
+                                <span>{subStatus.tier}</span>
                             </div>
+
+                            {/* Usage Stats Boxes */}
+                            <div className="flex items-center gap-2 ml-2">
+                                {/* Projects Box */}
+                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
+                                    projects.length >= subStatus.limits.projects 
+                                        ? 'bg-red-500/20 text-red-300 border-red-500/30' 
+                                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                }`}>
+                                    <LayoutGrid size={14} />
+                                    <span>{projects.length}/{subStatus.limits.projects}</span>
+                                    <span className="text-white/60">Projects</span>
+                                </div>
+                                {/* Modes Box */}
+                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
+                                    modes.length >= (subStatus.limits.modes || 0) 
+                                        ? 'bg-red-500/20 text-red-300 border-red-500/30' 
+                                        : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                }`}>
+                                    <Layers size={14} />
+                                    <span>{modes.length}/{subStatus.limits.modes || 0}</span>
+                                    <span className="text-white/60">Modes</span>
+                                </div>
+                                {/* Extenders Box */}
+                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
+                                    expanders.length >= (subStatus.limits.extenders || 0) 
+                                        ? 'bg-red-500/20 text-red-300 border-red-500/30' 
+                                        : 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                                }`}>
+                                    <Zap size={14} />
+                                    <span>{expanders.length}/{subStatus.limits.extenders || 0}</span>
+                                    <span className="text-white/60">Extenders</span>
+                                </div>
+                            </div>
+
+                            {subStatus.isBlocked && (
+                                <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1 ml-2">
+                                    <AlertTriangle size={14} /> Blocked
+                                </span>
+                            )}
                         </h2>
                         <div className="flex items-center gap-3">
                             {/* Extension Key Button */}
