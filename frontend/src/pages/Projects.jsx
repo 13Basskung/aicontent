@@ -47,6 +47,28 @@ export default function Projects() {
     const [testResult, setTestResult] = useState(null);
     const [copiedIndex, setCopiedIndex] = useState(null);
 
+    // --- LOCK SYSTEM: คำนวณรายการที่ถูกล็อค (เรียงตาม createdAt เก่าสุดใช้ได้ก่อน) ---
+    const getLockedIds = (items, limit) => {
+        if (!items || items.length === 0 || limit <= 0) return new Set();
+        // เรียงตาม createdAt (เก่าสุดก่อน)
+        const sorted = [...items].sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return dateA - dateB;
+        });
+        // รายการที่เกิน limit จะถูกล็อค
+        const lockedIds = new Set();
+        sorted.slice(limit).forEach(item => lockedIds.add(item.id));
+        return lockedIds;
+    };
+
+    // คำนวณ locked IDs สำหรับ Modes และ Expanders
+    const lockedModeIds = getLockedIds(modes, subStatus.limits?.modes || 0);
+    const lockedExpanderIds = getLockedIds(
+        expanders.filter(exp => exp.source !== 'purchased' && !exp.fromMarketplace && !exp.isTrial && !exp.originalExpanderId && !exp.purchasedAt && !exp.receivedFree),
+        subStatus.limits?.extenders || 0
+    );
+
     // --- NEW: Firestore Sequences Sync ---
     const [userTimezone, setUserTimezone] = useState('Asia/Bangkok'); // Added back
     const [currentTime, setCurrentTime] = useState(new Date()); // RTC State
@@ -1187,6 +1209,16 @@ export default function Projects() {
 
                                             {/* MODE BOX - Contains Selector + Info */}
                                             <div className="w-full bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
+                                                {/* Warning: Selected Mode is Locked */}
+                                                {selectedModeId && lockedModeIds.has(selectedModeId) && (
+                                                    <div className="mb-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-start gap-2">
+                                                        <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                                                        <div className="text-xs text-red-300">
+                                                            <span className="font-bold">⚠️ Mode ที่คุณเลือกถูกล็อคอยู่</span>
+                                                            <p className="mt-1 text-red-300/80">กรุณาเลือก Mode ที่ใช้งานได้ หรือ Upgrade เพื่อปลดล็อค</p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {/* Mode Selector */}
                                                 <div className="mb-4">
                                                     <label className="text-xs text-purple-300 uppercase font-bold mb-2 flex items-center gap-2">
@@ -1217,7 +1249,11 @@ export default function Projects() {
                                                             }}
                                                             options={
                                                                 modes.length > 0
-                                                                    ? modes.map(m => ({ value: m.id, label: m.name }))
+                                                                    ? modes.map(m => ({
+                                                                        value: m.id,
+                                                                        label: lockedModeIds.has(m.id) ? `🔒 ${m.name}` : m.name,
+                                                                        disabled: lockedModeIds.has(m.id)
+                                                                    }))
                                                                     : [{ value: '', label: 'No modes found', disabled: true }]
                                                             }
                                                             disabled={modes.length === 0}
@@ -1288,6 +1324,16 @@ export default function Projects() {
 
                                             {/* EXPANDER BOX - Contains Selector + Blocks */}
                                             <div className="w-full bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
+                                                {/* Warning: Selected Expander is Locked */}
+                                                {selectedExpanderId && lockedExpanderIds.has(selectedExpanderId) && (
+                                                    <div className="mb-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-start gap-2">
+                                                        <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                                                        <div className="text-xs text-red-300">
+                                                            <span className="font-bold">⚠️ Expander ที่คุณเลือกถูกล็อคอยู่</span>
+                                                            <p className="mt-1 text-red-300/80">กรุณาเลือก Expander ที่ใช้งานได้ หรือ Upgrade เพื่อปลดล็อค</p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {/* Expander Selector */}
                                                 <div className="mb-4">
                                                     <label className="text-xs text-yellow-300 uppercase font-bold mb-2 flex items-center gap-2">
@@ -1314,7 +1360,11 @@ export default function Projects() {
                                                             }}
                                                             options={[
                                                                 { value: '', label: 'ไม่ใช้ Expander' },
-                                                                ...expanders.map(ex => ({ value: ex.id, label: ex.name }))
+                                                                ...expanders.map(ex => ({
+                                                                    value: ex.id,
+                                                                    label: lockedExpanderIds.has(ex.id) ? `🔒 ${ex.name}` : ex.name,
+                                                                    disabled: lockedExpanderIds.has(ex.id)
+                                                                }))
                                                             ]}
                                                             buttonClassName="glass-dropdown w-full"
                                                         />
