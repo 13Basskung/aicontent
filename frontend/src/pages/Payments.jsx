@@ -213,6 +213,10 @@ const Payments = () => {
 
     // Calculate subscription price
     // กติกาหลัก: ถ้าลูกค้าเป็น Premium/Pro อยู่แล้ว → จ่ายเฉพาะ Add-on (ไม่คิดค่าแพลนซ้ำ)
+    // และต้องบวก extraProjects ใหม่เข้ากับที่มีอยู่แล้ว
+    const existingExtraProjects = subscription?.extraProjects || 0;
+    const totalExtraProjects = existingExtraProjects + extraProjects;
+    
     const subscriptionPriceInfo = useMemo(() => {
         const now = new Date();
         const dayOfMonth = now.getDate();
@@ -223,8 +227,10 @@ const Payments = () => {
                                      subscription?.status === 'active' &&
                                      !subStatus.isInTrial;
         
-        return calculateTotalPrice(extraProjects, isProrate, now, isAlreadySubscribed);
-    }, [extraProjects, subStatus.tier, subStatus.isInTrial, subscription?.status]);
+        // คำนวณราคาจาก extraProjects ที่ซื้อใหม่ (สำหรับคิดเงิน)
+        // แต่ limits จะคำนวณจาก totalExtraProjects (รวมของเดิม)
+        return calculateTotalPrice(extraProjects, isProrate, now, isAlreadySubscribed, totalExtraProjects);
+    }, [extraProjects, totalExtraProjects, subStatus.tier, subStatus.isInTrial, subscription?.status]);
 
     const statusMeta = useMemo(() => ({
         pending: {
@@ -430,9 +436,11 @@ const Payments = () => {
                 type: extraProjects > 0 ? 'subscription_with_projects' : 'subscription',
                 amount: priceInfo.total,
                 breakdown: priceInfo.breakdown,
-                extraProjects: extraProjects,
-                totalProjects: 1 + extraProjects,
-                limits: priceInfo.limits,
+                newExtraProjects: extraProjects,                    // จำนวนที่ซื้อใหม่ครั้งนี้
+                existingExtraProjects: existingExtraProjects,       // จำนวนที่มีอยู่เดิม
+                totalExtraProjects: totalExtraProjects,             // รวมทั้งหมด (เดิม + ใหม่)
+                totalProjects: 1 + totalExtraProjects,              // Base 1 + total extra
+                limits: priceInfo.limits,                           // Limits ที่คำนวณจาก totalExtraProjects
                 tier: priceInfo.tier,
                 isProrate: priceInfo.prorate !== null,
                 prorateInfo: priceInfo.prorate,
@@ -1089,7 +1097,7 @@ const Payments = () => {
                                                     <p className="text-sm text-white font-semibold">{formatPrice(payment.amount)}</p>
                                                     <p className="text-xs text-slate-500">
                                                         {payment.type === 'subscription_with_projects' 
-                                                            ? `${payment.extraProjects} Project + ${payment.extraProjects * 2} Mode + ${payment.extraProjects * 2} Extender` 
+                                                            ? `${payment.totalProjects || (1 + (payment.totalExtraProjects || payment.extraProjects || 0))} Project + ${payment.limits?.modes || ((payment.totalExtraProjects || payment.extraProjects || 0) + 1) * 2} Mode + ${payment.limits?.extenders || ((payment.totalExtraProjects || payment.extraProjects || 0) + 1) * 2} Extender` 
                                                             : 'Pro Plan'}
                                                     </p>
                                                     <p className="text-xs text-slate-600">{payment.createdAt?.toDate ? payment.createdAt.toDate().toLocaleString('th-TH') : '-'}</p>

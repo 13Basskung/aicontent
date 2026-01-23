@@ -395,7 +395,7 @@ const Admin = () => {
     // Subscription Payment Handlers
     const handleApproveSubscription = async (payment) => {
         if (!currentUser) return;
-        const tierText = payment.extraProjects > 0 ? `Premium (${payment.totalProjects} Projects)` : 'VIP (Pro Plan)';
+        const tierText = payment.totalExtraProjects > 0 ? `Premium (${payment.totalProjects} Projects)` : 'VIP (Pro Plan)';
         if (!confirm(`ยืนยันอนุมัติ Subscription ${tierText}\nยอด ${formatPrice(payment.amount)} ให้ ${payment.userEmail}?`)) return;
         setProcessingSubPaymentId(payment.id);
 
@@ -420,8 +420,10 @@ const Admin = () => {
             const subDoc = await getDoc(subRef);
             const currentSub = subDoc.exists() ? subDoc.data() : null;
 
-            // สร้าง subscription ใหม่
-            const newSub = createApprovedSubscription(currentSub, payment.extraProjects || 0);
+            // สร้าง subscription ใหม่ - ใช้ totalExtraProjects (รวมของเดิม + ใหม่)
+            // รองรับทั้ง format เก่า (extraProjects) และ format ใหม่ (totalExtraProjects)
+            const totalExtra = payment.totalExtraProjects ?? payment.extraProjects ?? 0;
+            const newSub = createApprovedSubscription(currentSub, totalExtra);
             await setDoc(subRef, {
                 ...newSub,
                 updatedAt: serverTimestamp(),
@@ -438,7 +440,8 @@ const Admin = () => {
                 amount: payment.amount,
                 slipUrl: payment.slipUrl || '',
                 tier: payment.tier,
-                extraProjects: payment.extraProjects || 0,
+                newExtraProjects: payment.newExtraProjects || payment.extraProjects || 0,
+                totalExtraProjects: totalExtra,
                 totalProjects: payment.totalProjects || 1,
                 limits: payment.limits,
                 status: 'approved',

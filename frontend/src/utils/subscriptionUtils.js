@@ -93,17 +93,23 @@ export const calculateProrate = (fullPrice, purchaseDate = new Date()) => {
  * กติกาหลัก:
  * - ถ้าลูกค้าเป็น Free → ต้องจ่ายค่าแพลน 199 + Add-on (ถ้ามี)
  * - ถ้าลูกค้าเป็น Premium/Pro แล้ว → จ่ายเฉพาะ Add-on (ไม่คิดค่าแพลนซ้ำ)
+ * - Limits จะคำนวณจาก totalExtraProjects (รวมของเดิม + ใหม่)
  * 
- * @param {number} extraProjects - จำนวน Project เพิ่มเติม
+ * @param {number} newExtraProjects - จำนวน Project ที่ซื้อใหม่ครั้งนี้ (สำหรับคิดเงิน)
  * @param {boolean} isProrate - เป็นการซื้อระหว่างเดือนหรือไม่
  * @param {Date} purchaseDate - วันที่ซื้อ
  * @param {boolean} isAlreadySubscribed - ลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่ (default: false = Free)
+ * @param {number} totalExtraProjects - จำนวน Project รวมทั้งหมด (เดิม + ใหม่) สำหรับคำนวณ Limits
  * @returns {{ total: number, breakdown: object }}
  */
-export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false) => {
+export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false, totalExtraProjects = null) => {
+    // ถ้าไม่ได้ส่ง totalExtraProjects มา ให้ใช้ newExtraProjects (กรณี Free user)
+    const effectiveTotalExtra = totalExtraProjects !== null ? totalExtraProjects : newExtraProjects;
+    
     // ถ้าเป็น Premium/Pro อยู่แล้ว → ไม่คิดค่าแพลนซ้ำ
     let proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN;
-    let extraProjectsPrice = extraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
+    // คิดเงินเฉพาะ Project ที่ซื้อใหม่
+    let extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
     
     let proPlanProrate = null;
     let extraProjectsProrate = null;
@@ -115,22 +121,24 @@ export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purcha
             proPlanPrice = proPlanProrate.proratedPrice;
         }
         
-        // คำนวณ prorate สำหรับ Add-on
-        if (extraProjects > 0) {
-            extraProjectsProrate = calculateProrate(SUBSCRIPTION_PRICES.EXTRA_PROJECT * extraProjects, purchaseDate);
+        // คำนวณ prorate สำหรับ Add-on (เฉพาะที่ซื้อใหม่)
+        if (newExtraProjects > 0) {
+            extraProjectsProrate = calculateProrate(SUBSCRIPTION_PRICES.EXTRA_PROJECT * newExtraProjects, purchaseDate);
             extraProjectsPrice = extraProjectsProrate.proratedPrice;
         }
     }
     
     const total = proPlanPrice + extraProjectsPrice;
-    const limits = calculateLimits(extraProjects);
+    // คำนวณ Limits จาก totalExtraProjects (รวมของเดิม + ใหม่)
+    const limits = calculateLimits(effectiveTotalExtra);
     
     return {
         total,
         breakdown: {
             proPlan: proPlanPrice,
             extraProjects: extraProjectsPrice,
-            extraProjectsCount: extraProjects,
+            newExtraProjectsCount: newExtraProjects,
+            totalExtraProjectsCount: effectiveTotalExtra,
             isAlreadySubscribed,
         },
         prorate: isProrate ? {
@@ -139,7 +147,7 @@ export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purcha
             daysRemaining: proPlanProrate?.daysRemaining || extraProjectsProrate?.daysRemaining,
         } : null,
         limits,
-        tier: extraProjects > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
+        tier: effectiveTotalExtra > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
     };
 };
 
@@ -258,15 +266,16 @@ export const createInitialSubscription = (userId) => {
 
 /**
  * สร้างข้อมูล Subscription หลังอนุมัติการชำระเงิน
+ * 
  * @param {object} currentSub - Subscription ปัจจุบัน (ถ้ามี)
- * @param {number} extraProjects - จำนวน Project เพิ่มเติม
+ * @param {number} totalExtraProjects - จำนวน Extra Projects รวมทั้งหมด (เดิม + ใหม่) จาก payment record
  * @param {Date} approvalDate - วันที่อนุมัติ
  * @returns {object}
  */
-export const createApprovedSubscription = (currentSub, extraProjects = 0, approvalDate = new Date()) => {
+export const createApprovedSubscription = (currentSub, totalExtraProjects = 0, approvalDate = new Date()) => {
     const now = approvalDate;
-    const totalProjects = 1 + extraProjects;
-    const limits = calculateLimits(extraProjects); // ส่ง extraProjects ไม่ใช่ totalProjects
+    const totalProjects = 1 + totalExtraProjects;  // Base 1 + total extra
+    const limits = calculateLimits(totalExtraProjects);  // คำนวณจาก total extra
     
     // คำนวณวันหมดอายุ
     let expiryDate;
@@ -287,8 +296,8 @@ export const createApprovedSubscription = (currentSub, extraProjects = 0, approv
     return {
         plan: 'pro',
         status: 'active',
-        tier: extraProjects > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
-        extraProjects,
+        tier: totalExtraProjects > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
+        extraProjects: totalExtraProjects,  // เก็บ total extra ทั้งหมด
         totalProjects,
         limits,
         startDate: now,
