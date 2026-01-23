@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, Search, Star, Download, Clock, History, LayoutGrid, CheckCircle, Loader2, Sparkles, Gift, ShoppingCart, Filter, X, Coins, AlertCircle, Store, MoreVertical, Play, ExternalLink, Wallet, ChevronDown } from 'lucide-react';
+import { ShoppingBag, Search, Star, Download, Clock, History, LayoutGrid, CheckCircle, Loader2, Sparkles, Gift, ShoppingCart, Filter, X, Coins, AlertCircle, Store, MoreVertical, Play, ExternalLink, Wallet, ChevronDown, Trash2 } from 'lucide-react';
 import GlassDropdown from '../components/ui/GlassDropdown';
 import { db, auth } from '../firebase';
-import { doc, setDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, updateDoc, increment, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, updateDoc, increment, getDoc, runTransaction, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 // CATEGORIES ต้องตรงกับ ExpanderCreator.jsx
@@ -490,6 +490,8 @@ const Marketplace = () => {
     const [openVideoMenu, setOpenVideoMenu] = useState(null); // ID ของ item ที่เปิด video menu อยู่
     const [walletBalance, setWalletBalance] = useState(0); // เครดิตคงเหลือ
     const [walletLoading, setWalletLoading] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false); // Admin can delete any expander
+    const [isDeleting, setIsDeleting] = useState(null); // ID of expander being deleted
 
     // Fetch user-published expanders from Firestore
     const fetchMarketplaceExpanders = async () => {
@@ -557,13 +559,23 @@ const Marketplace = () => {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
             if (user) {
                 fetchUserData(user.uid);
                 if (activeTab === 'history') {
                     fetchHistory(user.uid);
                 }
+                // Check if user is admin
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', user.uid));
+                    setIsAdmin(userSnap.data()?.role === 'admin');
+                } catch (error) {
+                    console.error('Failed to check admin role:', error);
+                    setIsAdmin(false);
+                }
+            } else {
+                setIsAdmin(false);
             }
         });
         return () => unsubscribe();
@@ -872,6 +884,28 @@ const Marketplace = () => {
         }
     };
 
+    // === ADMIN: DELETE EXPANDER ===
+    const handleAdminDeleteExpander = async (item) => {
+        if (!isAdmin) return;
+        if (!confirm(`🗑️ ยืนยันลบ "${item.name}" ออกจาก Marketplace?\n\nการกระทำนี้ไม่สามารถยกเลิกได้!`)) return;
+        
+        setIsDeleting(item.id);
+        try {
+            // Delete from marketplace_expanders collection
+            await deleteDoc(doc(db, 'marketplace_expanders', item.id));
+            
+            // Refresh the list
+            await fetchMarketplaceExpanders();
+            
+            alert(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`);
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('❌ ลบไม่สำเร็จ: ' + error.message);
+        } finally {
+            setIsDeleting(null);
+        }
+    };
+
     return (
         <div className="min-h-screen flex flex-col p-8 gap-8 bg-gradient-to-br from-red-900 via-slate-900 to-slate-950 text-white font-sans overflow-hidden">
             {/* Subtle Background */}
@@ -1125,6 +1159,24 @@ const Marketplace = () => {
                                                 <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-bold text-yellow-400 border border-white/10 shadow-xl">
                                                     <Star size={12} fill="currentColor" /> {item.rating}
                                                 </div>
+                                                {/* Admin Delete Button */}
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleAdminDeleteExpander(item);
+                                                        }}
+                                                        disabled={isDeleting === item.id}
+                                                        className="bg-red-500/80 backdrop-blur-md p-1.5 rounded-lg text-white border border-red-400/30 shadow-xl hover:bg-red-600 transition-all disabled:opacity-50"
+                                                        title="Admin: ลบ Expander นี้"
+                                                    >
+                                                        {isDeleting === item.id ? (
+                                                            <Loader2 size={14} className="animate-spin" />
+                                                        ) : (
+                                                            <Trash2 size={14} />
+                                                        )}
+                                                    </button>
+                                                )}
                                             </div>
                                             {/* Trial Badge */}
                                             {status === 'trialing' && (
