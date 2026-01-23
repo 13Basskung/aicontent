@@ -208,12 +208,19 @@ const Payments = () => {
     }, [currentUser]);
 
     // Calculate subscription price
+    // กติกาหลัก: ถ้าลูกค้าเป็น Premium/Pro อยู่แล้ว → จ่ายเฉพาะ Add-on (ไม่คิดค่าแพลนซ้ำ)
     const subscriptionPriceInfo = useMemo(() => {
         const now = new Date();
         const dayOfMonth = now.getDate();
         const isProrate = dayOfMonth > 1; // ถ้าไม่ใช่วันที่ 1 = prorate
-        return calculateTotalPrice(extraProjects, isProrate, now);
-    }, [extraProjects]);
+        
+        // ตรวจสอบว่าลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่
+        const isAlreadySubscribed = subStatus.tier !== SUBSCRIPTION_TIERS.FREE && 
+                                     subscription?.status === 'active' &&
+                                     !subStatus.isInTrial;
+        
+        return calculateTotalPrice(extraProjects, isProrate, now, isAlreadySubscribed);
+    }, [extraProjects, subStatus.tier, subStatus.isInTrial, subscription?.status]);
 
     const statusMeta = useMemo(() => ({
         pending: {
@@ -390,8 +397,9 @@ const Payments = () => {
         }
 
         const priceInfo = subscriptionPriceInfo;
+        const isAlreadySubscribed = priceInfo.breakdown.isAlreadySubscribed;
         const confirmMsg = `ยืนยันชำระค่า Subscription\n\n` +
-            `แพลน Pro: ${formatPrice(priceInfo.breakdown.proPlan)}\n` +
+            (isAlreadySubscribed ? `✓ คุณเป็นสมาชิกอยู่แล้ว (ไม่คิดค่าแพลนซ้ำ)\n` : `แพลน Pro: ${formatPrice(priceInfo.breakdown.proPlan)}\n`) +
             (extraProjects > 0 ? `เพิ่ม ${extraProjects} Project: ${formatPrice(priceInfo.breakdown.extraProjects)}\n` : '') +
             `\nรวมทั้งสิ้น: ${formatPrice(priceInfo.total)}\n` +
             `\nLimits ที่จะได้รับ:\n` +
@@ -980,20 +988,28 @@ const Payments = () => {
                             {/* Price Summary */}
                             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl p-4 mb-6 border border-purple-500/30">
                                 <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-slate-300">Pro Plan</span>
-                                        <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
-                                    </div>
+                                    {/* แสดง Pro Plan เฉพาะถ้าลูกค้ายังไม่ได้สมัคร */}
+                                    {!subscriptionPriceInfo.breakdown.isAlreadySubscribed ? (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-300">Pro Plan</span>
+                                            <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-green-400">✓ คุณเป็นสมาชิกอยู่แล้ว</span>
+                                            <span className="text-green-400 font-medium">ไม่คิดค่าแพลนซ้ำ</span>
+                                        </div>
+                                    )}
                                     {extraProjects > 0 && (
                                         <div className="flex justify-between text-sm">
                                             <span className="text-slate-300">เพิ่ม {extraProjects} Project</span>
                                             <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
                                         </div>
                                     )}
-                                    {subscriptionPriceInfo.prorate && (
+                                    {subscriptionPriceInfo.prorate && subscriptionPriceInfo.prorate.daysRemaining && (
                                         <div className="text-xs text-purple-300 pt-2 border-t border-white/10">
                                             <Zap size={12} className="inline mr-1" />
-                                            คำนวณตามวันที่เหลือในเดือน ({subscriptionPriceInfo.prorate.proPlan?.daysRemaining || 0} วัน)
+                                            คำนวณตามวันที่เหลือในเดือน ({subscriptionPriceInfo.prorate.daysRemaining} วัน)
                                         </div>
                                     )}
                                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/10">

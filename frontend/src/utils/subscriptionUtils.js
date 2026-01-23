@@ -5,15 +5,21 @@
 
 // ราคาแพ็คเกจ
 export const SUBSCRIPTION_PRICES = {
-    PRO_PLAN: 199,           // แพลน Pro รายเดือน
-    EXTRA_PROJECT: 250,      // เพิ่ม Project ละ 250 บาท/เดือน
+    PRO_PLAN: 199,           // แพลน Pro รายเดือน (ปลดล็อคสถานะ)
+    EXTRA_PROJECT: 250,      // เพิ่ม Project ละ 250 บาท/เดือน (Add-on)
 };
 
-// Limits พื้นฐานต่อ 1 Project
-export const BASE_LIMITS = {
+// Limits พื้นฐานของแพลน 199 (ได้ 1 Project, 1 Mode, 1 Extender)
+export const BASE_PLAN_LIMITS = {
     PROJECTS: 1,
-    MODES_PER_PROJECT: 2,
-    EXTENDERS_PER_PROJECT: 2,
+    MODES: 1,
+    EXTENDERS: 1,
+};
+
+// Limits ที่เพิ่มต่อ 1 Project ที่ซื้อเพิ่ม (Add-on)
+export const ADDON_LIMITS_PER_PROJECT = {
+    MODES: 2,
+    EXTENDERS: 2,
 };
 
 // Free Trial Limits
@@ -32,16 +38,18 @@ export const SUBSCRIPTION_TIERS = {
 };
 
 /**
- * คำนวณ Limits ตามจำนวน Projects ที่ซื้อ
- * @param {number} totalProjects - จำนวน Projects ทั้งหมด (1 = Pro Plan, 2+ = เพิ่ม Project)
+ * คำนวณ Limits ตามจำนวน Projects
+ * - แพลน 199 ได้: 1 Project, 1 Mode, 1 Extender
+ * - ซื้อเพิ่ม Project ละ 250: +1 Project, +2 Modes, +2 Extenders
+ * @param {number} extraProjects - จำนวน Projects ที่ซื้อเพิ่ม (0 = แพลน 199 อย่างเดียว)
  * @returns {{ projects: number, modes: number, extenders: number }}
  */
-export const calculateLimits = (totalProjects = 1) => {
-    const projects = Math.max(1, totalProjects);
+export const calculateLimits = (extraProjects = 0) => {
+    const extra = Math.max(0, extraProjects);
     return {
-        projects: projects,
-        modes: projects * BASE_LIMITS.MODES_PER_PROJECT,
-        extenders: projects * BASE_LIMITS.EXTENDERS_PER_PROJECT,
+        projects: BASE_PLAN_LIMITS.PROJECTS + extra,
+        modes: BASE_PLAN_LIMITS.MODES + (extra * ADDON_LIMITS_PER_PROJECT.MODES),
+        extenders: BASE_PLAN_LIMITS.EXTENDERS + (extra * ADDON_LIMITS_PER_PROJECT.EXTENDERS),
     };
 };
 
@@ -80,23 +88,34 @@ export const calculateProrate = (fullPrice, purchaseDate = new Date()) => {
 };
 
 /**
- * คำนวณราคารวมสำหรับการสมัคร/ต่ออายุ
- * @param {number} extraProjects - จำนวน Project เพิ่มเติม (0 = Pro Plan อย่างเดียว)
+ * คำนวณราคารวมสำหรับการสมัคร/ต่ออายุ/ซื้อ Add-on
+ * 
+ * กติกาหลัก:
+ * - ถ้าลูกค้าเป็น Free → ต้องจ่ายค่าแพลน 199 + Add-on (ถ้ามี)
+ * - ถ้าลูกค้าเป็น Premium/Pro แล้ว → จ่ายเฉพาะ Add-on (ไม่คิดค่าแพลนซ้ำ)
+ * 
+ * @param {number} extraProjects - จำนวน Project เพิ่มเติม
  * @param {boolean} isProrate - เป็นการซื้อระหว่างเดือนหรือไม่
  * @param {Date} purchaseDate - วันที่ซื้อ
+ * @param {boolean} isAlreadySubscribed - ลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่ (default: false = Free)
  * @returns {{ total: number, breakdown: object }}
  */
-export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purchaseDate = new Date()) => {
-    let proPlanPrice = SUBSCRIPTION_PRICES.PRO_PLAN;
+export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false) => {
+    // ถ้าเป็น Premium/Pro อยู่แล้ว → ไม่คิดค่าแพลนซ้ำ
+    let proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN;
     let extraProjectsPrice = extraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
     
     let proPlanProrate = null;
     let extraProjectsProrate = null;
     
     if (isProrate) {
-        proPlanProrate = calculateProrate(SUBSCRIPTION_PRICES.PRO_PLAN, purchaseDate);
-        proPlanPrice = proPlanProrate.proratedPrice;
+        // คำนวณ prorate สำหรับค่าแพลน (เฉพาะถ้าเป็น Free)
+        if (!isAlreadySubscribed) {
+            proPlanProrate = calculateProrate(SUBSCRIPTION_PRICES.PRO_PLAN, purchaseDate);
+            proPlanPrice = proPlanProrate.proratedPrice;
+        }
         
+        // คำนวณ prorate สำหรับ Add-on
         if (extraProjects > 0) {
             extraProjectsProrate = calculateProrate(SUBSCRIPTION_PRICES.EXTRA_PROJECT * extraProjects, purchaseDate);
             extraProjectsPrice = extraProjectsProrate.proratedPrice;
@@ -104,7 +123,7 @@ export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purcha
     }
     
     const total = proPlanPrice + extraProjectsPrice;
-    const limits = calculateLimits(1 + extraProjects);
+    const limits = calculateLimits(extraProjects);
     
     return {
         total,
@@ -112,10 +131,12 @@ export const calculateTotalPrice = (extraProjects = 0, isProrate = false, purcha
             proPlan: proPlanPrice,
             extraProjects: extraProjectsPrice,
             extraProjectsCount: extraProjects,
+            isAlreadySubscribed,
         },
         prorate: isProrate ? {
             proPlan: proPlanProrate,
             extraProjects: extraProjectsProrate,
+            daysRemaining: proPlanProrate?.daysRemaining || extraProjectsProrate?.daysRemaining,
         } : null,
         limits,
         tier: extraProjects > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
@@ -245,7 +266,7 @@ export const createInitialSubscription = (userId) => {
 export const createApprovedSubscription = (currentSub, extraProjects = 0, approvalDate = new Date()) => {
     const now = approvalDate;
     const totalProjects = 1 + extraProjects;
-    const limits = calculateLimits(totalProjects);
+    const limits = calculateLimits(extraProjects); // ส่ง extraProjects ไม่ใช่ totalProjects
     
     // คำนวณวันหมดอายุ
     let expiryDate;
