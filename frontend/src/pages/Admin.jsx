@@ -1418,8 +1418,17 @@ const Admin = () => {
                                                     }`}>{req.tier}</span>
                                                     <span className="text-lg font-bold text-purple-400">{formatPrice(req.amount)}</span>
                                                 </div>
-                                                {req.extraProjects > 0 && (
-                                                    <p className="text-xs text-amber-300">+{req.extraProjects} Projects เพิ่มเติม</p>
+                                                {/* แสดง Add-on details */}
+                                                {(req.newExtraProjects > 0 || req.extraProjects > 0) && (
+                                                    <p className="text-xs text-slate-300 bg-purple-500/10 rounded-lg px-2 py-1 mb-1">
+                                                        เพิ่ม <span className="text-purple-300 font-bold">{req.newExtraProjects ?? req.extraProjects}</span> Project + <span className="text-blue-300 font-bold">{(req.newExtraProjects ?? req.extraProjects) * 2}</span> Mode + <span className="text-green-300 font-bold">{(req.newExtraProjects ?? req.extraProjects) * 2}</span> Extender
+                                                    </p>
+                                                )}
+                                                {/* แสดง Prorate info */}
+                                                {req.prorateInfo?.daysRemaining && (
+                                                    <p className="text-xs text-blue-300 flex items-center gap-1">
+                                                        ⚡ คำนวณตามวันที่เหลือในเดือน ({req.prorateInfo.daysRemaining} วัน)
+                                                    </p>
                                                 )}
                                                 <p className="text-xs text-slate-500 mt-1">{req.reviewedAt?.toDate?.().toLocaleString('th-TH')}</p>
                                                 <p className="text-xs text-slate-400 mt-1">โดย: <span className="text-purple-300 font-medium">{formatApprover(req.reviewedByEmail)}</span></p>
