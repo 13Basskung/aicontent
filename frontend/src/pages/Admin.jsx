@@ -1343,11 +1343,16 @@ const Admin = () => {
                                                         </div>
                                                         {/* แสดง Add-on ที่ซื้อเพิ่ม (ไม่ใช่ Total Limits) */}
                                                         {req.breakdown?.isAlreadySubscribed ? (
-                                                            <div className="text-center">
-                                                                <p className="text-xs text-green-400 mb-1">✓ คุณเป็นสมาชิกอยู่แล้ว</p>
+                                                            <div className="text-center space-y-1">
+                                                                <p className="text-xs text-green-400">✓ ลูกค้าสมาชิกอยู่แล้ว</p>
                                                                 <p className="text-sm text-slate-300">
                                                                     เพิ่ม <span className="text-purple-300 font-bold">{req.newExtraProjects ?? req.extraProjects ?? 0}</span> Project + <span className="text-blue-300 font-bold">{(req.newExtraProjects ?? req.extraProjects ?? 0) * 2}</span> Mode + <span className="text-green-300 font-bold">{(req.newExtraProjects ?? req.extraProjects ?? 0) * 2}</span> Extender
                                                                 </p>
+                                                                {req.billingMonth === 'next' && (
+                                                                    <p className="text-xs text-cyan-300 bg-cyan-500/20 rounded px-2 py-0.5 inline-block">
+                                                                        📅 Add on เดือนหน้า
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         ) : (
                                                             <div className="grid grid-cols-3 gap-3 text-center">

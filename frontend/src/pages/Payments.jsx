@@ -1225,21 +1225,28 @@ const Payments = () => {
                             {/* Price Summary */}
                             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl p-4 mb-6 border border-purple-500/30">
                                 <div className="space-y-2">
-                                    {/* เดือนหน้า = Subscription ใหม่ */}
+                                    {/* เดือนหน้า */}
                                     {billingMonth === 'next' ? (
                                         <>
                                             {/* แสดงช่วงเวลา */}
                                             <div className="flex items-center gap-2 text-xs text-cyan-300 bg-cyan-500/10 rounded-lg px-3 py-2 mb-2">
                                                 <Calendar size={14} />
                                                 <span>
-                                                    Subscription เดือนหน้า: {subscriptionPriceInfo.billingPeriodStart?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {subscriptionPriceInfo.expiryDate?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    {subscriptionPriceInfo.breakdown.isAlreadySubscribed ? 'Add-on เดือนหน้า' : 'Subscription เดือนหน้า'}: {subscriptionPriceInfo.billingPeriodStart?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {subscriptionPriceInfo.expiryDate?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </span>
                                             </div>
-                                            {/* VIP Plan (199 บาทเสมอ) */}
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-slate-300">VIP Plan (1 Project, 2 Modes, 2 Extenders)</span>
-                                                <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
-                                            </div>
+                                            {/* ถ้าเป็นสมาชิกอยู่แล้ว: แสดงข้อความ, ถ้าไม่ใช่: แสดง VIP Plan */}
+                                            {subscriptionPriceInfo.breakdown.isAlreadySubscribed ? (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-green-400">✓ คุณเป็นสมาชิกอยู่แล้ว</span>
+                                                    <span className="text-green-400 font-medium">ไม่คิดค่าแพลนซ้ำ</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-300">VIP Plan (1 Project, 2 Modes, 2 Extenders)</span>
+                                                    <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
+                                                </div>
+                                            )}
                                             {/* Extra Projects สำหรับเดือนหน้า */}
                                             {extraProjects > 0 && (
                                                 <div className="flex justify-between text-sm">

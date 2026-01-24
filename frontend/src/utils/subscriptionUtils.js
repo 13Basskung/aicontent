@@ -124,10 +124,10 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
     let billingPeriodStart = null;
     
     if (billingMonth === 'next') {
-        isNewSubscription = true;
+        isNewSubscription = !isAlreadySubscribed; // true ถ้ายังไม่เป็นสมาชิก
         
-        // เดือนหน้า: จ่าย VIP 199 บาท + Add-on 250 บาท/project เสมอ
-        proPlanPrice = SUBSCRIPTION_PRICES.PRO_PLAN; // 199 บาท
+        // เดือนหน้า: ถ้าเป็นสมาชิกอยู่แล้ว → จ่ายเฉพาะ Add-on, ถ้ายังไม่เป็น → จ่าย VIP 199 + Add-on
+        proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN; // 199 บาท (ถ้ายังไม่เป็นสมาชิก)
         extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT; // 250 * n
         
         // Limits คำนวณจาก newExtraProjects เท่านั้น (ไม่รวมของเดิม)
