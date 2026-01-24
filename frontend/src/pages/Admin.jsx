@@ -133,7 +133,7 @@ const Admin = () => {
         return () => unsubscribe();
     }, [currentUser]);
 
-    // Fetch All Users with Wallet
+    // Fetch All Users with Wallet and Subscription
     useEffect(() => {
         if (!currentUser) return;
         setLoadingUsers(true);
@@ -142,12 +142,37 @@ const Admin = () => {
                 const usersSnap = await getDocs(collection(db, 'users'));
                 const usersData = await Promise.all(usersSnap.docs.map(async (userDoc) => {
                     const userData = { id: userDoc.id, ...userDoc.data() };
+                    
+                    // Fetch Wallet
                     try {
                         const walletDoc = await getDoc(doc(db, 'users', userDoc.id, 'wallet', 'main'));
                         userData.walletBalance = walletDoc.exists() ? (walletDoc.data().balance || 0) : 0;
                     } catch {
                         userData.walletBalance = 0;
                     }
+                    
+                    // Fetch Subscription from subcollection
+                    try {
+                        const subDoc = await getDoc(doc(db, 'users', userDoc.id, 'subscription', 'main'));
+                        if (subDoc.exists()) {
+                            const subData = subDoc.data();
+                            userData.subscription = {
+                                ...subData,
+                                // Convert Firestore timestamps
+                                startDate: subData.startDate?.toDate?.() || subData.startDate,
+                                expiryDate: subData.expiryDate?.toDate?.() || subData.expiryDate,
+                                trialEndsAt: subData.trialEndsAt?.toDate?.() || subData.trialEndsAt,
+                                createdAt: subData.createdAt?.toDate?.() || subData.createdAt,
+                                updatedAt: subData.updatedAt?.toDate?.() || subData.updatedAt,
+                                lastPaymentAt: subData.lastPaymentAt?.toDate?.() || subData.lastPaymentAt,
+                            };
+                        } else {
+                            userData.subscription = null;
+                        }
+                    } catch {
+                        userData.subscription = null;
+                    }
+                    
                     return userData;
                 }));
                 setAllUsers(usersData);
@@ -1733,10 +1758,11 @@ const Admin = () => {
                                                 .map((user) => {
                                                     const sub = user.subscription || {};
                                                     const isActive = sub.status === 'active';
-                                                    const isPro = sub.plan === 'pro' || sub.plan === 'vip';
-                                                    const expiryDate = sub.expiresAt?.toDate?.() || sub.expiresAt;
-                                                    const addOns = sub.addOns || 0;
-                                                    const limits = sub.limits || { projects: 1, modes: 2, expanders: 2 };
+                                                    const isPro = sub.plan === 'pro';
+                                                    const isTrial = sub.plan === 'free_trial';
+                                                    const expiryDate = sub.expiryDate;
+                                                    const extraProjects = sub.extraProjects || 0;
+                                                    const limits = sub.limits || { projects: 1, modes: 1, extenders: 1 };
                                                     
                                                     return (
                                                         <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
@@ -1746,9 +1772,10 @@ const Admin = () => {
                                                             </td>
                                                             <td className="py-4 px-4 text-center">
                                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                                    isPro ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 'bg-slate-600 text-slate-300'
+                                                                    isPro ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 
+                                                                    isTrial ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-slate-600 text-slate-300'
                                                                 }`}>
-                                                                    {sub.plan === 'pro' ? '👑 PRO' : sub.plan === 'vip' ? '💎 VIP' : '🆓 FREE'}
+                                                                    {isPro ? '👑 PRO' : isTrial ? '🎁 Trial' : '🆓 FREE'}
                                                                 </span>
                                                             </td>
                                                             <td className="py-4 px-4 text-center">
@@ -1773,10 +1800,10 @@ const Admin = () => {
                                                             <td className="py-4 px-4 text-center">
                                                                 <div className="flex flex-wrap gap-1 justify-center">
                                                                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">📁 {limits.projects || 1}P</span>
-                                                                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">🎭 {limits.modes || 2}M</span>
-                                                                    <span className="px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded text-xs">🧩 {limits.expanders || 2}E</span>
-                                                                    {addOns > 0 && (
-                                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">➕ {addOns} Add-on</span>
+                                                                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">🎭 {limits.modes || 1}M</span>
+                                                                    <span className="px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded text-xs">🧩 {limits.extenders || 1}E</span>
+                                                                    {extraProjects > 0 && (
+                                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">➕ {extraProjects} Extra</span>
                                                                     )}
                                                                 </div>
                                                             </td>
@@ -1818,7 +1845,7 @@ const Admin = () => {
                                         const adminDisplay = log.adminEmail?.includes('fxfarm.dashboard') ? 'Admin' : (log.adminEmail?.split('@')[0] || 'Admin');
                                         const planChanged = changes.oldPlan !== changes.newPlan;
                                         const statusChanged = changes.oldStatus !== changes.newStatus;
-                                        const addOnsChanged = changes.oldAddOns !== changes.newAddOns;
+                                        const extraChanged = changes.oldExtraProjects !== changes.newExtraProjects;
                                         
                                         return (
                                             <div key={log.id} className="bg-black/40 border border-white/10 rounded-xl p-4 hover:border-yellow-500/30 transition-colors">
@@ -1837,12 +1864,12 @@ const Admin = () => {
                                                             ✅ {changes.oldStatus} → <span className="font-bold">{changes.newStatus}</span>
                                                         </p>
                                                     )}
-                                                    {addOnsChanged && (
+                                                    {extraChanged && (
                                                         <p className="text-amber-300">
-                                                            ➕ {changes.oldAddOns} → <span className="font-bold">{changes.newAddOns}</span>
+                                                            📁 Extra: {changes.oldExtraProjects || 0} → <span className="font-bold">{changes.newExtraProjects || 0}</span>
                                                         </p>
                                                     )}
-                                                    {!planChanged && !statusChanged && !addOnsChanged && (
+                                                    {!planChanged && !statusChanged && !extraChanged && (
                                                         <p className="text-blue-300">📊 แก้ไข Limits/วันหมดอายุ</p>
                                                     )}
                                                 </div>
@@ -1888,8 +1915,8 @@ const Admin = () => {
                                         className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
                                     >
                                         <option value="free">🆓 FREE</option>
+                                        <option value="free_trial">🎁 Free Trial</option>
                                         <option value="pro">👑 PRO</option>
-                                        <option value="vip">💎 VIP</option>
                                     </select>
                                 </div>
 
@@ -1915,26 +1942,30 @@ const Admin = () => {
                                     <label className="text-sm text-slate-400 mb-2 block">วันหมดอายุ</label>
                                     <input
                                         type="date"
-                                        value={editingUserSub.subscription?.expiresAt?.toDate?.().toISOString().split('T')[0] || 
-                                               (editingUserSub.subscription?.expiresAt ? new Date(editingUserSub.subscription.expiresAt).toISOString().split('T')[0] : '')}
+                                        value={(() => {
+                                            const exp = editingUserSub.subscription?.expiryDate;
+                                            if (!exp) return '';
+                                            const d = exp instanceof Date ? exp : (exp?.toDate?.() || new Date(exp));
+                                            return d.toISOString().split('T')[0];
+                                        })()}
                                         onChange={(e) => setEditingUserSub(prev => ({
                                             ...prev,
-                                            subscription: { ...prev.subscription, expiresAt: new Date(e.target.value) }
+                                            subscription: { ...prev.subscription, expiryDate: new Date(e.target.value) }
                                         }))}
                                         className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
                                     />
                                 </div>
 
-                                {/* Add-ons */}
+                                {/* Extra Projects (Add-ons) */}
                                 <div>
-                                    <label className="text-sm text-slate-400 mb-2 block">Add-ons (จำนวน)</label>
+                                    <label className="text-sm text-slate-400 mb-2 block">Extra Projects (Add-ons)</label>
                                     <input
                                         type="number"
                                         min="0"
-                                        value={editingUserSub.subscription?.addOns || 0}
+                                        value={editingUserSub.subscription?.extraProjects || 0}
                                         onChange={(e) => setEditingUserSub(prev => ({
                                             ...prev,
-                                            subscription: { ...prev.subscription, addOns: parseInt(e.target.value) || 0 }
+                                            subscription: { ...prev.subscription, extraProjects: parseInt(e.target.value) || 0 }
                                         }))}
                                         className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
                                     />
@@ -2021,11 +2052,26 @@ const Admin = () => {
                                             const oldSub = allUsers.find(u => u.id === editingUserSub.id)?.subscription || {};
                                             const newSub = editingUserSub.subscription || {};
                                             
-                                            // Update user subscription
-                                            const userRef = doc(db, 'users', editingUserSub.id);
-                                            await updateDoc(userRef, {
-                                                subscription: newSub
-                                            });
+                                            // Prepare subscription data for Firestore
+                                            const subDataToSave = {
+                                                plan: newSub.plan || 'free',
+                                                status: newSub.status || 'inactive',
+                                                tier: newSub.plan === 'pro' ? (newSub.extraProjects > 0 ? 'Premium' : 'VIP') : 'Free',
+                                                extraProjects: newSub.extraProjects || 0,
+                                                totalProjects: 1 + (newSub.extraProjects || 0),
+                                                limits: newSub.limits || { projects: 1, modes: 2, extenders: 2 },
+                                                expiryDate: newSub.expiryDate || null,
+                                                updatedAt: serverTimestamp(),
+                                                // Preserve existing fields
+                                                startDate: oldSub.startDate || serverTimestamp(),
+                                                trialEndsAt: oldSub.trialEndsAt || null,
+                                                isTrialUsed: oldSub.isTrialUsed ?? true,
+                                                lastPaymentAt: oldSub.lastPaymentAt || null,
+                                            };
+                                            
+                                            // Update subscription in subcollection
+                                            const subRef = doc(db, 'users', editingUserSub.id, 'subscription', 'main');
+                                            await setDoc(subRef, subDataToSave, { merge: true });
                                             
                                             // Log the change
                                             await addDoc(collection(db, 'admin_subscription_logs'), {
@@ -2036,12 +2082,12 @@ const Admin = () => {
                                                     newPlan: newSub.plan || 'free',
                                                     oldStatus: oldSub.status || 'inactive',
                                                     newStatus: newSub.status || 'inactive',
-                                                    oldAddOns: oldSub.addOns || 0,
-                                                    newAddOns: newSub.addOns || 0,
+                                                    oldExtraProjects: oldSub.extraProjects || 0,
+                                                    newExtraProjects: newSub.extraProjects || 0,
                                                     oldLimits: oldSub.limits || {},
                                                     newLimits: newSub.limits || {},
-                                                    oldExpiresAt: oldSub.expiresAt || null,
-                                                    newExpiresAt: newSub.expiresAt || null
+                                                    oldExpiryDate: oldSub.expiryDate || null,
+                                                    newExpiryDate: newSub.expiryDate || null
                                                 },
                                                 adminId: currentUser.uid,
                                                 adminEmail: currentUser.email || '',
