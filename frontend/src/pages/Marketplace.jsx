@@ -494,6 +494,7 @@ const Marketplace = () => {
     const [walletLoading, setWalletLoading] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false); // Admin can delete any expander
     const [isDeleting, setIsDeleting] = useState(null); // ID of expander being deleted
+    const [hiddenFreeIds, setHiddenFreeIds] = useState([]); // Admin hidden FREE_EXPANDERS
 
     // Fetch user-published expanders from Firestore
     const fetchMarketplaceExpanders = async () => {
@@ -549,8 +550,22 @@ const Marketplace = () => {
         }
     };
 
+    // Fetch hidden FREE_EXPANDERS list (Admin only)
+    const fetchHiddenFreeExpanders = async () => {
+        try {
+            const docRef = doc(db, 'settings', 'marketplace_hidden');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setHiddenFreeIds(docSnap.data().hiddenIds || []);
+            }
+        } catch (error) {
+            console.error('Error fetching hidden expanders:', error);
+        }
+    };
+
     useEffect(() => {
         fetchMarketplaceExpanders();
+        fetchHiddenFreeExpanders();
     }, []);
     
     // ปิด Video Menu เมื่อคลิกที่อื่น
@@ -898,32 +913,40 @@ const Marketplace = () => {
         }
     };
 
-    // === ADMIN: DELETE EXPANDER ===
+    // === ADMIN: DELETE/HIDE EXPANDER ===
     const handleAdminDeleteExpander = async (item) => {
         if (!isAdmin) return;
         
-        // ป้องกันการลบ FREE_EXPANDERS (Hardcoded items)
-        if (item.isFree || item.id.startsWith('free_') || item.id.startsWith('sample_')) {
-            showAlert('⚠️ ไม่สามารถลบ Free Expander ได้\n\nFree Expanders เป็นข้อมูลระบบ ไม่ได้อยู่ใน Database', '🚫 ไม่อนุญาต');
-            return;
-        }
+        // FREE_EXPANDERS → ซ่อนแทนการลบ (เพราะเป็น Hardcoded)
+        const isFreeItem = item.isFree || item.id.startsWith('free_') || item.id.startsWith('sample_');
         
-        const confirmed = await showConfirm(`🗑️ ยืนยันลบ\n\n"🎯 ${item.name}"\nออกจาก Marketplace?\n\n⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!`, '⚠️ ยืนยันลบ');
+        const confirmMsg = isFreeItem 
+            ? `🙈 ยืนยันซ่อน\n\n"🎯 ${item.name}"\nออกจาก Marketplace?\n\n💡 Free Expanders จะถูกซ่อน (ไม่ลบถาวร)`
+            : `🗑️ ยืนยันลบ\n\n"🎯 ${item.name}"\nออกจาก Marketplace?\n\n⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!`;
+        
+        const confirmed = await showConfirm(confirmMsg, isFreeItem ? '🙈 ซ่อน' : '⚠️ ยืนยันลบ');
         if (!confirmed) return;
         
         setIsDeleting(item.id);
         try {
-            // Delete from marketplace_expanders collection
-            await deleteDoc(doc(db, 'marketplace_expanders', item.id));
-            
-            // Optimistically remove from local state immediately
-            setUserExpanders(prev => prev.filter(exp => exp.id !== item.id));
-            
-            showSuccess(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`, '✅ สำเร็จ');
+            if (isFreeItem) {
+                // ซ่อน FREE_EXPANDERS โดยเก็บ ID ใน Firestore
+                const newHiddenIds = [...hiddenFreeIds, item.id];
+                await setDoc(doc(db, 'settings', 'marketplace_hidden'), {
+                    hiddenIds: newHiddenIds,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                setHiddenFreeIds(newHiddenIds);
+                showSuccess(`🙈 ซ่อน "${item.name}" แล้ว`, '✅ สำเร็จ');
+            } else {
+                // ลบจริงจาก Firestore
+                await deleteDoc(doc(db, 'marketplace_expanders', item.id));
+                setUserExpanders(prev => prev.filter(exp => exp.id !== item.id));
+                showSuccess(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`, '✅ สำเร็จ');
+            }
         } catch (error) {
-            console.error('Delete failed:', error);
-            showError('❌ ลบไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
-            // Refresh to restore state if delete failed
+            console.error('Delete/Hide failed:', error);
+            showError('❌ ดำเนินการไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
             await fetchMarketplaceExpanders();
         } finally {
             setIsDeleting(null);
@@ -1102,6 +1125,9 @@ const Marketplace = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
                                 {(showFreeExpanders ? FREE_EXPANDERS : [...userExpanders, ...FREE_EXPANDERS])
                                     .filter(item => {
+                                        // Filter out hidden FREE_EXPANDERS (Admin hidden)
+                                        if (hiddenFreeIds.includes(item.id)) return false;
+                                        
                                         // Filter by search
                                         if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
                                         // Filter by category
