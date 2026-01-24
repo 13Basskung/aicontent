@@ -1391,9 +1391,9 @@ const Payments = () => {
                                     )}
                                     <button
                                         onClick={handleSubscriptionPayment}
-                                        disabled={submittingSub || !subSlipFile}
+                                        disabled={submittingSub || !subSlipFile || priceDetails.total === 0}
                                         className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-lg ${
-                                            submittingSub || !subSlipFile
+                                            submittingSub || !subSlipFile || priceDetails.total === 0
                                                 ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                                                 : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 shadow-lg shadow-purple-500/30 hover:scale-[1.02]'
                                         }`}
