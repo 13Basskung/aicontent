@@ -4,8 +4,10 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, serverTimestamp
 import { onAuthStateChanged } from 'firebase/auth';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import GlassDropdown from './ui/GlassDropdown';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 const AutomationBuilder = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [recipes, setRecipes] = useState([]);
     const [selectedRecipe, setSelectedRecipe] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -73,14 +75,14 @@ const AutomationBuilder = () => {
             setSelectedRecipe(created);
         } catch (error) {
             console.error("Error creating recipe:", error);
-            alert("Failed to create recipe.");
+            showError('❌ สร้าง Recipe ไม่สำเร็จ', '🚫 ผิดพลาด');
         }
     };
 
     const handleRecord = async () => {
         if (!selectedRecipe) return;
         if (!selectedProjectId) {
-            alert("⚠️ Please create at least one Project in the 'Dashboard' first.");
+            showAlert('⚠️ กรุณาสร้าง Project ใน Dashboard ก่อน', '⚠️ แจ้งเตือน');
             return;
         }
 
@@ -103,10 +105,10 @@ const AutomationBuilder = () => {
         try {
             const docRef = await addDoc(collection(db, 'agent_jobs'), payload);
             console.log("✅ [SUCCESS] Job written to Firestore! Doc ID:", docRef.id);
-            alert(`🎥 Recording Request Sent!\nJob ID: ${docRef.id}\n1. The Agent will open Chrome.\n2. Perform your actions.\n3. Close Chrome to save steps to '${selectedRecipe.name}'.`);
+            showSuccess(`🎥 Recording Request Sent!\n\n🎯 Job ID: ${docRef.id}\n1. Agent จะเปิด Chrome\n2. ทำการบันทึก\n3. ปิด Chrome เพื่อบันทึกไปยัง '${selectedRecipe.name}'`, '✅ สำเร็จ');
         } catch (e) {
             console.error("🔥 [ERROR] Firebase Write Failed:", e);
-            alert("Error sending record command: " + e.message);
+            showError('❌ ส่งคำสั่งไม่สำเร็จ\n' + e.message, '🚫 ผิดพลาด');
         }
     };
 
@@ -118,10 +120,10 @@ const AutomationBuilder = () => {
                 steps: selectedRecipe.steps,
                 updatedAt: serverTimestamp()
             });
-            alert("✅ Recipe saved successfully!");
+            showSuccess('✅ บันทึก Recipe สำเร็จ!', '✅ สำเร็จ');
         } catch (error) {
             console.error("Error saving recipe:", error);
-            alert("Failed to save changes.");
+            showError('❌ บันทึกไม่สำเร็จ', '🚫 ผิดพลาด');
         }
     };
 
@@ -147,8 +149,9 @@ const AutomationBuilder = () => {
         setNewStep({ type: 'GOTO', value: '' }); // Reset form
     };
 
-    const handleDeleteStep = (index) => {
-        if (!confirm("Delete this step?")) return;
+    const handleDeleteStep = async (index) => {
+        const confirmed = await showConfirm('🗑️ ลบ Step นี้?', '⚠️ ยืนยัน');
+        if (!confirmed) return;
         const updatedSteps = selectedRecipe.steps.filter((_, i) => i !== index);
         // Re-index orders? Optional, but good practice
         const reindexed = updatedSteps.map((step, i) => ({ ...step, order: i + 1 }));
@@ -157,7 +160,8 @@ const AutomationBuilder = () => {
 
     const handleDeleteRecipe = async (id, e) => {
         e.stopPropagation();
-        if (!confirm("Are you sure you want to delete this ENTIRE recipe?")) return;
+        const confirmed = await showConfirm('🗑️ ยืนยันลบ Recipe ทั้งหมด?\n\n⚠️ การกระทำนี้ไม่สามารถย้อนกลับได้', '⚠️ ยืนยันลบ');
+        if (!confirmed) return;
 
         try {
             await deleteDoc(doc(db, 'automation_recipes', id));
@@ -171,7 +175,7 @@ const AutomationBuilder = () => {
     const handleRun = async () => {
         if (!selectedRecipe) return;
         if (!selectedProjectId) {
-            alert("⚠️ Please select a Target Project from the left sidebar first.");
+            showAlert('⚠️ กรุณาเลือก Target Project ก่อน', '⚠️ แจ้งเตือน');
             return;
         }
 
@@ -183,10 +187,10 @@ const AutomationBuilder = () => {
                 createdAt: serverTimestamp(),
                 type: 'AUTOMATION'
             });
-            alert(`🚀 Playback Started!\nThe Agent will now execute '${selectedRecipe.name}' on Chrome.`);
+            showSuccess(`🚀 Playback Started!\n\n🎯 Agent กำลังทำงาน '${selectedRecipe.name}' บน Chrome`, '✅ เริ่มแล้ว');
         } catch (e) {
             console.error(e);
-            alert("Error sending run command.");
+            showError('❌ ส่งคำสั่งไม่สำเร็จ', '🚫 ผิดพลาด');
         }
     };
 

@@ -9,8 +9,10 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { onAuthStateChanged } from 'firebase/auth';
 import useSubscription from '../hooks/useSubscription';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 const ModeCreator = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     // A. The Data Structure (State)
     const [modeData, setModeData] = useState({
         name: "Mode Template",
@@ -320,7 +322,8 @@ const ModeCreator = () => {
 
     const handleDeleteMode = async (e, modeId) => {
         e.stopPropagation();
-        if (!window.confirm("Are you sure you want to delete this mode?")) return;
+        const confirmed = await showConfirm('🗑️ ยืนยันลบ Mode นี้?', '⚠️ ยืนยัน');
+        if (!confirmed) return;
 
         try {
             await deleteDoc(doc(db, 'users', currentUser.uid, 'modes', modeId));
@@ -593,7 +596,7 @@ const ModeCreator = () => {
     const addCharacterFromLibrary = (libraryChar) => {
         const existingIds = (modeData.characters || []).map(c => c.id);
         if (existingIds.includes(libraryChar.id)) {
-            alert('ตัวละครนี้อยู่ใน Mode แล้ว');
+            showAlert('⚠️ ตัวละครนี้อยู่ใน Mode แล้ว', '⚠️ แจ้งเตือน');
             return;
         }
         const newChar = {
@@ -628,7 +631,7 @@ const ModeCreator = () => {
         // 1. File Size Validation (3MB)
         const MAX_SIZE = 3 * 1024 * 1024; // 3MB in bytes
         if (file.size > MAX_SIZE) {
-            alert("⚠️ Image too large! Please select a file under 3MB.");
+            showAlert('🖼️ ภาพใหญ่เกินไป!\nกรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 3MB', '⚠️ แจ้งเตือน');
             e.target.value = ""; // Clear input
             return;
         }
@@ -652,7 +655,7 @@ const ModeCreator = () => {
 
         } catch (error) {
             console.error("Error uploading image:", error);
-            alert(`Error: ${error.message}`); // SHOW ACTUAL ERROR
+            showError('❌ อัพโหลดไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setIsUploading(false); // STOP Loading
         }
@@ -703,7 +706,7 @@ const ModeCreator = () => {
                 // ตรวจสอบ subscription limit ก่อนสร้าง Mode ใหม่
                 const limitCheck = canCreate('mode', allModes.length);
                 if (!limitCheck.allowed) {
-                    alert(`⚠️ ${limitCheck.reason}\n\nกรุณาอัพเกรด Subscription เพื่อสร้าง Mode เพิ่มเติม`);
+                    showAlert(`⚠️ ${limitCheck.reason}\n\n👑 กรุณาอัพเกรด Subscription เพื่อสร้าง Mode เพิ่มเติม`, '⚠️ Limit เต็ม');
                     setIsSaving(false);
                     return;
                 }
@@ -716,9 +719,9 @@ const ModeCreator = () => {
             }
 
             // SUCCESS FEEDBACK & EXIT
-            alert(compiledScenes.length > 0 
-                ? `Mode saved! AI compiled ${compiledScenes.length} scenes (TH→EN).`
-                : "Mode saved successfully!");
+            showSuccess(compiledScenes.length > 0 
+                ? `✅ บันทึก Mode สำเร็จ!\n\n🤖 AI แปล ${compiledScenes.length} scenes (TH→EN)`
+                : '✅ บันทึก Mode สำเร็จ!', '✅ สำเร็จ');
             setActiveTab('library');
             setSelectedLibraryId(null);
             setModeData(emptyModeState);
@@ -726,7 +729,7 @@ const ModeCreator = () => {
 
         } catch (error) {
             console.error("Error saving mode:", error);
-            alert("Error saving mode. Please try again.");
+            showError('❌ บันทึกไม่สำเร็จ\nกรุณาลองใหม่อีกครั้ง', '🚫 ผิดพลาด');
         } finally {
             setIsSaving(false);
         }

@@ -11,6 +11,7 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc, query, 
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import useSubscription from '../hooks/useSubscription';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 // === DEFAULT GROUPS (Blocks สามารถลบ/ย้าย/ฟังเสียงได้) ===
 const DEFAULT_GROUPS = [
@@ -114,6 +115,7 @@ const CATEGORIES = [
 ];
 
 const ExpanderCreator = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [user, setUser] = useState(null);
     const messagesEndRef = useRef(null);
     
@@ -286,19 +288,19 @@ const ExpanderCreator = () => {
     // เพิ่ม Video URL
     const handleAddVideoUrl = () => {
         if (!newVideoUrl.trim()) {
-            alert('กรุณาใส่ URL วีดีโอ');
+            showAlert('🎬 กรุณาใส่ URL วีดีโอ', '⚠️ แจ้งเตือน');
             return;
         }
         // ตรวจสอบ URL format
         try {
             new URL(newVideoUrl);
         } catch {
-            alert('URL ไม่ถูกต้อง');
+            showAlert('❌ URL ไม่ถูกต้อง', '⚠️ แจ้งเตือน');
             return;
         }
         // ตรวจสอบซ้ำใน list
         if (videoUrls.includes(newVideoUrl.trim())) {
-            alert('URL นี้มีอยู่แล้ว');
+            showAlert('⚠️ URL นี้มีอยู่แล้ว', '⚠️ แจ้งเตือน');
             return;
         }
         setVideoUrls(prev => [...prev, newVideoUrl.trim()]);
@@ -420,7 +422,8 @@ const ExpanderCreator = () => {
     };
     
     const deleteCustomGroup = async (groupId) => {
-        if (!user || !confirm('ต้องการลบ Group นี้?')) return;
+        const confirmed = await showConfirm('🗑️ ต้องการลบ Group นี้?', '⚠️ ยืนยัน');
+        if (!user || !confirmed) return;
         try {
             await deleteDoc(doc(db, 'users', user.uid, 'customGroups', groupId));
             setCustomGroups(prev => prev.filter(g => g.id !== groupId));
@@ -649,7 +652,7 @@ const ExpanderCreator = () => {
                 if (block.type === 'language') {
                     const hasOtherLanguage = selectedBlocks.find(b => b.type === 'language');
                     if (hasOtherLanguage) {
-                        alert('⚠️ เลือกได้เพียงภาษาเดียว! กรุณาลบภาษาเดิมก่อน');
+                        showAlert('⚠️ เลือกได้เพียงภาษาเดียว!\nกรุณาลบภาษาเดิมก่อน', '⚠️ แจ้งเตือน');
                         return;
                     }
                 }
@@ -673,13 +676,13 @@ const ExpanderCreator = () => {
         
         // Validate file type
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            alert('กรุณาเลือกไฟล์ JPG, PNG หรือ WEBP เท่านั้น');
+            showAlert('🖼️ กรุณาเลือกไฟล์ JPG, PNG หรือ WEBP เท่านั้น', '⚠️ แจ้งเตือน');
             return;
         }
         
         // Validate file size (3MB)
         if (file.size > 3 * 1024 * 1024) {
-            alert('ไฟล์ต้องมีขนาดไม่เกิน 3MB');
+            showAlert('📁 ไฟล์ต้องมีขนาดไม่เกิน 3MB', '⚠️ แจ้งเตือน');
             return;
         }
         
@@ -809,15 +812,15 @@ const ExpanderCreator = () => {
     // === SAVE EXPANDER ===
     const handleSave = async () => {
         if (!user) {
-            alert('กรุณาเข้าสู่ระบบก่อน');
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
             return;
         }
         if (!expanderName.trim()) {
-            alert('กรุณาใส่ชื่อ Expander');
+            showAlert('✏️ กรุณาใส่ชื่อ Expander', '⚠️ แจ้งเตือน');
             return;
         }
         if (selectedBlocks.length === 0) {
-            alert('กรุณาเพิ่มอย่างน้อย 1 กล่อง');
+            showAlert('📦 กรุณาเพิ่มอย่างน้อย 1 กล่อง', '⚠️ แจ้งเตือน');
             return;
         }
         
@@ -878,7 +881,7 @@ const ExpanderCreator = () => {
                 );
                 const limitCheck = canCreate('extender', createdExpanders.length);
                 if (!limitCheck.allowed) {
-                    alert(`⚠️ ${limitCheck.reason}\n\nกรุณาอัพเกรด Subscription เพื่อสร้าง Expander เพิ่มเติม`);
+                    showAlert(`⚠️ ${limitCheck.reason}\n\n👑 กรุณาอัพเกรด Subscription เพื่อสร้าง Expander เพิ่มเติม`, '⚠️ Limit เต็ม');
                     setSaving(false);
                     return;
                 }
@@ -899,7 +902,7 @@ const ExpanderCreator = () => {
             }
             
             await loadExpanders();
-            alert('บันทึก Expander สำเร็จ! ✅');
+            showSuccess('✅ บันทึก Expander สำเร็จ!', '✅ สำเร็จ');
             
             // Reset form
             setExpanderName('');
@@ -912,7 +915,7 @@ const ExpanderCreator = () => {
             setNewVideoUrl('');
         } catch (error) {
             console.error('Error saving expander:', error);
-            alert('เกิดข้อผิดพลาดในการบันทึก');
+            showError('❌ เกิดข้อผิดพลาดในการบันทึก', '🚫 ผิดพลาด');
         } finally {
             setSaving(false);
         }
@@ -921,11 +924,11 @@ const ExpanderCreator = () => {
     // === TEST EXPANDER ===
     const handleTest = async () => {
         if (selectedBlocks.length === 0) {
-            alert('กรุณาเพิ่มอย่างน้อย 1 กล่อง');
+            showAlert('📦 กรุณาเพิ่มอย่างน้อย 1 กล่อง', '⚠️ แจ้งเตือน');
             return;
         }
         if (!testPrompt.trim()) {
-            alert('กรุณาใส่ Prompt ทดสอบ');
+            showAlert('✏️ กรุณาใส่ Prompt ทดสอบ', '⚠️ แจ้งเตือน');
             return;
         }
         
@@ -975,7 +978,8 @@ const ExpanderCreator = () => {
     
     // === DELETE EXPANDER ===
     const handleDeleteExpander = async (expanderId) => {
-        if (!confirm('ต้องการลบ Expander นี้?')) return;
+        const confirmed = await showConfirm('🗑️ ต้องการลบ Expander นี้?', '⚠️ ยืนยัน');
+        if (!confirmed) return;
         
         try {
             await deleteDoc(doc(db, 'users', user.uid, 'expanders', expanderId));
@@ -1004,10 +1008,10 @@ const ExpanderCreator = () => {
             
             await loadExpanders();
             setShowCancelTrialModal(null);
-            alert('✅ ยกเลิกการทดลองใช้งานสำเร็จ\n\nรีเฟรชหน้า Marketplace เพื่อดูสถานะใหม่');
+            showSuccess('✅ ยกเลิกการทดลองใช้งานสำเร็จ\n\n🔄 รีเฟรชหน้า Marketplace เพื่อดูสถานะใหม่', '✅ สำเร็จ');
         } catch (error) {
             console.error('Error canceling trial:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         }
     };
     
@@ -1070,10 +1074,10 @@ const ExpanderCreator = () => {
             setAllowTrial(true);
             setTrialDays(3);
             setTrialFee(0);
-            alert('🎉 เผยแพร่ไปยัง Marketplace สำเร็จ!');
+            showSuccess('🎉 เผยแพร่ไปยัง Marketplace สำเร็จ!', '✅ สำเร็จ');
         } catch (error) {
             console.error('Error publishing to marketplace:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setPublishing(false);
         }
@@ -1086,7 +1090,7 @@ const ExpanderCreator = () => {
         const savedVideoUrls = expander.videoUrls || [];
         
         if (savedVideoUrls.length === 0) {
-            alert('⚠️ กรุณาเพิ่ม URL ตัวอย่างวีดีโออย่างน้อย 1 ลิงก์ก่อนขาย\n\n1. กด "แก้ไข" → เพิ่ม URL ในส่วน "ตัวอย่างวีดีโอ"\n2. กด "บันทึก Expander" ก่อน\n3. แล้วค่อยกด "ขาย"');
+            showAlert('⚠️ กรุณาเพิ่ม URL ตัวอย่างวีดีโอก่อนขาย\n\n1. กด "แก้ไข" → เพิ่ม URL\n2. กด "บันทึก Expander" ก่อน\n3. แล้วค่อยกด "ขาย"', '⚠️ แจ้งเตือน');
             return;
         }
         
@@ -1101,7 +1105,8 @@ const ExpanderCreator = () => {
     // === CANCEL SALE ===
     const cancelSale = async (expander) => {
         if (!user || !expander) return;
-        if (!confirm(`ยืนยันยกเลิกการขาย "${expander.name}"?`)) return;
+        const confirmed = await showConfirm(`🗑️ ยืนยันยกเลิกการขาย\n\n"🎯 ${expander.name}"`, '⚠️ ยืนยัน');
+        if (!confirmed) return;
         
         try {
             // Remove from marketplace - ใช้ originalId เพื่อหา doc
@@ -1131,10 +1136,10 @@ const ExpanderCreator = () => {
             });
             
             await loadExpanders();
-            alert('✅ ยกเลิกการขายสำเร็จ!');
+            showSuccess('✅ ยกเลิกการขายสำเร็จ!', '✅ สำเร็จ');
         } catch (error) {
             console.error('Error canceling sale:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         }
     };
     
@@ -1196,10 +1201,10 @@ const ExpanderCreator = () => {
             await loadExpanders();
             setShowFreeModal(null);
             setFreeDays(3);
-            alert(`✅ เผยแพร่ฟรี ${freeDays} วันสำเร็จ!`);
+            showSuccess(`✅ เผยแพร่ฟรี ${freeDays} วันสำเร็จ!`, '✅ สำเร็จ');
         } catch (error) {
             console.error('Error publishing free:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setPublishingFree(false);
         }
@@ -1208,7 +1213,8 @@ const ExpanderCreator = () => {
     // === CANCEL FREE ===
     const cancelFree = async (expander) => {
         if (!user || !expander) return;
-        if (!confirm(`ยืนยันยกเลิกการเผยแพร่ฟรี "${expander.name}"?`)) return;
+        const confirmed = await showConfirm(`🗑️ ยืนยันยกเลิกการเผยแพร่ฟรี\n\n"🎯 ${expander.name}"`, '⚠️ ยืนยัน');
+        if (!confirmed) return;
         
         try {
             // Remove from marketplace
@@ -1241,10 +1247,10 @@ const ExpanderCreator = () => {
             });
             
             await loadExpanders();
-            alert('✅ ยกเลิกการเผยแพร่ฟรีสำเร็จ!');
+            showSuccess('✅ ยกเลิกการเผยแพร่ฟรีสำเร็จ!', '✅ สำเร็จ');
         } catch (error) {
             console.error('Error canceling free:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         }
     };
     

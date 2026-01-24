@@ -14,9 +14,11 @@ import GlassDropdown from '../components/ui/GlassDropdown';
 import ProjectHistory from '../components/Projects/ProjectHistory';
 import ContentQueue from '../components/Projects/ContentQueue';
 import useSubscription from '../hooks/useSubscription';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 export default function Projects() {
     const { t } = useTranslation();
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [currentUser, setCurrentUser] = useState(null);
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState(null);
@@ -258,7 +260,7 @@ export default function Projects() {
         // ตรวจสอบ subscription limit
         const limitCheck = canCreate('project', projects.length);
         if (!limitCheck.allowed) {
-            alert(`⚠️ ${limitCheck.reason}\n\nกรุณาอัพเกรด Subscription เพื่อสร้าง Project เพิ่มเติม`);
+            showAlert(`⚠️ ${limitCheck.reason}\n\n👑 กรุณาอัพเกรด Subscription เพื่อสร้าง Project เพิ่มเติม`, '⚠️ Limit เต็ม');
             return;
         }
         
@@ -288,7 +290,8 @@ export default function Projects() {
 
     const handleClearLogs = async () => {
         if (!selectedProject || !currentUser) return;
-        if (!window.confirm('Are you sure you want to clear all logs for this project?')) return;
+        const confirmed = await showConfirm('🗑️ ยืนยันล้าง Logs ทั้งหมดของโปรเจคนี้?', '⚠️ ยืนยัน');
+        if (!confirmed) return;
 
         try {
             const logsRef = collection(db, 'users', currentUser.uid, 'projects', selectedProject.id, 'logs');
@@ -300,7 +303,7 @@ export default function Projects() {
             console.log("🧹 Logs cleared successfully.");
         } catch (error) {
             console.error("Error clearing logs:", error);
-            alert("Failed to clear logs: " + error.message);
+            showError('❌ ล้าง Logs ไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
         }
     };
 
@@ -530,11 +533,12 @@ export default function Projects() {
 
     const handleGenerateKey = async () => {
         if (!currentUser) {
-            alert("No user logged in. Please reload the page.");
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
             return;
         }
 
-        if (!confirm('This will generate a new key and invalidate any existing key. Continue?')) return;
+        const confirmed = await showConfirm('🔑 สร้าง Key ใหม่?\n\n⚠️ Key เก่าจะถูกยกเลิก', '🤔 ยืนยัน');
+        if (!confirmed) return;
 
         setIsGeneratingKey(true);
         console.log("🔑 [KeyGen] Starting generation for:", currentUser.uid, currentUser.email);
@@ -551,7 +555,7 @@ export default function Projects() {
                 setGeneratedKey(result.data.key);
             } else {
                 console.error("❌ [KeyGen] Failed:", result);
-                alert('Failed to generate key. Unexpected response format.');
+                showError('❌ สร้าง Key ไม่สำเร็จ', '🚫 ผิดพลาด');
             }
         } catch (error) {
             console.error('❌ [KeyGen] Error:', error);
@@ -563,7 +567,7 @@ export default function Projects() {
             if (error.code === 'failed-precondition') msg = 'Precondition Failed (Check Database)';
             if (error.code === 'internal') msg = 'Internal Server Error (Check Function Logs)';
 
-            alert(`Error: ${msg} (${error.code})`);
+            showError(`❌ ${msg}\n(${error.code})`, '🚫 ผิดพลาด');
         } finally {
             setIsGeneratingKey(false);
         }
@@ -587,7 +591,7 @@ export default function Projects() {
             let msg = error.message;
             if (error.code === 'failed-precondition') msg = error.message;
             if (error.code === 'not-found') msg = 'Mode หรือ Project ไม่พบ';
-            alert(`Error: ${msg}`);
+            showError(`❌ ${msg}`, '🚫 ผิดพลาด');
         } finally {
             setIsTestingPrompt(false);
         }
@@ -610,7 +614,8 @@ export default function Projects() {
     const handleDeleteProject = async (e, projectId) => {
         e.stopPropagation();
         if (!currentUser) return;
-        if (!window.confirm('คุณแน่ใจหรือไม่ที่จะลบโปรเจคนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+        const confirmed = await showConfirm('🗑️ ยืนยันลบโปรเจคนี้?\n\n⚠️ การกระทำนี้ไม่สามารถย้อนกลับได้', '⚠️ ยืนยันลบ');
+        if (!confirmed) return;
 
         try {
             await deleteDoc(doc(db, 'users', currentUser.uid, 'projects', projectId));
@@ -664,7 +669,7 @@ export default function Projects() {
         // Validate file size (3MB max)
         const MAX_SIZE = 3 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
-            alert("⚠️ ภาพใหญ่เกินไป! กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 3MB");
+            showAlert('🖼️ ภาพใหญ่เกินไป!\nกรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 3MB', '⚠️ แจ้งเตือน');
             e.target.value = "";
             return;
         }
@@ -690,7 +695,7 @@ export default function Projects() {
             console.log("✅ Project image uploaded:", downloadURL);
         } catch (error) {
             console.error("Error uploading project image:", error);
-            alert("เกิดข้อผิดพลาดในการอัพโหลดภาพ: " + error.message);
+            showError('❌ เกิดข้อผิดพลาดในการอัพโหลดภาพ\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setUploadingProjectId(null);
             e.target.value = "";
@@ -1907,7 +1912,7 @@ export default function Projects() {
                         <p className="text-gray-400 text-sm mb-4">Copy this key and paste it in your Extension. It will only be shown once!</p>
                         <div className="bg-black/60 border border-white/10 rounded-lg p-4 font-mono text-xs text-green-400 break-all select-all mb-4">{generatedKey}</div>
                         <div className="flex gap-3">
-                            <button onClick={() => { navigator.clipboard.writeText(generatedKey); alert('Key copied!'); }} className="flex-1 px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg hover:bg-green-500/30 font-bold text-sm">📋 Copy</button>
+                            <button onClick={() => { navigator.clipboard.writeText(generatedKey); showSuccess('📋 Key copied!', '✅ สำเร็จ'); }} className="flex-1 px-4 py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg hover:bg-green-500/30 font-bold text-sm">📋 Copy</button>
                             <button onClick={() => setGeneratedKey(null)} className="px-4 py-2 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 font-bold text-sm">Close</button>
                         </div>
                     </div>

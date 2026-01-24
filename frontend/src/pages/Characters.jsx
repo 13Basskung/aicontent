@@ -4,6 +4,7 @@ import GlassDropdown from '../components/ui/GlassDropdown';
 import { auth, db, storage } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 const APPEARANCE_OPTIONS = {
   skinTone: {
@@ -49,6 +50,7 @@ const GENDER_OPTIONS = ['ชาย', 'หญิง', 'อื่นๆ'];
 const DEFAULT_TAGS = ['นักรบ', 'พ่อมด', 'เจ้าหญิง', 'เจ้าชาย', 'นักล่า', 'นักสืบ', 'นักวิทยาศาสตร์', 'โจร', 'พ่อค้า', 'ชาวบ้าน', 'นักบวช', 'นางฟ้า', 'ปีศาจ'];
 
 const Characters = () => {
+  const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
   const [characters, setCharacters] = useState([]);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'create' | 'edit'
   const [editingCharacter, setEditingCharacter] = useState(null);
@@ -252,7 +254,7 @@ const Characters = () => {
       setFormData({ ...formData, image: downloadURL });
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('เกิดข้อผิดพลาดในการอัปโหลดรูป');
+      showError('❌ เกิดข้อผิดพลาดในการอัปโหลดรูป', '🚫 ผิดพลาด');
     } finally {
       setUploading(false);
     }
@@ -282,14 +284,15 @@ const Characters = () => {
       resetForm();
     } catch (error) {
       console.error('Error saving character:', error);
-      alert('เกิดข้อผิดพลาดในการบันทึก');
+      showError('❌ เกิดข้อผิดพลาดในการบันทึก', '🚫 ผิดพลาด');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (characterId) => {
-    if (!user || !window.confirm('ต้องการลบตัวละครนี้หรือไม่?')) return;
+    const confirmed = await showConfirm('🗑️ ต้องการลบตัวละครนี้หรือไม่?', '⚠️ ยืนยัน');
+    if (!user || !confirmed) return;
 
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'characters', characterId));

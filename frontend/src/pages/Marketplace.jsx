@@ -4,6 +4,7 @@ import GlassDropdown from '../components/ui/GlassDropdown';
 import { db, auth } from '../firebase';
 import { doc, setDoc, addDoc, collection, serverTimestamp, query, where, getDocs, orderBy, updateDoc, increment, getDoc, runTransaction, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 // CATEGORIES ต้องตรงกับ ExpanderCreator.jsx
 const CATEGORIES = [
@@ -470,6 +471,7 @@ const FREE_EXPANDERS = [
 ];
 
 const Marketplace = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [activeTab, setActiveTab] = useState('browse'); // 'browse' | 'history'
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
@@ -655,14 +657,20 @@ const Marketplace = () => {
 
     // === PURCHASE EXPANDER ===
     const handlePurchase = async (item) => {
-        if (!currentUser) return alert("กรุณาเข้าสู่ระบบก่อน");
+        if (!currentUser) {
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
+            return;
+        }
         
         const price = item.price || 0;
         if (price > 0 && walletBalance < price) {
-            alert('❌ เครดิตไม่เพียงพอ กรุณาเติมเครดิตก่อน');
+            showAlert('❌ เครดิตไม่เพียงพอ\nกรุณาเติมเครดิตก่อน', '⚠️ แจ้งเตือน');
             return;
         }
-        if (price > 0 && !confirm(`ยืนยันซื้อ "${item.name}" ในราคา ${price} TOKEN?`)) return;
+        if (price > 0) {
+            const confirmed = await showConfirm(`🛒 ยืนยันซื้อ\n\n"🎯 ${item.name}"\n💰 ราคา: ${price} TOKEN`, '🤔 ยืนยันซื้อ');
+            if (!confirmed) return;
+        }
         
         setIsInstalling(item.id);
 
@@ -768,11 +776,11 @@ const Marketplace = () => {
             const successMessage = price > 0 
                 ? `✅ ซื้อ "${item.name}" สำเร็จ!`
                 : `🎁 รับ "${item.name}" ฟรีแล้ว!`;
-            alert(`${successMessage}\n\nไปที่ Expander Creator > My Expander เพื่อใช้งาน`);
+            showSuccess(`${successMessage}\n\n👉 ไปที่ Expander Creator > My Expander เพื่อใช้งาน`, '✅ สำเร็จ');
 
         } catch (error) {
             console.error("Purchase failed:", error);
-            alert("เกิดข้อผิดพลาด: " + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setIsInstalling(null);
         }
@@ -780,18 +788,24 @@ const Marketplace = () => {
     
     // === START TRIAL ===
     const handleStartTrial = async (item) => {
-        if (!currentUser) return alert("กรุณาเข้าสู่ระบบก่อน");
+        if (!currentUser) {
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
+            return;
+        }
         
         const itemId = item.originalId || item.id;
         const trialFee = item.trialFee || 0;
         const trialDays = item.trialDays || 3;
 
         if (trialFee > 0 && walletBalance < trialFee) {
-            alert('❌ เครดิตไม่เพียงพอสำหรับทดลอง กรุณาเติมเครดิตก่อน');
+            showAlert('❌ เครดิตไม่เพียงพอสำหรับทดลอง\nกรุณาเติมเครดิตก่อน', '⚠️ แจ้งเตือน');
             return;
         }
         
-        if (trialFee > 0 && !confirm(`ทดลองใช้ "${item.name}" ${trialDays} วัน ค่าใช้จ่าย ${trialFee} TOKEN?`)) return;
+        if (trialFee > 0) {
+            const confirmed = await showConfirm(`🧪 ทดลองใช้\n\n"🎯 ${item.name}"\n⏰ ${trialDays} วัน\n💰 ค่าใช้จ่าย: ${trialFee} TOKEN`, '🤔 ยืนยัน');
+            if (!confirmed) return;
+        }
         
         setIsTrialing(item.id);
         setShowTrialModal(null);
@@ -874,11 +888,11 @@ const Marketplace = () => {
             // 4. Refresh user data
             await fetchUserData(currentUser.uid);
             
-            alert(`🎁 เริ่มทดลองใช้ "${item.name}" แล้ว! ใช้ได้ ${trialDays} วัน\n\nไปที่ Expander > My Expander เพื่อใช้งาน`);
+            showSuccess(`🎁 เริ่มทดลองใช้ "${item.name}" แล้ว!\n\n⏰ ใช้ได้ ${trialDays} วัน\n👉 ไปที่ Expander > My Expander เพื่อใช้งาน`, '✅ สำเร็จ');
 
         } catch (error) {
             console.error("Trial failed:", error);
-            alert("เกิดข้อผิดพลาด: " + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setIsTrialing(null);
         }
@@ -887,7 +901,8 @@ const Marketplace = () => {
     // === ADMIN: DELETE EXPANDER ===
     const handleAdminDeleteExpander = async (item) => {
         if (!isAdmin) return;
-        if (!confirm(`🗑️ ยืนยันลบ "${item.name}" ออกจาก Marketplace?\n\nการกระทำนี้ไม่สามารถยกเลิกได้!`)) return;
+        const confirmed = await showConfirm(`🗑️ ยืนยันลบ\n\n"🎯 ${item.name}"\nออกจาก Marketplace?\n\n⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!`, '⚠️ ยืนยันลบ');
+        if (!confirmed) return;
         
         setIsDeleting(item.id);
         try {
@@ -897,10 +912,10 @@ const Marketplace = () => {
             // Refresh the list
             await fetchMarketplaceExpanders();
             
-            alert(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`);
+            showSuccess(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`, '✅ สำเร็จ');
         } catch (error) {
             console.error('Delete failed:', error);
-            alert('❌ ลบไม่สำเร็จ: ' + error.message);
+            showError('❌ ลบไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setIsDeleting(null);
         }
