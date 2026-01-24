@@ -45,6 +45,8 @@ const Admin = () => {
     const [subscriptionManagerSearch, setSubscriptionManagerSearch] = useState('');
     const [editingUserSub, setEditingUserSub] = useState(null);
     const [savingUserSub, setSavingUserSub] = useState(false);
+    const [subscriptionLogs, setSubscriptionLogs] = useState([]);
+    const [loadingSubLogs, setLoadingSubLogs] = useState(false);
 
     // Activity Filters
     const [activitySearch, setActivitySearch] = useState('');
@@ -168,6 +170,19 @@ const Admin = () => {
             setAdminCreditLogs(data);
             setLoadingCreditLogs(false);
         }, () => setLoadingCreditLogs(false));
+        return () => unsubscribe();
+    }, [currentUser]);
+
+    // Fetch Subscription Logs
+    useEffect(() => {
+        if (!currentUser) return undefined;
+        setLoadingSubLogs(true);
+        const q = query(collection(db, 'admin_subscription_logs'), orderBy('createdAt', 'desc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setSubscriptionLogs(data);
+            setLoadingSubLogs(false);
+        }, () => setLoadingSubLogs(false));
         return () => unsubscribe();
     }, [currentUser]);
 
@@ -1664,124 +1679,181 @@ const Admin = () => {
 
                 {/* Subscription Manager Tab */}
                 {activeTab === 'credit' && creditSubTab === 'subscription_manager' && (
-                    <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500" />
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
-                        
-                        <div className="flex items-center justify-between gap-4 mb-8 relative">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/30">
-                                    <Star className="text-white" size={32} />
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        <div className="xl:col-span-2 relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500" />
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
+                            
+                            <div className="flex items-center justify-between gap-4 mb-8 relative">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+                                        <Star className="text-white" size={32} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-400">Subscription Manager</h2>
+                                        <p className="text-slate-400 mt-1">จัดการ Subscription ผู้ใช้งานทั้งหมด • {allUsers.filter(u => u.subscription?.status === 'active').length} คนใช้งานอยู่</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-400">Subscription Manager</h2>
-                                    <p className="text-slate-400 mt-1">จัดการ Subscription ผู้ใช้งานทั้งหมด • {allUsers.filter(u => u.subscription?.status === 'active').length} คนใช้งานอยู่</p>
-                                </div>
-                            </div>
-                            {/* Search Box */}
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="🔍 ค้นหาผู้ใช้..."
-                                    value={subscriptionManagerSearch}
-                                    onChange={(e) => setSubscriptionManagerSearch(e.target.value)}
-                                    className="w-64 px-4 py-2 bg-black/40 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-yellow-500/50 focus:ring-2 focus:ring-yellow-500/20"
+                                {/* Search Box */}
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 ค้นหาผู้ใช้..."
+                                        value={subscriptionManagerSearch}
+                                        onChange={(e) => setSubscriptionManagerSearch(e.target.value)}
+                                        className="w-64 px-4 py-2 bg-black/40 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-yellow-500/50 focus:ring-2 focus:ring-yellow-500/20"
                                 />
                             </div>
                         </div>
 
-                        {loadingUsers ? (
-                            <div className="text-slate-400 flex items-center gap-2 justify-center py-12"><Loader2 size={24} className="animate-spin" /> กำลังโหลดข้อมูลผู้ใช้...</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-white/20 bg-black/20">
-                                            <th className="text-left py-4 px-4 text-yellow-300 font-bold">ผู้ใช้</th>
-                                            <th className="text-center py-4 px-4 text-purple-300 font-bold">แพลน</th>
-                                            <th className="text-center py-4 px-4 text-green-300 font-bold">สถานะ</th>
-                                            <th className="text-center py-4 px-4 text-cyan-300 font-bold">หมดอายุ</th>
-                                            <th className="text-center py-4 px-4 text-pink-300 font-bold">Limits</th>
-                                            <th className="text-center py-4 px-4 text-slate-300 font-bold">จัดการ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {allUsers
-                                            .filter(user => {
-                                                if (!subscriptionManagerSearch.trim()) return true;
-                                                const search = subscriptionManagerSearch.toLowerCase();
-                                                const email = (user.email || '').toLowerCase();
-                                                const name = (user.displayName || '').toLowerCase();
-                                                return email.includes(search) || name.includes(search);
-                                            })
-                                            .map((user) => {
-                                                const sub = user.subscription || {};
-                                                const isActive = sub.status === 'active';
-                                                const isPro = sub.plan === 'pro' || sub.plan === 'vip';
-                                                const expiryDate = sub.expiresAt?.toDate?.() || sub.expiresAt;
-                                                const addOns = sub.addOns || 0;
-                                                const limits = sub.limits || { projects: 1, modes: 2, expanders: 2 };
-                                                
-                                                return (
-                                                    <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                                        <td className="py-4 px-4">
-                                                            <p className="text-white font-medium">{user.email || user.id}</p>
-                                                            <p className="text-xs text-slate-500">{user.displayName || 'ไม่ระบุชื่อ'}</p>
-                                                        </td>
-                                                        <td className="py-4 px-4 text-center">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                                isPro ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 'bg-slate-600 text-slate-300'
-                                                            }`}>
-                                                                {sub.plan === 'pro' ? '👑 PRO' : sub.plan === 'vip' ? '💎 VIP' : '🆓 FREE'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-4 text-center">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                                isActive ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                                            }`}>
-                                                                {isActive ? '✅ Active' : '❌ Inactive'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-4 px-4 text-center">
-                                                            {expiryDate ? (
-                                                                <div>
-                                                                    <p className="text-white text-sm">{new Date(expiryDate).toLocaleDateString('th-TH')}</p>
-                                                                    <p className="text-xs text-slate-500">
-                                                                        {Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))} วัน
-                                                                    </p>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-slate-500">-</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-4 px-4 text-center">
-                                                            <div className="flex flex-wrap gap-1 justify-center">
-                                                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">📁 {limits.projects || 1}P</span>
-                                                                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">🎭 {limits.modes || 2}M</span>
-                                                                <span className="px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded text-xs">🧩 {limits.expanders || 2}E</span>
-                                                                {addOns > 0 && (
-                                                                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">➕ {addOns} Add-on</span>
+                            {loadingUsers ? (
+                                <div className="text-slate-400 flex items-center gap-2 justify-center py-12"><Loader2 size={24} className="animate-spin" /> กำลังโหลดข้อมูลผู้ใช้...</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-white/20 bg-black/20">
+                                                <th className="text-left py-4 px-4 text-yellow-300 font-bold">ผู้ใช้</th>
+                                                <th className="text-center py-4 px-4 text-purple-300 font-bold">แพลน</th>
+                                                <th className="text-center py-4 px-4 text-green-300 font-bold">สถานะ</th>
+                                                <th className="text-center py-4 px-4 text-cyan-300 font-bold">หมดอายุ</th>
+                                                <th className="text-center py-4 px-4 text-pink-300 font-bold">Limits</th>
+                                                <th className="text-center py-4 px-4 text-slate-300 font-bold">จัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allUsers
+                                                .filter(user => {
+                                                    if (!subscriptionManagerSearch.trim()) return true;
+                                                    const search = subscriptionManagerSearch.toLowerCase();
+                                                    const email = (user.email || '').toLowerCase();
+                                                    const name = (user.displayName || '').toLowerCase();
+                                                    return email.includes(search) || name.includes(search);
+                                                })
+                                                .map((user) => {
+                                                    const sub = user.subscription || {};
+                                                    const isActive = sub.status === 'active';
+                                                    const isPro = sub.plan === 'pro' || sub.plan === 'vip';
+                                                    const expiryDate = sub.expiresAt?.toDate?.() || sub.expiresAt;
+                                                    const addOns = sub.addOns || 0;
+                                                    const limits = sub.limits || { projects: 1, modes: 2, expanders: 2 };
+                                                    
+                                                    return (
+                                                        <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                            <td className="py-4 px-4">
+                                                                <p className="text-white font-medium">{user.email || user.id}</p>
+                                                                <p className="text-xs text-slate-500">{user.displayName || 'ไม่ระบุชื่อ'}</p>
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                                    isPro ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 'bg-slate-600 text-slate-300'
+                                                                }`}>
+                                                                    {sub.plan === 'pro' ? '👑 PRO' : sub.plan === 'vip' ? '💎 VIP' : '🆓 FREE'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                                    isActive ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                                }`}>
+                                                                    {isActive ? '✅ Active' : '❌ Inactive'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">
+                                                                {expiryDate ? (
+                                                                    <div>
+                                                                        <p className="text-white text-sm">{new Date(expiryDate).toLocaleDateString('th-TH')}</p>
+                                                                        <p className="text-xs text-slate-500">
+                                                                            {Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))} วัน
+                                                                        </p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-slate-500">-</span>
                                                                 )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 px-4 text-center">
-                                                            <button
-                                                                onClick={() => setEditingUserSub({ ...user })}
-                                                                className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500 hover:text-black transition-all text-sm flex items-center gap-2 mx-auto"
-                                                            >
-                                                                <Edit3 size={14} /> แก้ไข
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                    </tbody>
-                                </table>
-                                {allUsers.length === 0 && (
-                                    <p className="text-slate-500 text-center py-8">ไม่พบผู้ใช้งาน</p>
-                                )}
-                            </div>
-                        )}
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">
+                                                                <div className="flex flex-wrap gap-1 justify-center">
+                                                                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">📁 {limits.projects || 1}P</span>
+                                                                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">🎭 {limits.modes || 2}M</span>
+                                                                    <span className="px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded text-xs">🧩 {limits.expanders || 2}E</span>
+                                                                    {addOns > 0 && (
+                                                                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">➕ {addOns} Add-on</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">
+                                                                <button
+                                                                    onClick={() => setEditingUserSub({ ...user })}
+                                                                    className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500 hover:text-black transition-all text-sm flex items-center gap-2 mx-auto"
+                                                                >
+                                                                    <Edit3 size={14} /> แก้ไข
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                        </tbody>
+                                    </table>
+                                    {allUsers.length === 0 && (
+                                        <p className="text-slate-500 text-center py-8">ไม่พบผู้ใช้งาน</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Subscription Logs Panel */}
+                        <div className="bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <Star className="text-yellow-400" size={18} />
+                                ประวัติการแก้ไข Subscription
+                            </h3>
+                            {loadingSubLogs ? (
+                                <div className="text-slate-400 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> กำลังโหลด...</div>
+                            ) : subscriptionLogs.length === 0 ? (
+                                <div className="text-slate-500 text-sm text-center py-8">ยังไม่มีประวัติการแก้ไข</div>
+                            ) : (
+                                <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                    {subscriptionLogs.map(log => {
+                                        const changes = log.changes || {};
+                                        const adminDisplay = log.adminEmail?.includes('fxfarm.dashboard') ? 'Admin' : (log.adminEmail?.split('@')[0] || 'Admin');
+                                        const planChanged = changes.oldPlan !== changes.newPlan;
+                                        const statusChanged = changes.oldStatus !== changes.newStatus;
+                                        const addOnsChanged = changes.oldAddOns !== changes.newAddOns;
+                                        
+                                        return (
+                                            <div key={log.id} className="bg-black/40 border border-white/10 rounded-xl p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-sm font-medium text-white">{log.userEmail}</p>
+                                                    <span className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</span>
+                                                </div>
+                                                <div className="space-y-1 text-xs">
+                                                    {planChanged && (
+                                                        <p className="text-yellow-300">
+                                                            👑 แพลน: <span className="text-slate-400">{changes.oldPlan}</span> → <span className="text-yellow-400 font-bold">{changes.newPlan}</span>
+                                                        </p>
+                                                    )}
+                                                    {statusChanged && (
+                                                        <p className="text-green-300">
+                                                            ✅ สถานะ: <span className="text-slate-400">{changes.oldStatus}</span> → <span className="text-green-400 font-bold">{changes.newStatus}</span>
+                                                        </p>
+                                                    )}
+                                                    {addOnsChanged && (
+                                                        <p className="text-amber-300">
+                                                            ➕ Add-ons: <span className="text-slate-400">{changes.oldAddOns}</span> → <span className="text-amber-400 font-bold">{changes.newAddOns}</span>
+                                                        </p>
+                                                    )}
+                                                    {!planChanged && !statusChanged && !addOnsChanged && (
+                                                        <p className="text-blue-300">📊 แก้ไข Limits/วันหมดอายุ</p>
+                                                    )}
+                                                </div>
+                                                <div className="mt-2 text-[11px] text-slate-500">
+                                                    โดย: <span className="text-yellow-300 font-medium">{adminDisplay}</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -1944,14 +2016,40 @@ const Admin = () => {
                                     onClick={async () => {
                                         setSavingUserSub(true);
                                         try {
+                                            // Get old subscription data for logging
+                                            const oldSub = allUsers.find(u => u.id === editingUserSub.id)?.subscription || {};
+                                            const newSub = editingUserSub.subscription || {};
+                                            
+                                            // Update user subscription
                                             const userRef = doc(db, 'users', editingUserSub.id);
                                             await updateDoc(userRef, {
-                                                subscription: editingUserSub.subscription
+                                                subscription: newSub
+                                            });
+                                            
+                                            // Log the change
+                                            await addDoc(collection(db, 'admin_subscription_logs'), {
+                                                userId: editingUserSub.id,
+                                                userEmail: editingUserSub.email || '',
+                                                changes: {
+                                                    oldPlan: oldSub.plan || 'free',
+                                                    newPlan: newSub.plan || 'free',
+                                                    oldStatus: oldSub.status || 'inactive',
+                                                    newStatus: newSub.status || 'inactive',
+                                                    oldAddOns: oldSub.addOns || 0,
+                                                    newAddOns: newSub.addOns || 0,
+                                                    oldLimits: oldSub.limits || {},
+                                                    newLimits: newSub.limits || {},
+                                                    oldExpiresAt: oldSub.expiresAt || null,
+                                                    newExpiresAt: newSub.expiresAt || null
+                                                },
+                                                adminId: currentUser.uid,
+                                                adminEmail: currentUser.email || '',
+                                                createdAt: serverTimestamp()
                                             });
                                             
                                             // Update local state
                                             setAllUsers(prev => prev.map(u => 
-                                                u.id === editingUserSub.id ? { ...u, subscription: editingUserSub.subscription } : u
+                                                u.id === editingUserSub.id ? { ...u, subscription: newSub } : u
                                             ));
                                             
                                             showSuccess(`✅ อัปเดต Subscription ของ ${editingUserSub.email} สำเร็จ`, '✅ สำเร็จ');

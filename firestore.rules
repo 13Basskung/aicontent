@@ -128,6 +128,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Admin Subscription Logs (Admin เท่านั้น)
+    match /admin_subscription_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
     // Settings (Admin เท่านั้น)
     match /settings/{docId} {
       allow read: if true;
