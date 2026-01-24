@@ -2333,8 +2333,9 @@ const ExpanderCreator = () => {
                         
                         {/* Confirm Button */}
                         <button
-                            onClick={() => {
-                                if (confirm(`คุณแน่ใจหรือว่าจะเผยแพร่ Expander "${showFreeModal.name}" ให้กับผู้ใช้งานอื่นฟรี ${freeDays} วัน?`)) {
+                            onClick={async () => {
+                                const confirmed = await showConfirm(`🎁 ยืนยันเผยแพร่ฟรี\n\n"${showFreeModal.name}"\n⏰ ระยะเวลา: ${freeDays} วัน`, '🤔 ยืนยัน');
+                                if (confirmed) {
                                     handlePublishFree();
                                 }
                             }}

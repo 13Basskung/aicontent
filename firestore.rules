@@ -87,21 +87,21 @@ service cloud.firestore {
     match /marketplaceModes/{modeId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
 
     // Marketplace Expanders (public read)
     match /marketplace_expanders/{expanderId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
     }
 
     // Marketplace (alias)
     match /marketplace/{expanderId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
     }
 
     // Characters (public read)
