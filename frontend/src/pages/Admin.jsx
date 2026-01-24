@@ -6,8 +6,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle, XCircle, ExternalLink, Clock, Loader2, TrendingUp, TrendingDown, Users, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Edit3, DollarSign, BarChart3, Building2, Database, Trash2, RefreshCw, HardDrive, Crown, Star } from 'lucide-react';
 import GlassDropdown from '../components/ui/GlassDropdown';
 import { createApprovedSubscription, formatPrice, formatThaiDate, SUBSCRIPTION_TIERS } from '../utils/subscriptionUtils';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 
 const Admin = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [currentUser, setCurrentUser] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
     const [creditSubTab, setCreditSubTab] = useState('deposits'); // deposits, withdrawals, subscriptions, manager
@@ -238,14 +240,15 @@ const Admin = () => {
 
     const handleApprovePayment = async (request) => {
         if (!currentUser) return;
-        if (!confirm(`ยืนยันอนุมัติยอด ${request.amount} TOKEN ให้ ${request.userEmail}?`)) return;
+        const confirmed = await showConfirm(`✅ ยืนยันอนุมัติเติมเครดิต\n\n💰 ยอด: ${request.amount} TOKEN\n👤 ให้: ${request.userEmail}`, '🤔 ยืนยันอนุมัติ');
+        if (!confirmed) return;
         setProcessingPaymentId(request.id);
 
         try {
             // ป้องกันอนุมัติซ้ำ: ตรวจสอบสถานะปัจจุบันก่อน
             const currentDoc = await getDoc(doc(db, 'payment_requests', request.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingPaymentId(null);
                 return;
             }
@@ -276,7 +279,7 @@ const Admin = () => {
             });
         } catch (error) {
             console.error('Approve payment failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingPaymentId(null);
         }
@@ -284,14 +287,15 @@ const Admin = () => {
 
     const handleRejectPayment = async (request) => {
         if (!currentUser) return;
-        const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุญาต (ถ้ามี)') || '';
-        if (!confirm(`ยืนยันไม่อนุญาตยอด ${request.amount} TOKEN?`)) return;
+        const reason = window.prompt('📝 กรุณาระบุเหตุผลที่ไม่อนุญาต (ถ้ามี)') || '';
+        const confirmed = await showConfirm(`❌ ยืนยันไม่อนุญาตเติมเครดิต\n\n💰 ยอด: ${request.amount} TOKEN\n📝 เหตุผล: ${reason || '-'}`, '⚠️ ยืนยันไม่อนุญาต');
+        if (!confirmed) return;
         setProcessingPaymentId(request.id);
 
         try {
             const currentDoc = await getDoc(doc(db, 'payment_requests', request.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingPaymentId(null);
                 return;
             }
@@ -318,7 +322,7 @@ const Admin = () => {
             });
         } catch (error) {
             console.error('Reject payment failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingPaymentId(null);
         }
@@ -327,13 +331,14 @@ const Admin = () => {
     // Withdrawal Handlers
     const handleApproveWithdrawal = async (request) => {
         if (!currentUser) return;
-        if (!confirm(`ยืนยันอนุมัติถอน ${request.amount} TOKEN ให้ ${request.userEmail}?\nบัญชี: ${request.bankName} ${request.accountNumber}`)) return;
+        const confirmed = await showConfirm(`💸 ยืนยันอนุมัติถอนเงิน\n\n💰 ยอด: ${request.amount} TOKEN\n👤 ให้: ${request.userEmail}\n🏦 บัญชี: ${request.bankName}\n🔢 เลขที่: ${request.accountNumber}`, '🤔 ยืนยันอนุมัติ');
+        if (!confirmed) return;
         setProcessingWithdrawalId(request.id);
 
         try {
             const currentDoc = await getDoc(doc(db, 'withdrawal_requests', request.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingWithdrawalId(null);
                 return;
             }
@@ -342,7 +347,7 @@ const Admin = () => {
             const walletDoc = await getDoc(doc(db, 'users', request.userId, 'wallet', 'main'));
             const currentBalance = walletDoc.exists() ? (walletDoc.data().balance || 0) : 0;
             if (currentBalance < request.amount) {
-                alert(`⚠️ ยอดเครดิตไม่เพียงพอ (มี ${currentBalance} ต้องการ ${request.amount})`);
+                showAlert(`⚠️ ยอดเครดิตไม่เพียงพอ\n(มี ${currentBalance} ต้องการ ${request.amount})`, '⚠️ แจ้งเตือน');
                 setProcessingWithdrawalId(null);
                 return;
             }
@@ -374,10 +379,10 @@ const Admin = () => {
                 createdAt: serverTimestamp()
             });
 
-            alert('✅ อนุมัติถอนเงินสำเร็จ');
+            showSuccess('✅ อนุมัติถอนเงินสำเร็จ', '✅ สำเร็จ');
         } catch (error) {
             console.error('Approve withdrawal failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingWithdrawalId(null);
         }
@@ -385,14 +390,15 @@ const Admin = () => {
 
     const handleRejectWithdrawal = async (request) => {
         if (!currentUser) return;
-        const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)') || '';
-        if (!confirm(`ยืนยันไม่อนุมัติถอน ${request.amount} TOKEN?`)) return;
+        const reason = window.prompt('📝 กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)') || '';
+        const confirmed = await showConfirm(`❌ ยืนยันไม่อนุมัติถอนเงิน\n\n💰 ยอด: ${request.amount} TOKEN\n📝 เหตุผล: ${reason || '-'}`, '⚠️ ยืนยันไม่อนุมัติ');
+        if (!confirmed) return;
         setProcessingWithdrawalId(request.id);
 
         try {
             const currentDoc = await getDoc(doc(db, 'withdrawal_requests', request.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingWithdrawalId(null);
                 return;
             }
@@ -419,7 +425,7 @@ const Admin = () => {
             });
         } catch (error) {
             console.error('Reject withdrawal failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingWithdrawalId(null);
         }
@@ -429,13 +435,14 @@ const Admin = () => {
     const handleApproveSubscription = async (payment) => {
         if (!currentUser) return;
         const tierText = payment.totalExtraProjects > 0 ? `Premium (${payment.totalProjects} Projects)` : 'VIP (Pro Plan)';
-        if (!confirm(`ยืนยันอนุมัติ Subscription ${tierText}\nยอด ${formatPrice(payment.amount)} ให้ ${payment.userEmail}?`)) return;
+        const confirmed = await showConfirm(`👑 ยืนยันอนุมัติ Subscription\n\n🎯 Tier: ${tierText}\n💰 ยอด: ${formatPrice(payment.amount)}\n👤 ให้: ${payment.userEmail}`, '🤔 ยืนยันอนุมัติ');
+        if (!confirmed) return;
         setProcessingSubPaymentId(payment.id);
 
         try {
             const currentDoc = await getDoc(doc(db, 'subscription_payments', payment.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingSubPaymentId(null);
                 return;
             }
@@ -485,10 +492,10 @@ const Admin = () => {
                 createdAt: serverTimestamp()
             });
 
-            alert(`✅ อนุมัติ Subscription สำเร็จ\nTier: ${payment.tier}\nLimits: ${payment.limits?.projects} Projects, ${payment.limits?.modes} Modes, ${payment.limits?.extenders} Extenders`);
+            showSuccess(`✅ อนุมัติ Subscription สำเร็จ\n\n🎯 Tier: ${payment.tier}\n📊 Limits: ${payment.limits?.projects} Projects, ${payment.limits?.modes} Modes, ${payment.limits?.extenders} Extenders`, '✅ สำเร็จ');
         } catch (error) {
             console.error('Approve subscription failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingSubPaymentId(null);
         }
@@ -496,14 +503,15 @@ const Admin = () => {
 
     const handleRejectSubscription = async (payment) => {
         if (!currentUser) return;
-        const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)') || '';
-        if (!confirm(`ยืนยันไม่อนุมัติ Subscription ยอด ${formatPrice(payment.amount)}?`)) return;
+        const reason = window.prompt('📝 กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)') || '';
+        const confirmed = await showConfirm(`❌ ยืนยันไม่อนุมัติ Subscription\n\n💰 ยอด: ${formatPrice(payment.amount)}\n📝 เหตุผล: ${reason || '-'}`, '⚠️ ยืนยันไม่อนุมัติ');
+        if (!confirmed) return;
         setProcessingSubPaymentId(payment.id);
 
         try {
             const currentDoc = await getDoc(doc(db, 'subscription_payments', payment.id));
             if (currentDoc.data()?.status !== 'pending') {
-                alert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว');
+                showAlert('⚠️ รายการนี้ถูกดำเนินการไปแล้ว', '⚠️ แจ้งเตือน');
                 setProcessingSubPaymentId(null);
                 return;
             }
@@ -530,7 +538,7 @@ const Admin = () => {
             });
         } catch (error) {
             console.error('Reject subscription failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setProcessingSubPaymentId(null);
         }
@@ -541,16 +549,17 @@ const Admin = () => {
         if (!currentUser || !selectedUser) return;
         const amount = parseInt(creditAdjustAmount);
         if (isNaN(amount) || amount === 0) {
-            alert('กรุณากรอกจำนวนเครดิตที่ถูกต้อง');
+            showAlert('💰 กรุณากรอกจำนวนเครดิตที่ถูกต้อง', '⚠️ แจ้งเตือน');
             return;
         }
         if (!creditAdjustReason.trim()) {
-            alert('กรุณาระบุเหตุผลการปรับเครดิต');
+            showAlert('📝 กรุณาระบุเหตุผลการปรับเครดิต', '⚠️ แจ้งเตือน');
             return;
         }
 
         const action = amount > 0 ? 'เพิ่ม' : 'ลด';
-        if (!confirm(`ยืนยัน${action}เครดิต ${Math.abs(amount)} TOKEN ให้ ${selectedUser.email}?`)) return;
+        const confirmed = await showConfirm(`💰 ยืนยัน${action}เครดิต\n\n💸 จำนวน: ${Math.abs(amount)} TOKEN\n👤 ให้: ${selectedUser.email}`, '🤔 ยืนยัน');
+        if (!confirmed) return;
 
         setAdjustingCredit(true);
         try {
@@ -559,7 +568,7 @@ const Admin = () => {
                 const walletDoc = await getDoc(doc(db, 'users', selectedUser.id, 'wallet', 'main'));
                 const currentBalance = walletDoc.exists() ? (walletDoc.data().balance || 0) : 0;
                 if (currentBalance + amount < 0) {
-                    alert(`⚠️ ไม่สามารถลดได้ (มี ${currentBalance} ต้องการลด ${Math.abs(amount)})`);
+                    showAlert(`⚠️ ไม่สามารถลดได้\n(มี ${currentBalance} ต้องการลด ${Math.abs(amount)})`, '⚠️ แจ้งเตือน');
                     setAdjustingCredit(false);
                     return;
                 }
@@ -587,14 +596,14 @@ const Admin = () => {
                     : u
             ));
 
-            alert(`✅ ${action}เครดิต ${Math.abs(amount)} TOKEN สำเร็จ`);
+            showSuccess(`✅ ${action}เครดิต ${Math.abs(amount)} TOKEN สำเร็จ`, '✅ สำเร็จ');
             setShowCreditModal(false);
             setCreditAdjustAmount('');
             setCreditAdjustReason('');
             setSelectedUser(null);
         } catch (error) {
             console.error('Adjust credit failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setAdjustingCredit(false);
         }
@@ -660,7 +669,7 @@ const Admin = () => {
             }
         } catch (err) {
             console.error('Get storage stats error:', err);
-            alert('เกิดข้อผิดพลาด: ' + err.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + err.message, '🚫 ผิดพลาด');
         } finally {
             setLoadingStorage(false);
         }
@@ -672,9 +681,10 @@ const Admin = () => {
         const parsed = JSON.parse(selectedProjectForStorage);
         const isAllProjects = parsed.projectId === 'all';
         const confirmMsg = isAllProjects 
-            ? `⚠️ ยืนยันการล้างข้อมูลเก่า (> 7 วัน) สำหรับ ทุกโปรเจค (${userProjects.length - 1} โปรเจค)?`
-            : `ยืนยันการล้างข้อมูลเก่า (> 7 วัน) สำหรับ ${targets.join(', ')}?`;
-        if (!confirm(confirmMsg)) return;
+            ? `🗑️ ยืนยันการล้างข้อมูลเก่า (> 7 วัน)\n\n📂 สำหรับ: ทุกโปรเจค (${userProjects.length - 1} โปรเจค)`
+            : `🗑️ ยืนยันการล้างข้อมูลเก่า (> 7 วัน)\n\n📂 สำหรับ: ${targets.join(', ')}`;
+        const confirmed = await showConfirm(confirmMsg, '⚠️ ยืนยันการล้าง');
+        if (!confirmed) return;
         
         setCleaningUp(true);
         try {
@@ -683,15 +693,15 @@ const Admin = () => {
             if (isAllProjects) {
                 const projectsList = userProjects.filter(p => !p.isAll).map(p => ({ userId: p.userId, projectId: p.id }));
                 const result = await manualCleanup({ allProjects: projectsList, targets });
-                alert(`✅ ${result.data.message}`);
+                showSuccess(`✅ ${result.data.message}`, '✅ สำเร็จ');
             } else {
                 const result = await manualCleanup({ projectId: parsed.projectId, userId: parsed.userId, targets });
-                alert(`✅ ${result.data.message}`);
+                showSuccess(`✅ ${result.data.message}`, '✅ สำเร็จ');
             }
             fetchStorageStats(); // Refresh stats
         } catch (err) {
             console.error('Manual cleanup error:', err);
-            alert('เกิดข้อผิดพลาด: ' + err.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + err.message, '🚫 ผิดพลาด');
         } finally {
             setCleaningUp(false);
         }

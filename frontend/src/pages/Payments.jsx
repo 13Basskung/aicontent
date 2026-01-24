@@ -349,6 +349,12 @@ const Payments = () => {
             return;
         }
 
+        const depositConfirmed = await showConfirm(
+            `💰 ยืนยันแจ้งเติมเครดิต\n\n📊 จำนวน: ${numericAmount} TOKEN\n💳 วิธีชำระ: PromptPay\n📱 หมายเลข: ${PROMPTPAY_MASKED}`,
+            '🤔 ยืนยันการเติมเงิน'
+        );
+        if (!depositConfirmed) return;
+
         setSubmitting(true);
         try {
             const safeName = slipFile.name.replace(/\s+/g, '_');
