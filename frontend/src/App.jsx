@@ -5,6 +5,7 @@ import { LayoutDashboard, FolderKanban, Settings, LogIn, LogOut, User, Share2, W
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { ConfirmModalProvider } from './hooks/useConfirmModal';
 
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -323,7 +324,9 @@ return (
 function App() {
   return (
     <Router>
-      <AppContent />
+      <ConfirmModalProvider>
+        <AppContent />
+      </ConfirmModalProvider>
     </Router>
   );
 }

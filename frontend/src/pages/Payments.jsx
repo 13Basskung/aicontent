@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, where, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import useSubscription from '../hooks/useSubscription';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 import {
     SUBSCRIPTION_PRICES,
     calculateTotalPrice,
@@ -52,6 +53,7 @@ const THAI_BANKS = [
 ];
 
 const Payments = () => {
+    const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [currentUser, setCurrentUser] = useState(null);
     const [mainTab, setMainTab] = useState('credit'); // 'credit' | 'subscription'
     const [activeTab, setActiveTab] = useState('deposit');
@@ -261,12 +263,60 @@ const Payments = () => {
         }
     }), []);
 
-    // หา payment เดือนหน้าที่ pending หรือ approved
-    const nextMonthPayment = useMemo(() => {
-        return subscriptionPayments.find(p => 
-            p.billingMonth === 'next' && 
-            (p.status === 'pending' || p.status === 'approved')
+    // รวม payment เดือนหน้าที่ approved ทั้งหมด (สะสม limits และ amount)
+    const nextMonthPaymentSummary = useMemo(() => {
+        const approvedPayments = subscriptionPayments.filter(p => 
+            p.billingMonth === 'next' && p.status === 'approved'
         );
+        const pendingPayments = subscriptionPayments.filter(p => 
+            p.billingMonth === 'next' && p.status === 'pending'
+        );
+        
+        if (approvedPayments.length === 0 && pendingPayments.length === 0) {
+            return null;
+        }
+        
+        // คำนวณ limits โดยสะสมจาก VIP base + add-ons ทั้งหมด
+        let hasVIPBase = false;
+        let totalAddOnProjects = 0;
+        let totalAmount = 0;
+        
+        approvedPayments.forEach(p => {
+            // ตรวจสอบว่าจ่าย VIP base หรือไม่
+            if ((p.breakdown?.proPlan ?? 0) > 0) {
+                hasVIPBase = true;
+            }
+            // นับ add-on projects (newExtraProjects หรือ extraProjects)
+            totalAddOnProjects += (p.newExtraProjects ?? p.extraProjects ?? 0);
+            totalAmount += p.amount || 0;
+        });
+        
+        // ถ้าไม่มี VIP base แต่มี add-on → ลูกค้าเป็นสมาชิกเดิมอยู่แล้ว ให้ใช้ base จาก subscription ปัจจุบัน
+        const baseProjects = hasVIPBase ? 1 : 0;
+        const baseModes = hasVIPBase ? 2 : 0;
+        const baseExtenders = hasVIPBase ? 2 : 0;
+        
+        // รวม limits = base + add-ons
+        const totalProjects = baseProjects + totalAddOnProjects;
+        const totalModes = baseModes + (totalAddOnProjects * 2);
+        const totalExtenders = baseExtenders + (totalAddOnProjects * 2);
+        
+        // ถ้ามี pending ให้แสดงว่ารอตรวจสอบ
+        const hasPending = pendingPayments.length > 0;
+        const hasApproved = approvedPayments.length > 0;
+        
+        return {
+            status: hasPending ? (hasApproved ? 'partial' : 'pending') : 'approved',
+            limits: {
+                projects: totalProjects || 1,
+                modes: totalModes || 2,
+                extenders: totalExtenders || 2
+            },
+            amount: totalAmount,
+            approvedCount: approvedPayments.length,
+            pendingCount: pendingPayments.length,
+            billingPeriod: approvedPayments[0]?.billingPeriod || pendingPayments[0]?.billingPeriod
+        };
     }, [subscriptionPayments]);
 
     // คำนวณวันสิ้นสุดของเดือนปัจจุบัน
@@ -285,17 +335,17 @@ const Payments = () => {
 
     const handleSubmit = async () => {
         if (!currentUser) {
-            alert('กรุณาเข้าสู่ระบบก่อน');
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
             return;
         }
 
         const numericAmount = Number(amount);
         if (!numericAmount || numericAmount <= 0) {
-            alert('กรุณากรอกจำนวนเงินที่ถูกต้อง');
+            showAlert('💰 กรุณากรอกจำนวนเงินที่ถูกต้อง', '⚠️ แจ้งเตือน');
             return;
         }
         if (!slipFile) {
-            alert('กรุณาแนบสลิปการโอนเงิน');
+            showAlert('📎 กรุณาแนบสลิปการโอนเงิน', '⚠️ แจ้งเตือน');
             return;
         }
 
@@ -322,10 +372,10 @@ const Payments = () => {
 
             setAmount('');
             setSlipFile(null);
-            alert('✅ แจ้งชำระเงินเรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน');
+            showSuccess('💸 แจ้งชำระเงินเรียบร้อยแล้ว\nรอการตรวจสอบจากแอดมิน', '✅ สำเร็จ');
         } catch (error) {
             console.error('Payment request failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setSubmitting(false);
         }
@@ -335,11 +385,11 @@ const Payments = () => {
     const handleAddBank = async () => {
         if (!currentUser) return;
         if (!newBank.bankCode || !newBank.accountNumber || !newBank.accountName) {
-            alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+            showAlert('📝 กรุณากรอกข้อมูลให้ครบถ้วน', '⚠️ แจ้งเตือน');
             return;
         }
         if (newBank.accountNumber.length < 10) {
-            alert('เลขบัญชีต้องมีอย่างน้อย 10 หลัก');
+            showAlert('🔢 เลขบัญชีต้องมีอย่างน้อย 10 หลัก', '⚠️ แจ้งเตือน');
             return;
         }
 
@@ -355,10 +405,10 @@ const Payments = () => {
             });
             setNewBank({ bankCode: '', accountNumber: '', accountName: '' });
             setShowAddBankModal(false);
-            alert('✅ เพิ่มบัญชีเรียบร้อยแล้ว');
+            showSuccess('🏦 เพิ่มบัญชีเรียบร้อยแล้ว', '✅ สำเร็จ');
         } catch (error) {
             console.error('Add bank failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setSavingBank(false);
         }
@@ -366,43 +416,48 @@ const Payments = () => {
 
     // Delete Bank Account
     const handleDeleteBank = async (bankId) => {
-        if (!confirm('ยืนยันลบบัญชีนี้?')) return;
+        const confirmed = await showConfirm('🗑️ ยืนยันลบบัญชีนี้?', '⚠️ ยืนยัน');
+        if (!confirmed) return;
         try {
             await deleteDoc(doc(db, 'users', currentUser.uid, 'bank_accounts', bankId));
             if (selectedBankId === bankId) setSelectedBankId('');
         } catch (error) {
             console.error('Delete bank failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         }
     };
 
     // Submit Withdrawal
     const handleWithdraw = async () => {
         if (!currentUser) {
-            alert('กรุณาเข้าสู่ระบบก่อน');
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
             return;
         }
         const numericAmount = Number(withdrawAmount);
         if (!numericAmount || numericAmount <= 0) {
-            alert('กรุณากรอกจำนวนเงินที่ถูกต้อง');
+            showAlert('💰 กรุณากรอกจำนวนเงินที่ถูกต้อง', '⚠️ แจ้งเตือน');
             return;
         }
         if (numericAmount > walletBalance) {
-            alert(`ยอดเครดิตไม่เพียงพอ (คงเหลือ ${walletBalance} TOKEN)`);
+            showAlert(`💸 ยอดเครดิตไม่เพียงพอ\n(คงเหลือ ${walletBalance} TOKEN)`, '⚠️ แจ้งเตือน');
             return;
         }
         if (!selectedBankId) {
-            alert('กรุณาเลือกบัญชีปลายทาง');
+            showAlert('🏦 กรุณาเลือกบัญชีปลายทาง', '⚠️ แจ้งเตือน');
             return;
         }
 
         const selectedBank = bankAccounts.find(b => b.id === selectedBankId);
         if (!selectedBank) {
-            alert('ไม่พบบัญชีที่เลือก');
+            showAlert('🏦 ไม่พบบัญชีที่เลือก', '⚠️ แจ้งเตือน');
             return;
         }
 
-        if (!confirm(`ยืนยันขอถอน ${numericAmount} TOKEN ไปยัง\n${selectedBank.bankName}\n${selectedBank.accountNumber}\n${selectedBank.accountName}?`)) return;
+        const withdrawConfirmed = await showConfirm(
+            `💸 ยืนยันขอถอน ${numericAmount} TOKEN ไปยัง\n\n🏦 ${selectedBank.bankName}\n🔢 ${selectedBank.accountNumber}\n👤 ${selectedBank.accountName}`,
+            '🤔 ยืนยันการถอน'
+        );
+        if (!withdrawConfirmed) return;
 
         setSubmittingWithdrawal(true);
         try {
@@ -419,10 +474,10 @@ const Payments = () => {
                 createdAt: serverTimestamp()
             });
             setWithdrawAmount('');
-            alert('✅ ส่งคำขอถอนเงินเรียบร้อยแล้ว รอการอนุมัติจากแอดมิน');
+            showSuccess('💸 ส่งคำขอถอนเงินเรียบร้อยแล้ว\nรอการอนุมัติจากแอดมิน', '✅ สำเร็จ');
         } catch (error) {
             console.error('Withdrawal request failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setSubmittingWithdrawal(false);
         }
@@ -431,11 +486,11 @@ const Payments = () => {
     // Submit Subscription Payment
     const handleSubscriptionPayment = async () => {
         if (!currentUser) {
-            alert('กรุณาเข้าสู่ระบบก่อน');
+            showAlert('🔐 กรุณาเข้าสู่ระบบก่อน', '⚠️ แจ้งเตือน');
             return;
         }
         if (!subSlipFile) {
-            alert('กรุณาแนบสลิปการโอนเงิน');
+            showAlert('📎 กรุณาแนบสลิปการโอนเงิน', '⚠️ แจ้งเตือน');
             return;
         }
 
@@ -454,7 +509,8 @@ const Payments = () => {
             `- Modes: ${priceInfo.limits.modes}\n` +
             `- Extenders: ${priceInfo.limits.extenders}`;
 
-        if (!confirm(confirmMsg)) return;
+        const subConfirmed = await showConfirm(confirmMsg, '👑 ยืนยันชำระ Subscription');
+        if (!subConfirmed) return;
 
         setSubmittingSub(true);
         try {
@@ -507,10 +563,10 @@ const Payments = () => {
             setExtraProjects(0);
             setSubSlipFile(null);
             setBillingMonth('current'); // Reset billing month selection
-            alert('✅ แจ้งชำระค่า Subscription เรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน');
+            showSuccess('👑 แจ้งชำระค่า Subscription เรียบร้อยแล้ว\nรอการตรวจสอบจากแอดมิน', '✅ สำเร็จ');
         } catch (error) {
             console.error('Subscription payment failed:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            showError('❌ เกิดข้อผิดพลาด\n' + error.message, '🚫 ผิดพลาด');
         } finally {
             setSubmittingSub(false);
         }
@@ -1017,33 +1073,40 @@ const Payments = () => {
                             </div>
 
                             {/* Next Month Limits */}
-                            {nextMonthPayment ? (
+                            {nextMonthPaymentSummary ? (
                                 <>
                                     <div className="grid grid-cols-3 gap-2 mb-4">
                                         <div className="bg-black/30 rounded-lg p-3 text-center border border-purple-500/20">
-                                            <p className="text-2xl font-bold text-purple-400">{nextMonthPayment.limits?.projects || 1}</p>
+                                            <p className="text-2xl font-bold text-purple-400">{nextMonthPaymentSummary.limits.projects}</p>
                                             <p className="text-xs text-slate-400">Projects</p>
                                         </div>
                                         <div className="bg-black/30 rounded-lg p-3 text-center border border-blue-500/20">
-                                            <p className="text-2xl font-bold text-blue-400">{nextMonthPayment.limits?.modes || 2}</p>
+                                            <p className="text-2xl font-bold text-blue-400">{nextMonthPaymentSummary.limits.modes}</p>
                                             <p className="text-xs text-slate-400">Modes</p>
                                         </div>
                                         <div className="bg-black/30 rounded-lg p-3 text-center border border-green-500/20">
-                                            <p className="text-2xl font-bold text-green-400">{nextMonthPayment.limits?.extenders || 2}</p>
+                                            <p className="text-2xl font-bold text-green-400">{nextMonthPaymentSummary.limits.extenders}</p>
                                             <p className="text-xs text-slate-400">Extenders</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-xs">
                                         <span className={`px-2 py-1 rounded-full ${
-                                            nextMonthPayment.status === 'approved' 
+                                            nextMonthPaymentSummary.status === 'approved' 
                                                 ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                                                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                                                : nextMonthPaymentSummary.status === 'partial'
+                                                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                                    : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
                                         }`}>
-                                            {nextMonthPayment.status === 'approved' ? '✓ ชำระแล้ว' : '⏳ รอตรวจสอบ'}
+                                            {nextMonthPaymentSummary.status === 'approved' ? '✓ ชำระแล้ว' : nextMonthPaymentSummary.status === 'partial' ? '⏳ บางส่วนรอตรวจสอบ' : '⏳ รอตรวจสอบ'}
                                         </span>
                                         <span className="text-slate-400">
-                                            ฿{nextMonthPayment.amount?.toLocaleString()}
+                                            ฿{nextMonthPaymentSummary.amount?.toLocaleString()}
                                         </span>
+                                        {nextMonthPaymentSummary.approvedCount > 1 && (
+                                            <span className="text-cyan-300 text-[10px]">
+                                                ({nextMonthPaymentSummary.approvedCount} รายการ)
+                                            </span>
+                                        )}
                                     </div>
                                 </>
                             ) : (
