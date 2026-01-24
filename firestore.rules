@@ -123,6 +123,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Admin Credit Logs (Admin เท่านั้น)
+    match /admin_credit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
     // Subscription Payments (User สร้างได้, Admin อ่าน/อัปเดตได้)
     match /subscription_payments/{paymentId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);

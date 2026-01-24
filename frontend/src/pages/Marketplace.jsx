@@ -909,13 +909,15 @@ const Marketplace = () => {
             // Delete from marketplace_expanders collection
             await deleteDoc(doc(db, 'marketplace_expanders', item.id));
             
-            // Refresh the list
-            await fetchMarketplaceExpanders();
+            // Optimistically remove from local state immediately
+            setUserExpanders(prev => prev.filter(exp => exp.id !== item.id));
             
             showSuccess(`✅ ลบ "${item.name}" ออกจาก Marketplace แล้ว`, '✅ สำเร็จ');
         } catch (error) {
             console.error('Delete failed:', error);
             showError('❌ ลบไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
+            // Refresh to restore state if delete failed
+            await fetchMarketplaceExpanders();
         } finally {
             setIsDeleting(null);
         }
