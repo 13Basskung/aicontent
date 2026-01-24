@@ -96,43 +96,53 @@ export const calculateProrate = (fullPrice, purchaseDate = new Date()) => {
 };
 
 /**
- * คำนวณราคารวมสำหรับการสมัคร/ต่ออายุ/ซื้อ Add-on
+ * คำนวณราคา Subscription
  * 
  * กติกาหลัก:
- * - ถ้าลูกค้าเป็น Free → ต้องจ่ายค่าแพลน 199 + Add-on (ถ้ามี)
- * - ถ้าลูกค้าเป็น Premium/Pro แล้ว → จ่ายเฉพาะ Add-on (ไม่คิดค่าแพลนซ้ำ)
- * - Limits จะคำนวณจาก totalExtraProjects (รวมของเดิม + ใหม่)
+ * - เดือนนี้ (current): ถ้าลูกค้าเป็น VIP/Premium อยู่แล้ว → จ่ายเฉพาะ Add-on (upgrade)
+ * - เดือนหน้า (next): เป็น Subscription ใหม่เสมอ → จ่าย VIP 199 + Add-on (ไม่ใช่ upgrade)
  * 
- * @param {number} newExtraProjects - จำนวน Project ที่ซื้อใหม่ครั้งนี้ (สำหรับคิดเงิน)
+ * @param {number} newExtraProjects - จำนวน Project ที่ซื้อใหม่ครั้งนี้
  * @param {boolean} isProrate - เป็นการซื้อระหว่างเดือนหรือไม่
  * @param {Date} purchaseDate - วันที่ซื้อ
- * @param {boolean} isAlreadySubscribed - ลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่ (default: false = Free)
- * @param {number} totalExtraProjects - จำนวน Project รวมทั้งหมด (เดิม + ใหม่) สำหรับคำนวณ Limits
- * @param {string} billingMonth - 'current' = เดือนนี้ (prorate), 'next' = เดือนหน้า (เต็มเดือน)
+ * @param {boolean} isAlreadySubscribed - ลูกค้าเป็น Premium/Pro อยู่แล้วหรือไม่
+ * @param {number} totalExtraProjects - จำนวน Project รวมทั้งหมด (เดิม + ใหม่) สำหรับ current month
+ * @param {string} billingMonth - 'current' = เดือนนี้ (prorate/upgrade), 'next' = เดือนหน้า (subscription ใหม่)
  * @returns {{ total: number, breakdown: object }}
  */
 export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, purchaseDate = new Date(), isAlreadySubscribed = false, totalExtraProjects = null, billingMonth = 'current') => {
-    // ถ้าไม่ได้ส่ง totalExtraProjects มา ให้ใช้ newExtraProjects (กรณี Free user)
-    const effectiveTotalExtra = totalExtraProjects !== null ? totalExtraProjects : newExtraProjects;
     
-    // ถ้าเป็น Premium/Pro อยู่แล้ว → ไม่คิดค่าแพลนซ้ำ
-    let proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN;
-    // คิดเงินเฉพาะ Project ที่ซื้อใหม่
-    let extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
-    
+    let proPlanPrice = 0;
+    let extraProjectsPrice = 0;
     let proPlanProrate = null;
     let extraProjectsProrate = null;
     let expiryDate = null;
+    let effectiveTotalExtra = 0;
+    let isNewSubscription = false;
     
-    // ถ้าเลือก "เดือนหน้า" → ไม่คิด prorate, คิดราคาเต็ม, หมดอายุสิ้นเดือนหน้า
+    // ========== เดือนหน้า = Subscription ใหม่ (ไม่ใช่ upgrade) ==========
+    let billingPeriodStart = null;
+    
     if (billingMonth === 'next') {
-        // ราคาเต็ม (ไม่ prorate)
-        proPlanPrice = isAlreadySubscribed ? 0 : SUBSCRIPTION_PRICES.PRO_PLAN;
-        extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT;
+        isNewSubscription = true;
         
-        // คำนวณวันหมดอายุ = สิ้นเดือนหน้า
+        // เดือนหน้า: จ่าย VIP 199 บาท + Add-on 250 บาท/project เสมอ
+        proPlanPrice = SUBSCRIPTION_PRICES.PRO_PLAN; // 199 บาท
+        extraProjectsPrice = newExtraProjects * SUBSCRIPTION_PRICES.EXTRA_PROJECT; // 250 * n
+        
+        // Limits คำนวณจาก newExtraProjects เท่านั้น (ไม่รวมของเดิม)
+        effectiveTotalExtra = newExtraProjects;
+        
+        // วันเริ่มต้น = วันที่ 1 ของเดือนหน้า
+        billingPeriodStart = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 1);
+        billingPeriodStart.setHours(0, 0, 0, 0);
+        
+        // วันหมดอายุ = สิ้นเดือนหน้า
         const nextMonth = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 2, 0);
+        nextMonth.setHours(23, 59, 59, 999);
         expiryDate = nextMonth;
+        
+    // ========== เดือนนี้ = Upgrade (ถ้ามี subscription อยู่แล้ว) ==========
     } else if (isProrate) {
         // เดือนนี้ + prorate
         // คำนวณ prorate สำหรับค่าแพลน (เฉพาะถ้าเป็น Free)
@@ -147,10 +157,14 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
             extraProjectsPrice = extraProjectsProrate.proratedPrice;
         }
         
+        // Limits สำหรับเดือนนี้ = รวมของเดิม + ใหม่
+        effectiveTotalExtra = totalExtraProjects !== null ? totalExtraProjects : newExtraProjects;
+        
         // วันหมดอายุ = สิ้นเดือนนี้
         expiryDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 0);
     } else {
         // วันที่ 1 ของเดือน = ไม่ prorate
+        effectiveTotalExtra = totalExtraProjects !== null ? totalExtraProjects : newExtraProjects;
         expiryDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 0);
     }
     
@@ -175,7 +189,9 @@ export const calculateTotalPrice = (newExtraProjects = 0, isProrate = false, pur
         limits,
         tier: effectiveTotalExtra > 0 ? SUBSCRIPTION_TIERS.PREMIUM : SUBSCRIPTION_TIERS.VIP,
         billingMonth,
+        billingPeriodStart, // วันเริ่มต้น (สำหรับเดือนหน้า = วันที่ 1)
         expiryDate,
+        isNewSubscription, // true = subscription ใหม่ (เดือนหน้า), false = upgrade (เดือนนี้)
     };
 };
 

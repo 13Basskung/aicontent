@@ -444,6 +444,14 @@ const Payments = () => {
 
             const now = new Date();
             const expiryDate = priceInfo.expiryDate || getExpiryDate(now);
+            
+            // สำหรับเดือนหน้า: start = วันที่ 1 ของเดือนหน้า, end = สิ้นเดือนหน้า
+            // สำหรับเดือนนี้: start = วันนี้, end = สิ้นเดือนนี้
+            const billingStart = priceInfo.billingPeriodStart || now;
+            
+            // สำหรับเดือนหน้า: totalExtraProjects = newExtraProjects (ไม่รวมของเดิม)
+            const effectiveTotalExtra = billingMonth === 'next' ? extraProjects : totalExtraProjects;
+            const effectiveTotalProjects = 1 + effectiveTotalExtra;
 
             await addDoc(collection(db, 'subscription_payments'), {
                 userId: currentUser.uid,
@@ -452,16 +460,17 @@ const Payments = () => {
                 amount: priceInfo.total,
                 breakdown: priceInfo.breakdown,
                 newExtraProjects: extraProjects,                    // จำนวนที่ซื้อใหม่ครั้งนี้
-                existingExtraProjects: existingExtraProjects,       // จำนวนที่มีอยู่เดิม
-                totalExtraProjects: totalExtraProjects,             // รวมทั้งหมด (เดิม + ใหม่)
-                totalProjects: 1 + totalExtraProjects,              // Base 1 + total extra
-                limits: priceInfo.limits,                           // Limits ที่คำนวณจาก totalExtraProjects
+                existingExtraProjects: billingMonth === 'next' ? 0 : existingExtraProjects, // เดือนหน้า = 0 (เริ่มใหม่)
+                totalExtraProjects: effectiveTotalExtra,            // เดือนหน้า = newExtraProjects, เดือนนี้ = รวมทั้งหมด
+                totalProjects: effectiveTotalProjects,              // Base 1 + effectiveTotalExtra
+                limits: priceInfo.limits,                           // Limits ที่คำนวณจาก effectiveTotalExtra
                 tier: priceInfo.tier,
                 isProrate: priceInfo.prorate !== null && billingMonth === 'current',
+                isNewSubscription: priceInfo.isNewSubscription || false, // true = subscription ใหม่ (เดือนหน้า)
                 prorateInfo: priceInfo.prorate,
                 billingMonth: billingMonth,                         // 'current' หรือ 'next'
                 billingPeriod: {
-                    start: now,
+                    start: billingStart,                            // เดือนหน้า = วันที่ 1, เดือนนี้ = วันนี้
                     end: expiryDate,
                 },
                 slipUrl,
@@ -1087,31 +1096,60 @@ const Payments = () => {
                             {/* Price Summary */}
                             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-xl p-4 mb-6 border border-purple-500/30">
                                 <div className="space-y-2">
-                                    {/* แสดง Pro Plan เฉพาะถ้าลูกค้ายังไม่ได้สมัคร */}
-                                    {!subscriptionPriceInfo.breakdown.isAlreadySubscribed ? (
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-300">Pro Plan</span>
-                                            <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-green-400">✓ คุณเป็นสมาชิกอยู่แล้ว</span>
-                                            <span className="text-green-400 font-medium">ไม่คิดค่าแพลนซ้ำ</span>
-                                        </div>
-                                    )}
-                                    {extraProjects > 0 && (
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-slate-300">เพิ่ม {extraProjects} Project + {extraProjects * 2} Mode + {extraProjects * 2} Extender</span>
-                                                <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
+                                    {/* เดือนหน้า = Subscription ใหม่ */}
+                                    {billingMonth === 'next' ? (
+                                        <>
+                                            {/* แสดงช่วงเวลา */}
+                                            <div className="flex items-center gap-2 text-xs text-cyan-300 bg-cyan-500/10 rounded-lg px-3 py-2 mb-2">
+                                                <Calendar size={14} />
+                                                <span>
+                                                    Subscription เดือนหน้า: {subscriptionPriceInfo.billingPeriodStart?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {subscriptionPriceInfo.expiryDate?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                </span>
                                             </div>
-                                        </div>
-                                    )}
-                                    {subscriptionPriceInfo.prorate && subscriptionPriceInfo.prorate.daysRemaining && (
-                                        <div className="text-xs text-purple-300 pt-2 border-t border-white/10">
-                                            <Zap size={12} className="inline mr-1" />
-                                            คำนวณตามวันที่เหลือในเดือน ({subscriptionPriceInfo.prorate.daysRemaining} วัน)
-                                        </div>
+                                            {/* VIP Plan (199 บาทเสมอ) */}
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-slate-300">VIP Plan (1 Project, 2 Modes, 2 Extenders)</span>
+                                                <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
+                                            </div>
+                                            {/* Extra Projects สำหรับเดือนหน้า */}
+                                            {extraProjects > 0 && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-300">+ {extraProjects} Project เพิ่ม (+{extraProjects * 2} Modes, +{extraProjects * 2} Extenders)</span>
+                                                    <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
+                                                </div>
+                                            )}
+                                            {/* Total Limits */}
+                                            <div className="text-xs text-green-300 bg-green-500/10 rounded-lg p-2 mt-2">
+                                                📦 รวม: <span className="font-bold">{subscriptionPriceInfo.limits.projects} Projects, {subscriptionPriceInfo.limits.modes} Modes, {subscriptionPriceInfo.limits.extenders} Extenders</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* เดือนนี้ = Upgrade */}
+                                            {!subscriptionPriceInfo.breakdown.isAlreadySubscribed ? (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-300">Pro Plan</span>
+                                                    <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.proPlan)}</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-green-400">✓ คุณเป็นสมาชิกอยู่แล้ว</span>
+                                                    <span className="text-green-400 font-medium">ไม่คิดค่าแพลนซ้ำ</span>
+                                                </div>
+                                            )}
+                                            {extraProjects > 0 && (
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-300">เพิ่ม {extraProjects} Project + {extraProjects * 2} Mode + {extraProjects * 2} Extender</span>
+                                                    <span className="text-white font-medium">{formatPrice(subscriptionPriceInfo.breakdown.extraProjects)}</span>
+                                                </div>
+                                            )}
+                                            {subscriptionPriceInfo.prorate && subscriptionPriceInfo.prorate.daysRemaining && (
+                                                <div className="text-xs text-purple-300 pt-2 border-t border-white/10">
+                                                    <Zap size={12} className="inline mr-1" />
+                                                    คำนวณตามวันที่เหลือในเดือน ({subscriptionPriceInfo.prorate.daysRemaining} วัน)
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/10">
                                         <span className="text-white">รวมทั้งสิ้น</span>
@@ -1178,20 +1216,33 @@ const Payments = () => {
                                     {subscriptionPayments.map((payment) => {
                                         const meta = statusMeta[payment.status] || statusMeta.pending;
                                         const StatusIcon = meta.icon;
+                                        const isNextMonth = payment.billingMonth === 'next';
+                                        const periodStart = payment.billingPeriod?.start?.toDate?.() || payment.billingPeriod?.start;
+                                        const periodEnd = payment.billingPeriod?.end?.toDate?.() || payment.billingPeriod?.end;
                                         return (
-                                            <div key={payment.id} className="bg-black/40 border border-white/10 rounded-xl p-3 flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-sm text-white font-semibold">{formatPrice(payment.amount)}</p>
-                                                    <p className="text-xs text-slate-500">
-                                                        {payment.type === 'subscription_with_projects' 
-                                                            ? `${payment.totalProjects || (1 + (payment.totalExtraProjects || payment.extraProjects || 0))} Project + ${payment.limits?.modes || ((payment.totalExtraProjects || payment.extraProjects || 0) + 1) * 2} Mode + ${payment.limits?.extenders || ((payment.totalExtraProjects || payment.extraProjects || 0) + 1) * 2} Extender` 
-                                                            : 'Pro Plan'}
-                                                    </p>
-                                                    <p className="text-xs text-slate-600">{payment.createdAt?.toDate ? payment.createdAt.toDate().toLocaleString('th-TH') : '-'}</p>
+                                            <div key={payment.id} className={`bg-black/40 border rounded-xl p-3 ${isNextMonth ? 'border-cyan-500/30' : 'border-white/10'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-sm text-white font-semibold">{formatPrice(payment.amount)}</p>
+                                                            {isNextMonth && (
+                                                                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">เดือนหน้า</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-slate-500">
+                                                            {payment.limits?.projects || 1} Project, {payment.limits?.modes || 2} Modes, {payment.limits?.extenders || 2} Extenders
+                                                        </p>
+                                                        {isNextMonth && periodStart && periodEnd && (
+                                                            <p className="text-xs text-cyan-400">
+                                                                📅 {periodStart.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {periodEnd.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-xs text-slate-600">{payment.createdAt?.toDate ? payment.createdAt.toDate().toLocaleString('th-TH') : '-'}</p>
+                                                    </div>
+                                                    <span className={`text-xs font-semibold px-3 py-1 rounded-full border flex items-center gap-1 ${meta.className}`}>
+                                                        <StatusIcon size={12} /> {meta.label}
+                                                    </span>
                                                 </div>
-                                                <span className={`text-xs font-semibold px-3 py-1 rounded-full border flex items-center gap-1 ${meta.className}`}>
-                                                    <StatusIcon size={12} /> {meta.label}
-                                                </span>
                                             </div>
                                         );
                                     })}
