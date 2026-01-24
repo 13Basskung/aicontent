@@ -39,6 +39,12 @@ const Admin = () => {
     const [showCreditModal, setShowCreditModal] = useState(false);
     const [adminCreditLogs, setAdminCreditLogs] = useState([]);
     const [loadingCreditLogs, setLoadingCreditLogs] = useState(false);
+    const [creditManagerSearch, setCreditManagerSearch] = useState('');
+
+    // Subscription Manager
+    const [subscriptionManagerSearch, setSubscriptionManagerSearch] = useState('');
+    const [editingUserSub, setEditingUserSub] = useState(null);
+    const [savingUserSub, setSavingUserSub] = useState(false);
 
     // Activity Filters
     const [activitySearch, setActivitySearch] = useState('');
@@ -719,7 +725,8 @@ const Admin = () => {
         { id: 'deposits', label: 'เติมเงิน', icon: ArrowUpRight },
         { id: 'withdrawals', label: 'ถอนเงิน', icon: ArrowDownRight },
         { id: 'subscriptions', label: 'Subscription', icon: Crown },
-        { id: 'manager', label: 'Credit Manager', icon: Users }
+        { id: 'manager', label: 'Credit Manager', icon: Users },
+        { id: 'subscription_manager', label: 'Subscription Manager', icon: Star }
     ];
 
     return (
@@ -1530,13 +1537,25 @@ const Admin = () => {
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500" />
                             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
                             
-                            <div className="flex items-center gap-4 mb-8 relative">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                                    <Users className="text-white" size={32} />
+                            <div className="flex items-center justify-between gap-4 mb-8 relative">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                        <Users className="text-white" size={32} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-400">Credit Manager</h2>
+                                        <p className="text-slate-400 mt-1">จัดการเครดิตผู้ใช้งานทั้งหมด • {allUsers.length} คน</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-400">Credit Manager</h2>
-                                    <p className="text-slate-400 mt-1">จัดการเครดิตผู้ใช้งานทั้งหมด • {allUsers.length} คน</p>
+                                {/* Search Box */}
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 ค้นหาผู้ใช้..."
+                                        value={creditManagerSearch}
+                                        onChange={(e) => setCreditManagerSearch(e.target.value)}
+                                        className="w-64 px-4 py-2 bg-black/40 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20"
+                                    />
                                 </div>
                             </div>
 
@@ -1555,7 +1574,15 @@ const Admin = () => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {allUsers.map((user, index) => {
+                                            {allUsers
+                                                .filter(user => {
+                                                    if (!creditManagerSearch.trim()) return true;
+                                                    const search = creditManagerSearch.toLowerCase();
+                                                    const email = (user.email || '').toLowerCase();
+                                                    const name = (user.displayName || '').toLowerCase();
+                                                    return email.includes(search) || name.includes(search);
+                                                })
+                                                .map((user, index) => {
                                                 const userStats = getUserStats(user.id);
                                                 const userEmail = user.email || paymentLogs.find(l => l.userId === user.id)?.userEmail || user.id;
                                                 return (
@@ -1631,6 +1658,318 @@ const Admin = () => {
                                     })}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Subscription Manager Tab */}
+                {activeTab === 'credit' && creditSubTab === 'subscription_manager' && (
+                    <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500" />
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
+                        
+                        <div className="flex items-center justify-between gap-4 mb-8 relative">
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+                                    <Star className="text-white" size={32} />
+                                </div>
+                                <div>
+                                    <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-400">Subscription Manager</h2>
+                                    <p className="text-slate-400 mt-1">จัดการ Subscription ผู้ใช้งานทั้งหมด • {allUsers.filter(u => u.subscription?.status === 'active').length} คนใช้งานอยู่</p>
+                                </div>
+                            </div>
+                            {/* Search Box */}
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="🔍 ค้นหาผู้ใช้..."
+                                    value={subscriptionManagerSearch}
+                                    onChange={(e) => setSubscriptionManagerSearch(e.target.value)}
+                                    className="w-64 px-4 py-2 bg-black/40 border border-white/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-yellow-500/50 focus:ring-2 focus:ring-yellow-500/20"
+                                />
+                            </div>
+                        </div>
+
+                        {loadingUsers ? (
+                            <div className="text-slate-400 flex items-center gap-2 justify-center py-12"><Loader2 size={24} className="animate-spin" /> กำลังโหลดข้อมูลผู้ใช้...</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-white/20 bg-black/20">
+                                            <th className="text-left py-4 px-4 text-yellow-300 font-bold">ผู้ใช้</th>
+                                            <th className="text-center py-4 px-4 text-purple-300 font-bold">แพลน</th>
+                                            <th className="text-center py-4 px-4 text-green-300 font-bold">สถานะ</th>
+                                            <th className="text-center py-4 px-4 text-cyan-300 font-bold">หมดอายุ</th>
+                                            <th className="text-center py-4 px-4 text-pink-300 font-bold">Limits</th>
+                                            <th className="text-center py-4 px-4 text-slate-300 font-bold">จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {allUsers
+                                            .filter(user => {
+                                                if (!subscriptionManagerSearch.trim()) return true;
+                                                const search = subscriptionManagerSearch.toLowerCase();
+                                                const email = (user.email || '').toLowerCase();
+                                                const name = (user.displayName || '').toLowerCase();
+                                                return email.includes(search) || name.includes(search);
+                                            })
+                                            .map((user) => {
+                                                const sub = user.subscription || {};
+                                                const isActive = sub.status === 'active';
+                                                const isPro = sub.plan === 'pro' || sub.plan === 'vip';
+                                                const expiryDate = sub.expiresAt?.toDate?.() || sub.expiresAt;
+                                                const addOns = sub.addOns || 0;
+                                                const limits = sub.limits || { projects: 1, modes: 2, expanders: 2 };
+                                                
+                                                return (
+                                                    <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                        <td className="py-4 px-4">
+                                                            <p className="text-white font-medium">{user.email || user.id}</p>
+                                                            <p className="text-xs text-slate-500">{user.displayName || 'ไม่ระบุชื่อ'}</p>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                                isPro ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 'bg-slate-600 text-slate-300'
+                                                            }`}>
+                                                                {sub.plan === 'pro' ? '👑 PRO' : sub.plan === 'vip' ? '💎 VIP' : '🆓 FREE'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                                isActive ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                            }`}>
+                                                                {isActive ? '✅ Active' : '❌ Inactive'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            {expiryDate ? (
+                                                                <div>
+                                                                    <p className="text-white text-sm">{new Date(expiryDate).toLocaleDateString('th-TH')}</p>
+                                                                    <p className="text-xs text-slate-500">
+                                                                        {Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))} วัน
+                                                                    </p>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-500">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <div className="flex flex-wrap gap-1 justify-center">
+                                                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded text-xs">📁 {limits.projects || 1}P</span>
+                                                                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs">🎭 {limits.modes || 2}M</span>
+                                                                <span className="px-2 py-0.5 bg-pink-500/20 text-pink-300 rounded text-xs">🧩 {limits.expanders || 2}E</span>
+                                                                {addOns > 0 && (
+                                                                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs">➕ {addOns} Add-on</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-4 text-center">
+                                                            <button
+                                                                onClick={() => setEditingUserSub({ ...user })}
+                                                                className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500 hover:text-black transition-all text-sm flex items-center gap-2 mx-auto"
+                                                            >
+                                                                <Edit3 size={14} /> แก้ไข
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
+                                {allUsers.length === 0 && (
+                                    <p className="text-slate-500 text-center py-8">ไม่พบผู้ใช้งาน</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Subscription Edit Modal */}
+                {editingUserSub && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-3xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                                    <Star className="text-yellow-400" size={28} />
+                                    แก้ไข Subscription
+                                </h3>
+                                <button onClick={() => setEditingUserSub(null)} className="text-slate-400 hover:text-white">✕</button>
+                            </div>
+                            
+                            <div className="mb-6 p-4 bg-black/40 rounded-xl border border-white/10">
+                                <p className="text-white font-medium">{editingUserSub.email}</p>
+                                <p className="text-xs text-slate-500">{editingUserSub.displayName || 'ไม่ระบุชื่อ'}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                {/* Plan */}
+                                <div>
+                                    <label className="text-sm text-slate-400 mb-2 block">แพลน</label>
+                                    <select
+                                        value={editingUserSub.subscription?.plan || 'free'}
+                                        onChange={(e) => setEditingUserSub(prev => ({
+                                            ...prev,
+                                            subscription: { ...prev.subscription, plan: e.target.value }
+                                        }))}
+                                        className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
+                                    >
+                                        <option value="free">🆓 FREE</option>
+                                        <option value="pro">👑 PRO</option>
+                                        <option value="vip">💎 VIP</option>
+                                    </select>
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="text-sm text-slate-400 mb-2 block">สถานะ</label>
+                                    <select
+                                        value={editingUserSub.subscription?.status || 'inactive'}
+                                        onChange={(e) => setEditingUserSub(prev => ({
+                                            ...prev,
+                                            subscription: { ...prev.subscription, status: e.target.value }
+                                        }))}
+                                        className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
+                                    >
+                                        <option value="active">✅ Active</option>
+                                        <option value="inactive">❌ Inactive</option>
+                                        <option value="expired">⏰ Expired</option>
+                                    </select>
+                                </div>
+
+                                {/* Expiry Date */}
+                                <div>
+                                    <label className="text-sm text-slate-400 mb-2 block">วันหมดอายุ</label>
+                                    <input
+                                        type="date"
+                                        value={editingUserSub.subscription?.expiresAt?.toDate?.().toISOString().split('T')[0] || 
+                                               (editingUserSub.subscription?.expiresAt ? new Date(editingUserSub.subscription.expiresAt).toISOString().split('T')[0] : '')}
+                                        onChange={(e) => setEditingUserSub(prev => ({
+                                            ...prev,
+                                            subscription: { ...prev.subscription, expiresAt: new Date(e.target.value) }
+                                        }))}
+                                        className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+
+                                {/* Add-ons */}
+                                <div>
+                                    <label className="text-sm text-slate-400 mb-2 block">Add-ons (จำนวน)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={editingUserSub.subscription?.addOns || 0}
+                                        onChange={(e) => setEditingUserSub(prev => ({
+                                            ...prev,
+                                            subscription: { ...prev.subscription, addOns: parseInt(e.target.value) || 0 }
+                                        }))}
+                                        className="w-full px-4 py-3 bg-black/40 border border-white/20 rounded-xl text-white focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Limits */}
+                            <div className="mb-6">
+                                <label className="text-sm text-slate-400 mb-3 block">📊 Limits (จำนวนที่สร้างได้)</label>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-xs text-blue-300 mb-1 block">📁 Projects</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={editingUserSub.subscription?.limits?.projects || 1}
+                                            onChange={(e) => setEditingUserSub(prev => ({
+                                                ...prev,
+                                                subscription: { 
+                                                    ...prev.subscription, 
+                                                    limits: { ...prev.subscription?.limits, projects: parseInt(e.target.value) || 1 }
+                                                }
+                                            }))}
+                                            className="w-full px-3 py-2 bg-black/40 border border-blue-500/30 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-purple-300 mb-1 block">🎭 Modes</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={editingUserSub.subscription?.limits?.modes || 2}
+                                            onChange={(e) => setEditingUserSub(prev => ({
+                                                ...prev,
+                                                subscription: { 
+                                                    ...prev.subscription, 
+                                                    limits: { ...prev.subscription?.limits, modes: parseInt(e.target.value) || 2 }
+                                                }
+                                            }))}
+                                            className="w-full px-3 py-2 bg-black/40 border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-pink-300 mb-1 block">🧩 Expanders</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={editingUserSub.subscription?.limits?.expanders || 2}
+                                            onChange={(e) => setEditingUserSub(prev => ({
+                                                ...prev,
+                                                subscription: { 
+                                                    ...prev.subscription, 
+                                                    limits: { ...prev.subscription?.limits, expanders: parseInt(e.target.value) || 2 }
+                                                }
+                                            }))}
+                                            className="w-full px-3 py-2 bg-black/40 border border-pink-500/30 rounded-lg text-white focus:outline-none focus:border-pink-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Info: Add-on Benefits */}
+                            <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                                <p className="text-amber-300 text-sm font-medium mb-2">💡 Add-on Benefits (1 Add-on = เพิ่ม)</p>
+                                <div className="flex gap-4 text-xs text-amber-200">
+                                    <span>📁 +1 Project</span>
+                                    <span>🎭 +2 Modes</span>
+                                    <span>🧩 +2 Expanders</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setEditingUserSub(null)}
+                                    className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-all"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setSavingUserSub(true);
+                                        try {
+                                            const userRef = doc(db, 'users', editingUserSub.id);
+                                            await updateDoc(userRef, {
+                                                subscription: editingUserSub.subscription
+                                            });
+                                            
+                                            // Update local state
+                                            setAllUsers(prev => prev.map(u => 
+                                                u.id === editingUserSub.id ? { ...u, subscription: editingUserSub.subscription } : u
+                                            ));
+                                            
+                                            showSuccess(`✅ อัปเดต Subscription ของ ${editingUserSub.email} สำเร็จ`, '✅ สำเร็จ');
+                                            setEditingUserSub(null);
+                                        } catch (error) {
+                                            console.error('Update subscription failed:', error);
+                                            showError('❌ อัปเดตไม่สำเร็จ\n' + error.message, '🚫 ผิดพลาด');
+                                        } finally {
+                                            setSavingUserSub(false);
+                                        }
+                                    }}
+                                    disabled={savingUserSub}
+                                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold hover:from-yellow-400 hover:to-amber-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {savingUserSub ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                                    บันทึก
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
