@@ -985,7 +985,8 @@ const Admin = () => {
                                     options={[
                                         { value: 'all', label: 'ทุกประเภท' },
                                         { value: 'deposit', label: 'เติมเงิน' },
-                                        { value: 'withdrawal', label: 'ถอนเงิน' }
+                                        { value: 'withdrawal', label: 'ถอนเงิน' },
+                                        { value: 'subscription', label: 'Subscription' }
                                     ]}
                                     buttonClassName="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500 cursor-pointer hover:bg-black/60 transition-all"
                                 />
@@ -1001,7 +1002,7 @@ const Admin = () => {
                                 />
                             </div>
 
-                            <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-2">
+                            <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-2">
                                 {filteredActivities.map((log, index) => {
                                     const getActivityType = () => {
                                         if (log.type === 'subscription') return { label: 'Subscription', color: 'text-amber-400 bg-amber-500/20', icon: Crown };
@@ -1010,30 +1011,73 @@ const Admin = () => {
                                     };
                                     const activityType = getActivityType();
                                     const ActivityIcon = activityType.icon;
+                                    
+                                    const getSubscriptionLabel = () => {
+                                        if (log.type !== 'subscription') return null;
+                                        const isNextMonth = log.billingMonth === 'next';
+                                        const isAlreadyMember = log.breakdown?.isAlreadySubscribed;
+                                        const hasAddons = (log.newExtraProjects ?? log.extraProjects ?? 0) > 0;
+                                        
+                                        if (isNextMonth && isAlreadyMember && hasAddons) return 'Add-on เดือนหน้า';
+                                        if (isNextMonth && !isAlreadyMember && hasAddons) return 'VIP + Add-on เดือนหน้า';
+                                        if (isNextMonth && !isAlreadyMember) return 'VIP Plan เดือนหน้า';
+                                        if (!isNextMonth && isAlreadyMember && hasAddons) return 'Add-on เดือนนี้';
+                                        if (!isNextMonth && !isAlreadyMember && hasAddons) return 'VIP + Add-on เดือนนี้';
+                                        return 'VIP Plan เดือนนี้';
+                                    };
+                                    
                                     return (
                                         <div 
                                             key={log.id} 
-                                            className="group flex items-center justify-between bg-black/30 rounded-xl p-4 border border-white/5 hover:bg-black/50 hover:border-white/20 transition-all duration-300 hover:scale-[1.02]"
+                                            className={`group bg-black/30 rounded-xl p-4 border border-white/5 hover:bg-black/50 hover:border-white/20 transition-all duration-300 hover:scale-[1.01] ${log.type === 'subscription' ? 'border-l-2 border-l-amber-500' : ''}`}
                                             style={{ animationDelay: `${index * 50}ms` }}
                                         >
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 ${
-                                                    log.type === 'subscription' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
-                                                    log.type === 'withdrawal' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-green-500 to-green-700'
-                                                }`}>
-                                                    <ActivityIcon className="text-white" size={20} />
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex items-start gap-4">
+                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 flex-shrink-0 ${
+                                                        log.type === 'subscription' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
+                                                        log.type === 'withdrawal' ? 'bg-gradient-to-br from-red-500 to-red-700' : 'bg-gradient-to-br from-green-500 to-green-700'
+                                                    }`}>
+                                                        <ActivityIcon className="text-white" size={20} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-white truncate">{log.userEmail}</p>
+                                                        <p className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</p>
+                                                        
+                                                        {log.type === 'subscription' && (
+                                                            <div className="mt-2 space-y-1">
+                                                                <p className="text-xs text-amber-300 font-medium">
+                                                                    📦 {getSubscriptionLabel()}
+                                                                </p>
+                                                                {log.tier && (
+                                                                    <span className={`inline-block text-[10px] px-2 py-0.5 rounded ${log.tier === 'Premium' ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'}`}>
+                                                                        {log.tier}
+                                                                    </span>
+                                                                )}
+                                                                {(log.newExtraProjects ?? log.extraProjects ?? 0) > 0 && (
+                                                                    <p className="text-xs text-slate-400">
+                                                                        +{log.newExtraProjects ?? log.extraProjects} Project, +{(log.newExtraProjects ?? log.extraProjects ?? 0) * 2} Mode/Ext
+                                                                    </p>
+                                                                )}
+                                                                {log.billingPeriod && (
+                                                                    <p className="text-xs text-cyan-300/80">
+                                                                        📅 {log.billingPeriod.start?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {log.billingPeriod.end?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                    </p>
+                                                                )}
+                                                                {log.status === 'rejected' && log.rejectReason && (
+                                                                    <p className="text-xs text-red-400">❌ เหตุผล: {log.rejectReason}</p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white">{log.userEmail}</p>
-                                                    <p className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</p>
+                                                <div className="text-right flex-shrink-0">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activityType.color}`}>{activityType.label}</span>
+                                                    <p className={`font-bold mt-1 text-lg ${log.type === 'subscription' ? 'text-amber-400' : log.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'}`}>
+                                                        {log.type === 'withdrawal' ? '-' : '+'}{Math.abs(log.amount)} {log.type === 'subscription' ? 'THB' : 'TOKEN'}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">โดย <span className="text-purple-300">{formatApprover(log.reviewedByEmail)}</span></p>
                                                 </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activityType.color}`}>{activityType.label}</span>
-                                                <p className={`font-bold mt-1 ${log.type === 'subscription' ? 'text-amber-400' : log.type === 'withdrawal' ? 'text-red-400' : 'text-green-400'}`}>
-                                                    {log.type === 'withdrawal' ? '-' : '+'}{Math.abs(log.amount)} {log.type === 'subscription' ? 'THB' : 'TOKEN'}
-                                                </p>
-                                                <p className="text-xs text-slate-500">โดย <span className="text-purple-300">{formatApprover(log.reviewedByEmail)}</span></p>
                                             </div>
                                         </div>
                                     );

@@ -973,7 +973,7 @@ const Payments = () => {
                         </div>
 
                         {/* Next Month Limits Box */}
-                        <div className="bg-gradient-to-br from-cyan-900/30 via-blue-900/20 to-indigo-900/30 backdrop-blur-2xl rounded-3xl border border-cyan-500/30 p-6 shadow-2xl overflow-hidden relative">
+                        <div className="bg-gradient-to-br from-cyan-900/30 via-blue-900/20 to-indigo-900/30 backdrop-blur-2xl rounded-3xl border border-cyan-500/30 p-6 shadow-2xl relative" style={{ overflow: 'visible' }}>
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
                             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl" />
                             
@@ -991,28 +991,26 @@ const Payments = () => {
                                 </div>
                                 
                                 {/* Learn More Tooltip */}
-                                <div className="relative group">
+                                <div className="relative group" style={{ overflow: 'visible' }}>
                                     <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all flex items-center gap-1">
                                         <HelpCircle size={14} /> เรียนรู้เพิ่มเติม
                                     </button>
-                                    <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                                        <h4 className="text-sm font-bold text-cyan-300 mb-2">เงื่อนไขการล็อก</h4>
-                                        <ul className="text-xs text-slate-300 space-y-2">
-                                            <li className="flex items-start gap-2">
-                                                <span className="text-purple-400 mt-0.5">●</span>
-                                                <span><strong>Projects:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Project ใหม่ได้</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <span className="text-blue-400 mt-0.5">●</span>
-                                                <span><strong>Modes:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Mode ใหม่ได้</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <span className="text-green-400 mt-0.5">●</span>
-                                                <span><strong>Extenders:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Extender ใหม่ได้</span>
-                                            </li>
-                                        </ul>
-                                        <p className="text-xs text-amber-300 mt-3 pt-2 border-t border-white/10">
-                                            💡 เมื่อเข้าเดือนใหม่ ระบบจะใช้ Limits เดือนหน้า
+                                    <div className="absolute right-0 top-full mt-2 w-80 max-h-64 overflow-y-auto bg-slate-900/98 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100] scrollbar-thin scrollbar-thumb-cyan-500/50 scrollbar-track-transparent">
+                                        <h4 className="text-sm font-bold text-cyan-300 mb-3">📋 เงื่อนไขการใช้งาน</h4>
+                                        
+                                        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                                            หาก Limit ของเดือนถัดไป <span className="text-red-400 font-semibold">น้อยกว่า</span> จำนวน Project/Mode/Extender ที่ใช้งานอยู่ ระบบจะ<span className="text-amber-300 font-semibold">เก็บรายการเก่าสุด</span>ตาม Limit ไว้ และ<span className="text-red-400 font-semibold">ล็อกรายการที่สร้างใหม่กว่า</span>
+                                        </p>
+                                        
+                                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-2">
+                                            <p className="text-xs text-green-300 font-medium mb-1">💡 คำแนะนำ</p>
+                                            <p className="text-xs text-green-200 leading-relaxed">
+                                                ควรมี Limit เดือนหน้า <span className="font-bold">เท่ากับหรือมากกว่า</span> เดือนนี้ เพื่อให้ใช้งานต่อเนื่องโดยไม่ถูกล็อก
+                                            </p>
+                                        </div>
+                                        
+                                        <p className="text-xs text-cyan-300/80 mt-2 pt-2 border-t border-white/10">
+                                            🔄 เมื่อเข้าเดือนใหม่ ระบบจะใช้ Limits เดือนหน้าโดยอัตโนมัติ
                                         </p>
                                     </div>
                                 </div>
