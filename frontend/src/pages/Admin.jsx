@@ -1679,8 +1679,8 @@ const Admin = () => {
 
                 {/* Subscription Manager Tab */}
                 {activeTab === 'credit' && creditSubTab === 'subscription_manager' && (
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        <div className="xl:col-span-2 relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden">
+                    <div className="space-y-6">
+                        <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500" />
                             <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl" />
                             
@@ -1800,18 +1800,19 @@ const Admin = () => {
                             )}
                         </div>
 
-                        {/* Subscription Logs Panel */}
+                        {/* Subscription Logs Panel - ด้านล่าง */}
                         <div className="bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 p-6 shadow-2xl">
-                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                <Star className="text-yellow-400" size={18} />
+                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                <Star className="text-yellow-400" size={20} />
                                 ประวัติการแก้ไข Subscription
+                                <span className="text-sm font-normal text-slate-400 ml-2">({subscriptionLogs.length} รายการ)</span>
                             </h3>
                             {loadingSubLogs ? (
-                                <div className="text-slate-400 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> กำลังโหลด...</div>
+                                <div className="text-slate-400 flex items-center gap-2 py-8 justify-center"><Loader2 size={20} className="animate-spin" /> กำลังโหลด...</div>
                             ) : subscriptionLogs.length === 0 ? (
                                 <div className="text-slate-500 text-sm text-center py-8">ยังไม่มีประวัติการแก้ไข</div>
                             ) : (
-                                <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar">
                                     {subscriptionLogs.map(log => {
                                         const changes = log.changes || {};
                                         const adminDisplay = log.adminEmail?.includes('fxfarm.dashboard') ? 'Admin' : (log.adminEmail?.split('@')[0] || 'Admin');
@@ -1820,32 +1821,32 @@ const Admin = () => {
                                         const addOnsChanged = changes.oldAddOns !== changes.newAddOns;
                                         
                                         return (
-                                            <div key={log.id} className="bg-black/40 border border-white/10 rounded-xl p-4">
+                                            <div key={log.id} className="bg-black/40 border border-white/10 rounded-xl p-4 hover:border-yellow-500/30 transition-colors">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <p className="text-sm font-medium text-white">{log.userEmail}</p>
-                                                    <span className="text-xs text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH')}</span>
+                                                    <p className="text-sm font-medium text-white truncate max-w-[150px]">{log.userEmail}</p>
+                                                    <span className="text-[10px] text-slate-500">{log.createdAt?.toDate?.().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
                                                 </div>
                                                 <div className="space-y-1 text-xs">
                                                     {planChanged && (
                                                         <p className="text-yellow-300">
-                                                            👑 แพลน: <span className="text-slate-400">{changes.oldPlan}</span> → <span className="text-yellow-400 font-bold">{changes.newPlan}</span>
+                                                            👑 {changes.oldPlan} → <span className="font-bold">{changes.newPlan}</span>
                                                         </p>
                                                     )}
                                                     {statusChanged && (
                                                         <p className="text-green-300">
-                                                            ✅ สถานะ: <span className="text-slate-400">{changes.oldStatus}</span> → <span className="text-green-400 font-bold">{changes.newStatus}</span>
+                                                            ✅ {changes.oldStatus} → <span className="font-bold">{changes.newStatus}</span>
                                                         </p>
                                                     )}
                                                     {addOnsChanged && (
                                                         <p className="text-amber-300">
-                                                            ➕ Add-ons: <span className="text-slate-400">{changes.oldAddOns}</span> → <span className="text-amber-400 font-bold">{changes.newAddOns}</span>
+                                                            ➕ {changes.oldAddOns} → <span className="font-bold">{changes.newAddOns}</span>
                                                         </p>
                                                     )}
                                                     {!planChanged && !statusChanged && !addOnsChanged && (
                                                         <p className="text-blue-300">📊 แก้ไข Limits/วันหมดอายุ</p>
                                                     )}
                                                 </div>
-                                                <div className="mt-2 text-[11px] text-slate-500">
+                                                <div className="mt-2 text-[10px] text-slate-500">
                                                     โดย: <span className="text-yellow-300 font-medium">{adminDisplay}</span>
                                                 </div>
                                             </div>
