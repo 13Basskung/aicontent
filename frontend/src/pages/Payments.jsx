@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Upload, Image as ImageIcon, Loader2, CheckCircle, Clock, XCircle, Wallet, ArrowUpRight, ArrowDownRight, Building2, Plus, Trash2, CreditCard, Crown, Star, Zap, Calendar, AlertTriangle, Sparkles, Hash, User } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2, CheckCircle, Clock, XCircle, Wallet, ArrowUpRight, ArrowDownRight, Building2, Plus, Trash2, CreditCard, Crown, Star, Zap, Calendar, AlertTriangle, Sparkles, Hash, User, HelpCircle } from 'lucide-react';
 import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
 import GlassDropdown from '../components/ui/GlassDropdown';
@@ -260,6 +260,28 @@ const Payments = () => {
             icon: XCircle
         }
     }), []);
+
+    // หา payment เดือนหน้าที่ pending หรือ approved
+    const nextMonthPayment = useMemo(() => {
+        return subscriptionPayments.find(p => 
+            p.billingMonth === 'next' && 
+            (p.status === 'pending' || p.status === 'approved')
+        );
+    }, [subscriptionPayments]);
+
+    // คำนวณวันสิ้นสุดของเดือนปัจจุบัน
+    const endOfCurrentMonth = useMemo(() => {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }, []);
+
+    // คำนวณวันเริ่มต้นและสิ้นสุดของเดือนหน้า
+    const nextMonthDates = useMemo(() => {
+        const now = new Date();
+        const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+        return { start: startOfNextMonth, end: endOfNextMonth };
+    }, []);
 
     const handleSubmit = async () => {
         if (!currentUser) {
@@ -939,14 +961,121 @@ const Payments = () => {
                                 </div>
                             </div>
 
-                            {/* Expiry Date */}
+                            {/* Expiry Date - แสดงวันสิ้นเดือนปัจจุบัน */}
                             {subscription?.expiryDate && !subStatus.isInTrial && (
                                 <div className="mt-4 pt-4 border-t border-white/10">
                                     <p className="text-xs text-slate-400">
                                         <Calendar size={12} className="inline mr-1" />
-                                        หมดอายุ: {formatThaiDate(subscription.expiryDate)}
+                                        หมดอายุ: {endOfCurrentMonth.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
                                     </p>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Next Month Limits Box */}
+                        <div className="bg-gradient-to-br from-cyan-900/30 via-blue-900/20 to-indigo-900/30 backdrop-blur-2xl rounded-3xl border border-cyan-500/30 p-6 shadow-2xl overflow-hidden relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl" />
+                            
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+                                        <Calendar className="text-white" size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white">Limits เดือนหน้า</h3>
+                                        <p className="text-xs text-cyan-300">
+                                            {nextMonthDates.start.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {nextMonthDates.end.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                {/* Learn More Tooltip */}
+                                <div className="relative group">
+                                    <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all flex items-center gap-1">
+                                        <HelpCircle size={14} /> เรียนรู้เพิ่มเติม
+                                    </button>
+                                    <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                                        <h4 className="text-sm font-bold text-cyan-300 mb-2">เงื่อนไขการล็อก</h4>
+                                        <ul className="text-xs text-slate-300 space-y-2">
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-purple-400 mt-0.5">●</span>
+                                                <span><strong>Projects:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Project ใหม่ได้</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-blue-400 mt-0.5">●</span>
+                                                <span><strong>Modes:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Mode ใหม่ได้</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <span className="text-green-400 mt-0.5">●</span>
+                                                <span><strong>Extenders:</strong> ถ้าสร้างเกิน Limit จะไม่สามารถสร้าง Extender ใหม่ได้</span>
+                                            </li>
+                                        </ul>
+                                        <p className="text-xs text-amber-300 mt-3 pt-2 border-t border-white/10">
+                                            💡 เมื่อเข้าเดือนใหม่ ระบบจะใช้ Limits เดือนหน้า
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Next Month Limits */}
+                            {nextMonthPayment ? (
+                                <>
+                                    <div className="grid grid-cols-3 gap-2 mb-4">
+                                        <div className="bg-black/30 rounded-lg p-3 text-center border border-purple-500/20">
+                                            <p className="text-2xl font-bold text-purple-400">{nextMonthPayment.limits?.projects || 1}</p>
+                                            <p className="text-xs text-slate-400">Projects</p>
+                                        </div>
+                                        <div className="bg-black/30 rounded-lg p-3 text-center border border-blue-500/20">
+                                            <p className="text-2xl font-bold text-blue-400">{nextMonthPayment.limits?.modes || 2}</p>
+                                            <p className="text-xs text-slate-400">Modes</p>
+                                        </div>
+                                        <div className="bg-black/30 rounded-lg p-3 text-center border border-green-500/20">
+                                            <p className="text-2xl font-bold text-green-400">{nextMonthPayment.limits?.extenders || 2}</p>
+                                            <p className="text-xs text-slate-400">Extenders</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <span className={`px-2 py-1 rounded-full ${
+                                            nextMonthPayment.status === 'approved' 
+                                                ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                                                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                                        }`}>
+                                            {nextMonthPayment.status === 'approved' ? '✓ ชำระแล้ว' : '⏳ รอตรวจสอบ'}
+                                        </span>
+                                        <span className="text-slate-400">
+                                            ฿{nextMonthPayment.amount?.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4">
+                                        <p className="text-amber-300 text-sm font-medium flex items-center gap-2">
+                                            <AlertTriangle size={16} /> ยังไม่มี Subscription เดือนหน้า
+                                        </p>
+                                        <p className="text-amber-200 text-xs mt-1">
+                                            💡 แนะนำ: สมัครเพื่อให้มี Limits เท่าเดิม ({subStatus.limits.projects} Projects, {subStatus.limits.modes} Modes, {subStatus.limits.extenders} Extenders)
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 mb-3">
+                                        <div className="bg-black/20 rounded-lg p-3 text-center border border-dashed border-slate-600">
+                                            <p className="text-2xl font-bold text-slate-500">?</p>
+                                            <p className="text-xs text-slate-500">Projects</p>
+                                        </div>
+                                        <div className="bg-black/20 rounded-lg p-3 text-center border border-dashed border-slate-600">
+                                            <p className="text-2xl font-bold text-slate-500">?</p>
+                                            <p className="text-xs text-slate-500">Modes</p>
+                                        </div>
+                                        <div className="bg-black/20 rounded-lg p-3 text-center border border-dashed border-slate-600">
+                                            <p className="text-2xl font-bold text-slate-500">?</p>
+                                            <p className="text-xs text-slate-500">Extenders</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 text-center">
+                                        เลื่อนลงด้านล่างเพื่อสมัคร Subscription เดือนหน้า ↓
+                                    </p>
+                                </>
                             )}
                         </div>
                     </div>

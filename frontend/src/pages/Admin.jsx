@@ -1419,7 +1419,18 @@ const Admin = () => {
                                                         req.tier === 'Premium' ? 'bg-amber-500/20 text-amber-300' : 'bg-purple-500/20 text-purple-300'
                                                     }`}>{req.tier}</span>
                                                     <span className="text-lg font-bold text-purple-400">{formatPrice(req.amount)}</span>
+                                                    {req.billingMonth === 'next' && (
+                                                        <span className="px-2 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                                            📅 เดือนหน้า
+                                                        </span>
+                                                    )}
                                                 </div>
+                                                {/* แสดงช่วงเวลา Billing สำหรับเดือนหน้า */}
+                                                {req.billingMonth === 'next' && req.billingPeriod && (
+                                                    <p className="text-xs text-cyan-300 bg-cyan-500/10 rounded-lg px-2 py-1 mb-1 flex items-center gap-1">
+                                                        📆 ช่วงเวลา: {req.billingPeriod.start?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) || '-'} - {req.billingPeriod.end?.toDate?.()?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) || '-'}
+                                                    </p>
+                                                )}
                                                 {/* แสดง Add-on details */}
                                                 {(req.newExtraProjects > 0 || req.extraProjects > 0) && (
                                                     <p className="text-xs text-slate-300 bg-purple-500/10 rounded-lg px-2 py-1 mb-1">
