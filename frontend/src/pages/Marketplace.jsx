@@ -901,6 +901,13 @@ const Marketplace = () => {
     // === ADMIN: DELETE EXPANDER ===
     const handleAdminDeleteExpander = async (item) => {
         if (!isAdmin) return;
+        
+        // ป้องกันการลบ FREE_EXPANDERS (Hardcoded items)
+        if (item.isFree || item.id.startsWith('free_') || item.id.startsWith('sample_')) {
+            showAlert('⚠️ ไม่สามารถลบ Free Expander ได้\n\nFree Expanders เป็นข้อมูลระบบ ไม่ได้อยู่ใน Database', '🚫 ไม่อนุญาต');
+            return;
+        }
+        
         const confirmed = await showConfirm(`🗑️ ยืนยันลบ\n\n"🎯 ${item.name}"\nออกจาก Marketplace?\n\n⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!`, '⚠️ ยืนยันลบ');
         if (!confirmed) return;
         
