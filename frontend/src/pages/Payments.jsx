@@ -995,21 +995,21 @@ const Payments = () => {
                                     <button className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30 transition-all flex items-center gap-1">
                                         <HelpCircle size={14} /> เรียนรู้เพิ่มเติม
                                     </button>
-                                    <div className="absolute right-0 top-full mt-2 w-80 max-h-64 overflow-y-auto bg-slate-900/98 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100] scrollbar-thin scrollbar-thumb-cyan-500/50 scrollbar-track-transparent">
+                                    <div className="absolute right-0 top-full mt-2 w-80 max-h-64 overflow-y-auto bg-slate-950 border border-cyan-500/40 rounded-xl p-4 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-[100]" style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
                                         <h4 className="text-sm font-bold text-cyan-300 mb-3">📋 เงื่อนไขการใช้งาน</h4>
                                         
-                                        <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                                        <p className="text-xs text-slate-200 mb-3 leading-relaxed">
                                             หาก Limit ของเดือนถัดไป <span className="text-red-400 font-semibold">น้อยกว่า</span> จำนวน Project/Mode/Extender ที่ใช้งานอยู่ ระบบจะ<span className="text-amber-300 font-semibold">เก็บรายการเก่าสุด</span>ตาม Limit ไว้ และ<span className="text-red-400 font-semibold">ล็อกรายการที่สร้างใหม่กว่า</span>
                                         </p>
                                         
-                                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-2">
+                                        <div className="bg-green-900/60 border border-green-500/40 rounded-lg p-3 mb-2">
                                             <p className="text-xs text-green-300 font-medium mb-1">💡 คำแนะนำ</p>
-                                            <p className="text-xs text-green-200 leading-relaxed">
+                                            <p className="text-xs text-green-100 leading-relaxed">
                                                 ควรมี Limit เดือนหน้า <span className="font-bold">เท่ากับหรือมากกว่า</span> เดือนนี้ เพื่อให้ใช้งานต่อเนื่องโดยไม่ถูกล็อก
                                             </p>
                                         </div>
                                         
-                                        <p className="text-xs text-cyan-300/80 mt-2 pt-2 border-t border-white/10">
+                                        <p className="text-xs text-cyan-200 mt-2 pt-2 border-t border-white/20">
                                             🔄 เมื่อเข้าเดือนใหม่ ระบบจะใช้ Limits เดือนหน้าโดยอัตโนมัติ
                                         </p>
                                     </div>
