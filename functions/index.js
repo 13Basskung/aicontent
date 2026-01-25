@@ -568,6 +568,44 @@ const CATEGORY_DIALOGUE_RULES = {
 };
 
 // ============================================
+// ✅ FIX #3: RETRY HELPER for GPT-4o calls
+// ============================================
+async function callOpenAIWithRetry(openai, params, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`   🔄 GPT-4o Call (Attempt ${attempt}/${maxRetries})...`);
+      const response = await openai.chat.completions.create(params);
+      const content = response.choices[0]?.message?.content?.trim() || '{}';
+      
+      // Validate JSON response
+      const parsed = JSON.parse(content);
+      console.log(`   ✅ GPT-4o Response valid (Attempt ${attempt})`);
+      return { success: true, data: parsed, raw: content };
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`   ⚠️ GPT-4o Attempt ${attempt} failed: ${error.message}`);
+      
+      // If it's a rate limit error, wait longer
+      if (error.message?.includes('rate_limit') || error.status === 429) {
+        const waitTime = attempt * 5000; // 5s, 10s, 15s
+        console.log(`   ⏳ Rate limited, waiting ${waitTime/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else if (attempt < maxRetries) {
+        // For other errors, short wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+  }
+  
+  // All retries failed
+  console.error(`   ❌ All ${maxRetries} attempts failed. Last error: ${lastError?.message}`);
+  return { success: false, data: null, error: lastError };
+}
+
+// ============================================
 // SHARED HELPER: Expand Scenes with Topic (STORY-FIRST APPROACH)
 // Step 1: Create Full Story with all dialogues
 // Step 2: Split into Scene Prompts
@@ -778,7 +816,8 @@ Write a COMPLETE STORY that:
   ]
 }`;
 
-    const storyResponse = await openai.chat.completions.create({
+    // ✅ FIX #3: ใช้ Retry mechanism สำหรับ Story Creator
+    const storyResult = await callOpenAIWithRetry(openai, {
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: storySystemPrompt },
@@ -787,18 +826,16 @@ Write a COMPLETE STORY that:
       temperature: 0.8,
       max_tokens: 6000,
       response_format: { type: 'json_object' }
-    });
+    }, 3); // Max 3 retries
 
-    let storyContent = storyResponse.choices[0]?.message?.content?.trim() || '{}';
     let storyData;
-    
-    try {
-      storyData = JSON.parse(storyContent);
+    if (storyResult.success) {
+      storyData = storyResult.data;
       console.log(`   ✅ Story created: "${storyData.storyTitle || 'Untitled'}"`);
       console.log(`   📄 Synopsis: ${(storyData.storySynopsis || '').substring(0, 100)}...`);
       console.log(`   📄 Dialogue scenes: ${storyData.fullDialogueScript?.length || 0}`);
-    } catch (parseErr) {
-      console.error(`   ❌ Story parse error:`, parseErr.message);
+    } else {
+      console.error(`   ❌ Story creation failed after all retries`);
       storyData = { fullDialogueScript: [] };
     }
 
@@ -847,7 +884,8 @@ Each prompt must:
     const dialogueScenes = storyData.fullDialogueScript || [];
     const splitUserContent = `Convert these ${dialogueScenes.length} story scenes into video prompts:\n${JSON.stringify(dialogueScenes, null, 2)}`;
 
-    const splitResponse = await openai.chat.completions.create({
+    // ✅ FIX #3: ใช้ Retry mechanism สำหรับ Scene Splitter
+    const splitResult = await callOpenAIWithRetry(openai, {
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: splitSystemPrompt },
@@ -856,16 +894,14 @@ Each prompt must:
       temperature: 0.7,
       max_tokens: 8000,
       response_format: { type: 'json_object' }
-    });
+    }, 3); // Max 3 retries
 
-    let splitContent = splitResponse.choices[0]?.message?.content?.trim() || '{}';
     let splitData;
-
-    try {
-      splitData = JSON.parse(splitContent);
+    if (splitResult.success) {
+      splitData = splitResult.data;
       console.log(`   ✅ Prompts generated: ${splitData.scenes?.length || 0} scenes`);
-    } catch (parseErr) {
-      console.error(`   ❌ Split parse error:`, parseErr.message);
+    } else {
+      console.error(`   ❌ Scene split failed after all retries`);
       splitData = { scenes: [] };
     }
 
@@ -1826,15 +1862,20 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                   }
 
                   // Use SHARED LOGIC for expansion (same as testPromptPipeline)
+                  // ✅ FIX #1: ดึง sceneDuration จาก Posting Schedule (slot data)
+                  const slotSceneDuration = slot.sceneDuration || 8;
+                  console.log(`      ⏱️ Scene Duration from Posting Schedule: ${slotSceneDuration}s`);
+
                   if (scenes.length > 0 || prompts.length > 0) {
                     try {
-                      // Build raw scenes from existing data
+                      // ✅ FIX #2: Build raw scenes with sceneInstruction
                       const rawScenes = scenes.length > 0
                         ? scenes.map((s, i) => ({
                             sceneNumber: i + 1,
                             blockTitle: s.blockTitle || `Scene ${i + 1}`,
                             visualPrompt: s.englishPrompt || prompts[i] || '',
                             rawPrompt: s.englishPrompt || prompts[i] || '',
+                            sceneInstruction: s.sceneInstruction || s.dialogueScript || '',
                             audioAmbience: s.audioDescription || '',
                             cameraAngle: s.cameraMovement || 'wide'
                           }))
@@ -1843,6 +1884,7 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                             blockTitle: `Scene ${i + 1}`,
                             visualPrompt: p,
                             rawPrompt: p,
+                            sceneInstruction: '',
                             audioAmbience: '',
                             cameraAngle: 'wide'
                           }));
@@ -1850,13 +1892,14 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                       console.log(`      🔧 Using SHARED expandScenesWithTopic() for ${rawScenes.length} scenes...`);
 
                       // Use SHARED HELPER for per-scene expansion
+                      // ✅ FIX #1: ใช้ slotSceneDuration แทน hard-coded 8
                       expandedPromptsResult = await expandScenesWithTopic({
                         rawScenes,
                         expanderBlocks,
                         episodeTopic: episodeData?.title || modeMetadata.modeName || 'Video',
                         episodeDesc: episodeData?.description || modeMetadata.description || '',
                         characters: modeMetadata.characters || [],
-                        sceneDuration: 8,
+                        sceneDuration: slotSceneDuration,
                         modeCategory: modeMetadata.category || 'Cinematic',
                         systemInstruction: modeMetadata.systemInstruction || ''
                       });

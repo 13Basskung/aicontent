@@ -501,6 +501,36 @@ export default function Projects() {
         const isRunning = targetProject.status === 'running';
         const newStatus = isRunning ? 'idle' : 'running';
 
+        // ✅ VALIDATION: ต้องเลือก Mode และ Expander ก่อน Run
+        if (!isRunning) {
+            const hasModeId = targetProject.executionModeId;
+            const hasExpanderId = targetProject.expanderId;
+            
+            if (!hasModeId && !hasExpanderId) {
+                showAlert(
+                    '⚠️ กรุณาเลือก Mode และ Expander ก่อนกด Run\n\nไปที่ Dashboard > เลือก Mode และ Expander ให้ครบ',
+                    '❌ ไม่สามารถ Run ได้'
+                );
+                return;
+            }
+            
+            if (!hasModeId) {
+                showAlert(
+                    '⚠️ กรุณาเลือก Execution Mode ก่อนกด Run\n\nไปที่ Dashboard > Select Execution Mode',
+                    '❌ ไม่สามารถ Run ได้'
+                );
+                return;
+            }
+            
+            if (!hasExpanderId) {
+                showAlert(
+                    '⚠️ กรุณาเลือก Expander ก่อนกด Run\n\nไปที่ Dashboard > Select Expander',
+                    '❌ ไม่สามารถ Run ได้'
+                );
+                return;
+            }
+        }
+
         try {
             const projectRef = doc(db, 'users', currentUser.uid, 'projects', targetProject.id);
             await updateDoc(projectRef, {
