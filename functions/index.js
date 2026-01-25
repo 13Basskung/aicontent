@@ -670,9 +670,23 @@ async function expandScenesWithTopic(params) {
     ? characters.map(c => `- ${c.name}: ${c.visualDescription || c.description || 'N/A'}`).join('\n')
     : 'No specific characters defined';
 
-  // Category Dialogue Rules
-  const dialogueRules = CATEGORY_DIALOGUE_RULES[modeCategory] || CATEGORY_DIALOGUE_RULES["Cinematic / Movie"];
-  console.log(`   📊 Dialogue Rules: ${dialogueRules.style} (${dialogueRules.dialoguePerScene})`);
+  // 🎬 SCENE BLUEPRINT: สร้างข้อมูลซีนจาก Mode สำหรับ AI
+  const lastScene = rawScenes[rawScenes.length - 1];
+  const sceneBlueprint = rawScenes.map((scene, i) => {
+    const isLastScene = (i === rawScenes.length - 1);
+    const sceneRole = isLastScene ? '🔴 FINAL SCENE (MUST END STORY)' : `Scene ${i + 1}`;
+    return `${sceneRole}:
+  - Title: "${scene.blockTitle || 'Untitled'}"
+  - Instruction: "${scene.sceneInstruction || 'Follow Expander'}"
+  - Visual: "${scene.visualPrompt || 'N/A'}"`;
+  }).join('\n\n');
+
+  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน
+  const minDialoguePerScene = Math.max(1, Math.floor(sceneDuration / 4));
+  const maxDialoguePerScene = Math.floor(sceneDuration / 2);
+
+  console.log(`   🎬 Scene Blueprint: ${totalScenes} scenes × ${sceneDuration}s = ${totalDuration}s total`);
+  console.log(`   📊 Dialogue estimate: ${minDialoguePerScene}-${maxDialoguePerScene} lines per scene`);
 
   try {
     // ============================================
@@ -680,16 +694,38 @@ async function expandScenesWithTopic(params) {
     // ============================================
     console.log(`\n   📖 STEP 1: Creating Full Story...`);
 
-    const storySystemPrompt = `You are a professional screenwriter. Create a complete story with connected dialogues.
+    const storySystemPrompt = `You are a world-class professional screenwriter. Create a complete story with connected dialogues.
 
-=== 🔴 PRIORITY 1: EXPANDER RULES (MUST FOLLOW STRICTLY) ===
+=== 🎬 PRODUCTION CONSTRAINTS (READ FIRST!) ===
+📊 FROM POSTING SCHEDULE:
+- Total Scenes: ${totalScenes} scene(s)
+- Duration per Scene: ${sceneDuration} seconds
+- Total Video Length: ${totalDuration} seconds (${(totalDuration/60).toFixed(1)} minutes)
+
+⚠️ CRITICAL TIMING RULE:
+You have EXACTLY ${totalScenes} scene(s) × ${sceneDuration} seconds each = ${totalDuration} seconds total.
+- If 1 scene × 8s → Complete story in ONE 8-second scene
+- If 3 scenes × 8s → Spread story across THREE 8-second scenes  
+- If 5 scenes × 10s → Epic arc across FIVE 10-second scenes
+
+Each scene's content (dialogue + action) MUST be achievable within ${sceneDuration} seconds.
+Approximate dialogue: ${minDialoguePerScene} to ${maxDialoguePerScene} lines per scene.
+
+=== 🎬 SCENE BLUEPRINT (FROM MODE) ===
+${sceneBlueprint}
+
+=== 🔴 PRIORITY 1: EXPANDER RULES (ABSOLUTE AUTHORITY) ===
 ${expanderInstructions}
 
-⚠️ These Expander rules are MANDATORY. Every dialogue, every scene MUST follow these rules.
-If Expander says "ภาษาอีสาน" → ALL dialogues must be in Isan Thai dialect.
-If Expander says "horror style" → ALL scenes must have horror atmosphere.
+⚠️ EXPANDER IS KING:
+- Expander Instructions override ALL other rules
+- If Expander says "ภาษาอีสาน" → ALL dialogues in Isan dialect
+- If Expander says "horror" → ALL scenes must be horror
+- If Expander says "no dialogue" → ZERO dialogue lines
+- NEVER ignore Expander instructions to fit timing - ADAPT the story instead
+- Read each Expander block's Instruction carefully and follow EXACTLY
 
-=== 🟠 PRIORITY 2: MODE STRUCTURE (Scene breakdown) ===
+=== 🟠 PRIORITY 2: MODE STRUCTURE ===
 ${modeStructure}
 
 === 🟡 PRIORITY 3: CHARACTERS ===
@@ -699,22 +735,29 @@ ${characterContext}
 Topic: "${episodeTopic || 'Untitled'}"
 Description: ${episodeDesc || 'N/A'}
 Category: ${modeCategory || 'Cinematic'}
-
-=== DIALOGUE RULES (Category: ${modeCategory}) ===
-Style: ${dialogueRules.style}
-Amount per scene: ${dialogueRules.dialoguePerScene}
-Type: ${dialogueRules.type}
-
-=== VIDEO CONSTRAINTS ===
-Total Duration: ${totalDuration} seconds (${totalScenes} scenes × ${sceneDuration}s each)
 Language for ALL dialogues: ${detectedLanguage}
 
-=== YOUR TASK ===
-Write a COMPLETE STORY with:
-1. Full narrative arc (beginning → middle → end)
-2. ALL character dialogues that flow naturally and connect scene to scene
-3. Emotional progression matching the scene structure
-4. Every dialogue must be in ${detectedLanguage} and follow Expander rules
+=== 🔗 SEAMLESS SCENE TRANSITIONS ===
+- Scene 1 → Scene 2: Must have visual/emotional bridge
+- Each scene MUST end with a natural bridge to the next
+- NO abrupt cuts - use continuity in audio, visual, or emotion
+- Maintain narrative flow across all scenes
+
+=== 🔴 FINAL SCENE ABSOLUTE RULES (Scene ${totalScenes}) ===
+1. This is the LAST scene - story MUST END here completely
+2. Title from Mode: "${lastScene?.blockTitle || 'Conclusion'}"
+3. Instruction from Mode: "${lastScene?.sceneInstruction || 'End the story'}"
+4. All character arcs RESOLVED
+5. Emotional payoff DELIVERED
+6. NO cliffhangers, NO "to be continued"
+
+=== 📖 YOUR TASK ===
+Write a COMPLETE STORY that:
+1. Fits EXACTLY within ${totalScenes} scenes × ${sceneDuration}s each
+2. Follows Expander Instructions as PRIMARY rules
+3. Creates seamless transitions between scenes
+4. ENDS the story completely in Scene ${totalScenes}
+5. All dialogues in ${detectedLanguage}
 
 === OUTPUT FORMAT (JSON) ===
 {
@@ -723,13 +766,14 @@ Write a COMPLETE STORY with:
   "fullDialogueScript": [
     {
       "sceneNumber": 1,
-      "emotionalArc": "INTRODUCTION",
+      "emotionalArc": "INTRODUCTION/RISING/CLIMAX/RESOLUTION",
       "setting": "Location and atmosphere",
       "dialogues": [
         { "character": "Character Name", "line": "Dialogue in ${detectedLanguage}" }
       ],
-      "visualAction": "What happens visually",
-      "audioMood": "Sound/music mood"
+      "visualAction": "What happens visually (achievable in ${sceneDuration}s)",
+      "audioMood": "Sound/music mood",
+      "transitionToNext": "How this scene bridges to the next (or 'STORY ENDS' for final scene)"
     }
   ]
 }`;
