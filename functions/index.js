@@ -1094,20 +1094,19 @@ IMPORTANT:
 - Output valid JSON only, no markdown`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: 'You are a social media expert. Output valid JSON only.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 1500
-    });
-
-    let content = response.choices[0].message.content.trim();
-    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    return JSON.parse(content);
+    // Use Direct HTTPS instead of SDK
+    const messages = [
+      { role: 'system', content: 'You are a social media expert. Output valid JSON only.' },
+      { role: 'user', content: prompt }
+    ];
+    
+    const result = await callOpenAIDirect(messages, 'gpt-4o');
+    
+    if (result.success && result.data) {
+      return result.data;
+    }
+    
+    throw new Error('Failed to generate titles and tags');
   } catch (err) {
     console.error('generateTitlesAndTags error:', err.message);
     // Fallback
