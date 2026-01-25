@@ -923,7 +923,7 @@ Each prompt must:
       else if (position <= 0.8) emotionalArc = 'FALLING';
       else emotionalArc = 'RESOLUTION';
 
-      const hasPrompt = generated.prompt && generated.prompt.length > 50;
+      const hasPrompt = !!(generated.prompt && generated.prompt.length > 50);
       if (!hasPrompt) {
         console.log(`   ⚠️ Scene ${i + 1}: No prompt generated, using fallback`);
       }
@@ -931,11 +931,11 @@ Each prompt must:
       allExpandedPrompts.push({
         sceneNumber: i + 1,
         englishPrompt: generated.prompt || scene.visualPrompt || scene.rawPrompt || scene.blockTitle || `Scene ${i + 1}`,
-        originalPrompt: scene.visualPrompt || scene.rawPrompt || scene.blockTitle,
+        originalPrompt: scene.visualPrompt || scene.rawPrompt || scene.blockTitle || '',
         audioDescription: generated.audioDescription || scene.audioAmbience || 'Ambient sounds',
         cameraAngle: scene.cameraAngle || 'wide',
         blockTitle: scene.blockTitle || `Scene ${i + 1}`,
-        emotionalArc,
+        emotionalArc: emotionalArc || 'RISING',
         storyConnected: hasPrompt
       });
     }
