@@ -17,7 +17,9 @@ function getOpenAI() {
   }
   
   return new OpenAI({
-    apiKey: apiKey
+    apiKey: apiKey,
+    timeout: 60000, // 60 seconds timeout
+    maxRetries: 0   // Disable SDK retries, we handle it ourselves
   });
 }
 
@@ -595,7 +597,15 @@ async function callOpenAIWithRetry(openai, params, maxRetries = 3) {
       
     } catch (error) {
       lastError = error;
-      console.error(`   ⚠️ GPT-4o Attempt ${attempt} failed: ${error.message}`);
+      // Detailed error logging
+      console.error(`   ⚠️ GPT-4o Attempt ${attempt} failed:`);
+      console.error(`      Error Type: ${error.constructor.name}`);
+      console.error(`      Error Message: ${error.message}`);
+      console.error(`      Error Status: ${error.status || 'N/A'}`);
+      console.error(`      Error Code: ${error.code || 'N/A'}`);
+      if (error.error) {
+        console.error(`      API Error: ${JSON.stringify(error.error)}`);
+      }
       
       // If it's a rate limit error, wait longer
       if (error.message?.includes('rate_limit') || error.status === 429) {
