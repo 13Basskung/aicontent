@@ -26,7 +26,7 @@ function getOpenAI() {
 
 // Direct HTTPS call to OpenAI (bypass SDK)
 async function callOpenAIDirect(messages, model = 'gpt-4o') {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = (process.env.OPENAI_API_KEY || '').trim();
   
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({
