@@ -9,7 +9,8 @@ admin.initializeApp();
 
 // Initialize OpenAI only when function is called
 function getOpenAI() {
-  const apiKey = process.env.OPENAI_API_KEY;
+  // CRITICAL: Trim API Key to remove newlines/whitespace (Firebase Secrets issue)
+  const apiKey = (process.env.OPENAI_API_KEY || '').trim();
   console.log(`🔑 OpenAI API Key: ${apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT FOUND'}`);
   console.log(`🔑 API Key Length: ${apiKey?.length || 0} characters`);
   
@@ -20,7 +21,7 @@ function getOpenAI() {
   return new OpenAI({
     apiKey: apiKey,
     timeout: 60000, // 60 seconds timeout
-    maxRetries: 0   // Disable SDK retries, we handle it ourselves
+    maxRetries: 3   // Enable SDK retries
   });
 }
 
