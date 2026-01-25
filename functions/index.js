@@ -3,12 +3,21 @@ const admin = require('firebase-admin');
 const { OpenAI } = require('openai');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
 
+// Force redeploy: 2026-01-26T01:10
 admin.initializeApp();
 
 // Initialize OpenAI only when function is called
 function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  console.log(`🔑 OpenAI API Key: ${apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT FOUND'}`);
+  console.log(`🔑 API Key Length: ${apiKey?.length || 0} characters`);
+  
+  if (!apiKey) {
+    console.error('❌ OPENAI_API_KEY is not set in environment!');
+  }
+  
   return new OpenAI({
-    apiKey: functions.config().openai.key
+    apiKey: apiKey
   });
 }
 
