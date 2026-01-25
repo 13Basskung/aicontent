@@ -358,7 +358,7 @@ function normalizePercentages(items) {
 
 // Function: Analyze Mode (AI Critique + TTS)
 exports.analyzeMode = functions
-  .runWith({ secrets: [], timeoutSeconds: 300, memory: '1GB' }) // Fix Timeout & Memory for heavy AI tasks
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 300, memory: '1GB' }) // Fix Timeout & Memory for heavy AI tasks
   .https.onCall(async (data, context) => {
     // Check authentication
     if (!context.auth) {
@@ -1221,7 +1221,9 @@ async function getRemainingEpisodeCount(projectRef) {
   return snapshot.size;
 }
 
-exports.consultantChat = functions.https.onCall(async (data, context) => {
+exports.consultantChat = functions
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
   try {
     const openai = getOpenAI();
     const { message, history, currentModeData, aiMode = 'architect', expanderList = [] } = data;
@@ -2345,7 +2347,7 @@ Instruction: "Apply cinematic color grading with dramatic lighting. Use wide sho
 
 // Function: Generate Episodes from Topic (AI Episode Director)
 exports.generateEpisodes = functions
-  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -2404,7 +2406,7 @@ exports.generateEpisodes = functions
 
 // Function: Expand Episode to Full Prompts (Episode + Mode Template + Expander)
 exports.expandEpisodeToPrompts = functions
-  .runWith({ timeoutSeconds: 120, memory: '1GB' })
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 120, memory: '1GB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -3246,7 +3248,7 @@ exports.cleanupUsedEpisodes = functions.pubsub.schedule('0 5 * * *')
 
 // Callable function for manual trigger
 exports.autoGenerateEpisodes = functions
-  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -3528,7 +3530,7 @@ exports.getStorageStats = functions
 // AI BLOCK EDITOR: Chat with AI to edit Blocks
 // ============================================
 exports.aiBlockEditor = functions
-  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
