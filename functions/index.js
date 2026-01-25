@@ -971,6 +971,7 @@ Each prompt must:
         cameraAngle: scene.cameraAngle || 'wide',
         blockTitle: scene.blockTitle || `Scene ${i + 1}`,
         emotionalArc,
+        storyConnected: false,
         failed: true
       });
     }
