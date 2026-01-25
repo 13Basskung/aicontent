@@ -2,6 +2,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { OpenAI } = require('openai');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+const https = require('https');
 
 // Force redeploy: 2026-01-26T01:10
 admin.initializeApp();
@@ -20,6 +21,61 @@ function getOpenAI() {
     apiKey: apiKey,
     timeout: 60000, // 60 seconds timeout
     maxRetries: 0   // Disable SDK retries, we handle it ourselves
+  });
+}
+
+// Direct HTTPS call to OpenAI (bypass SDK)
+async function callOpenAIDirect(messages, model = 'gpt-4o') {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: 0.7,
+      response_format: { type: 'json_object' }
+    });
+    
+    const options = {
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(data)
+      },
+      timeout: 60000
+    };
+    
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (res.statusCode === 200) {
+            const content = parsed.choices?.[0]?.message?.content || '{}';
+            resolve({ success: true, data: JSON.parse(content), raw: content });
+          } else {
+            console.error(`OpenAI API Error: ${res.statusCode}`, body.substring(0, 500));
+            reject(new Error(`API Error ${res.statusCode}: ${parsed.error?.message || 'Unknown'}`));
+          }
+        } catch (e) {
+          reject(new Error(`Parse error: ${e.message}`));
+        }
+      });
+    });
+    
+    req.on('error', (e) => reject(e));
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+    
+    req.write(data);
+    req.end();
   });
 }
 
@@ -579,21 +635,21 @@ const CATEGORY_DIALOGUE_RULES = {
 };
 
 // ============================================
-// ✅ FIX #3: RETRY HELPER for GPT-4o calls
+// ✅ FIX #3: RETRY HELPER for GPT-4o calls (Using Direct HTTPS)
 // ============================================
 async function callOpenAIWithRetry(openai, params, maxRetries = 3) {
   let lastError = null;
+  const messages = params.messages;
+  const model = params.model || 'gpt-4o';
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`   🔄 GPT-4o Call (Attempt ${attempt}/${maxRetries})...`);
-      const response = await openai.chat.completions.create(params);
-      const content = response.choices[0]?.message?.content?.trim() || '{}';
+      console.log(`   🔄 GPT-4o Direct HTTPS Call (Attempt ${attempt}/${maxRetries})...`);
       
-      // Validate JSON response
-      const parsed = JSON.parse(content);
+      // Use direct HTTPS instead of SDK
+      const result = await callOpenAIDirect(messages, model);
       console.log(`   ✅ GPT-4o Response valid (Attempt ${attempt})`);
-      return { success: true, data: parsed, raw: content };
+      return result;
       
     } catch (error) {
       lastError = error;
@@ -601,14 +657,9 @@ async function callOpenAIWithRetry(openai, params, maxRetries = 3) {
       console.error(`   ⚠️ GPT-4o Attempt ${attempt} failed:`);
       console.error(`      Error Type: ${error.constructor.name}`);
       console.error(`      Error Message: ${error.message}`);
-      console.error(`      Error Status: ${error.status || 'N/A'}`);
-      console.error(`      Error Code: ${error.code || 'N/A'}`);
-      if (error.error) {
-        console.error(`      API Error: ${JSON.stringify(error.error)}`);
-      }
       
       // If it's a rate limit error, wait longer
-      if (error.message?.includes('rate_limit') || error.status === 429) {
+      if (error.message?.includes('rate_limit') || error.message?.includes('429')) {
         const waitTime = attempt * 5000; // 5s, 10s, 15s
         console.log(`   ⏳ Rate limited, waiting ${waitTime/1000}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
