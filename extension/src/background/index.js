@@ -200,22 +200,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 4. Handle TEST_BLOCK - Run single block for testing (Auto-open startUrl)
     // 🔥 UPGRADED: Now supports loop_start/loop_end and fetches prompts from Firestore
     if (request.action === "TEST_BLOCK") {
-        console.log("🧪 Testing Block:", request.blockName);
+        console.log("🧪 Testing Block:", request.blockName, "tabId:", request.tabId);
         (async () => {
             try {
+                console.log("🔍 Fetching block from Firestore...");
                 const block = await fetchBlock(request.blockName);
                 if (!block) {
                     console.error("❌ Block not found:", request.blockName);
+                    chrome.runtime.sendMessage({
+                        action: "RECIPE_STATUS_UPDATE",
+                        recipeId: request.blockName,
+                        status: "FAILED",
+                        message: `Block not found: ${request.blockName}`
+                    });
                     return;
                 }
-                console.log("📦 Block loaded:", block);
+                console.log("📦 Block loaded:", block.name, "steps:", block.steps?.length);
 
                 // 📝 FETCH PROMPTS FROM FIRESTORE (from locked project for this window)
                 let prompts = [];
+                let windowId = null;
                 
-                // Get window ID from the tab
-                const tab = await chrome.tabs.get(request.tabId);
-                const windowId = tab.windowId;
+                // Get window ID from the tab (if tabId provided)
+                if (request.tabId) {
+                    try {
+                        const tab = await chrome.tabs.get(request.tabId);
+                        windowId = tab.windowId;
+                    } catch (e) {
+                        console.warn("⚠️ Could not get tab:", e.message);
+                        // Try to get current window instead
+                        const currentWindow = await chrome.windows.getCurrent();
+                        windowId = currentWindow.id;
+                    }
+                } else {
+                    const currentWindow = await chrome.windows.getCurrent();
+                    windowId = currentWindow.id;
+                }
                 
                 // Get locked project for this window
                 const storage = await chrome.storage.local.get(['windowProjects', 'activeUserId']);
