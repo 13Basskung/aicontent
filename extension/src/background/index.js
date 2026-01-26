@@ -240,16 +240,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 // Get locked project for this window
                 const storage = await chrome.storage.local.get(['windowProjects', 'activeUserId']);
                 const windowProjects = storage.windowProjects || {};
-                const locked = windowProjects[windowId];
+                
+                // 🔧 FIX: Try both number and string keys
+                const locked = windowProjects[windowId] || windowProjects[String(windowId)];
                 const projectId = locked?.projectId;
                 const userId = storage.activeUserId;
                 
                 console.log(`🪟 Window ${windowId} → Locked Project: ${locked?.projectName || 'None'}`);
-                
-                if (!projectId) {
-                    console.warn("⚠️ No project locked to this window. Please lock a project first.");
-                }
-                
+                console.log(`📊 windowProjects keys:`, Object.keys(windowProjects));
                 console.log(`🔑 projectId: ${projectId}, userId: ${userId}`);
                 
                 if (projectId && userId) {
