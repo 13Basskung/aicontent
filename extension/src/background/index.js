@@ -198,6 +198,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // 4. Handle TEST_BLOCK - Run single block for testing (Auto-open startUrl)
+    // 🔥 UPGRADED: Now supports loop_start/loop_end and fetches prompts from Firestore
     if (request.action === "TEST_BLOCK") {
         console.log("🧪 Testing Block:", request.blockName);
         (async () => {
@@ -208,6 +209,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     return;
                 }
                 console.log("📦 Block loaded:", block);
+
+                // 📝 FETCH PROMPTS FROM FIRESTORE (from active project)
+                let prompts = [];
+                const storage = await chrome.storage.local.get(['activeProjectId', 'activeUserId']);
+                const projectId = storage.activeProjectId;
+                const userId = storage.activeUserId;
+                
+                if (projectId && userId) {
+                    try {
+                        // Fetch scenes from project
+                        const scenesUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${userId}/projects/${projectId}/scenes?key=${API_KEY}`;
+                        const scenesRes = await fetch(scenesUrl);
+                        const scenesData = await scenesRes.json();
+                        
+                        if (scenesData.documents) {
+                            prompts = scenesData.documents
+                                .map(doc => fromFirestoreValue(doc.fields?.prompt))
+                                .filter(p => p && p.trim());
+                            console.log(`📝 Loaded ${prompts.length} prompts from Firestore`);
+                        }
+                    } catch (e) {
+                        console.warn("⚠️ Could not fetch prompts:", e.message);
+                    }
+                }
 
                 // Smart Tab: Check existing tabs first, then use startUrl if needed
                 let tabId = request.tabId;
@@ -228,21 +253,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     if (existingTab) {
                         console.log("✅ Found existing tab with same origin:", existingTab.url);
                         tabId = existingTab.id;
-                        // Activate the existing tab and navigate to exact startUrl
-                        await chrome.tabs.update(tabId, { active: true, url: targetUrl });
+                        await chrome.tabs.update(tabId, { active: true });
                         await chrome.windows.update(existingTab.windowId, { focused: true });
-
-                        // Wait for navigation to complete
-                        await new Promise(resolve => {
-                            const listener = (updatedTabId, info) => {
-                                if (updatedTabId === tabId && info.status === 'complete') {
-                                    chrome.tabs.onUpdated.removeListener(listener);
-                                    resolve();
-                                }
-                            };
-                            chrome.tabs.onUpdated.addListener(listener);
-                            setTimeout(resolve, 10000);
-                        });
                         await new Promise(r => setTimeout(r, 1000));
                     } else {
                         console.log("🌐 No existing tab found, opening new tab:", targetUrl);
@@ -260,8 +272,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             chrome.tabs.onUpdated.addListener(listener);
                             setTimeout(resolve, 10000);
                         });
-
-                        // Additional wait for page scripts
                         await new Promise(r => setTimeout(r, 2000));
                     }
                     console.log("✅ Tab ready:", tabId);
@@ -298,54 +308,105 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.warn("⚠️ Script injection check failed:", e.message);
                 }
 
-                // Execute block steps with highlight
-                for (let i = 0; i < block.steps.length; i++) {
-                    // Check if test was stopped
-                    const stopFlag = await chrome.storage.local.get('stopTest');
-                    if (stopFlag.stopTest) {
-                        console.log("⏹ Test stopped by user");
-                        await chrome.storage.local.remove('stopTest');
-                        return;
-                    }
-
-                    const step = block.steps[i];
-                    const stepDelay = step.delay || 1000;
-                    console.log(`▶️ Step ${i + 1}/${block.steps.length} (delay: ${stepDelay}ms):`, step);
-
-                    // Send STEP_STARTED to UI
+                // 🔄 CHECK IF BLOCK HAS LOOP - use EXECUTE_RECIPE for full loop support
+                const hasLoop = block.steps.some(s => s.action === 'loop_start' || s.action === 'loop_end');
+                
+                if (hasLoop && prompts.length > 0) {
+                    // 🔥 USE EXECUTE_RECIPE for loop support with real prompts
+                    console.log(`🔄 Block has loop - executing with ${prompts.length} prompts`);
+                    
                     chrome.runtime.sendMessage({
                         action: "RECIPE_STATUS_UPDATE",
                         recipeId: request.blockName,
                         status: "STEP_STARTED",
-                        stepIndex: i,
+                        stepIndex: 0,
                         totalSteps: block.steps.length,
-                        stepAction: step.action,
-                        stepSelector: step.selector || ''
+                        stepAction: "Starting loop execution"
                     });
 
-                    // Wait before step using recorded delay (minimum 500ms)
-                    if (i > 0) {
-                        const waitTime = Math.max(stepDelay, 500);
-                        console.log(`⏱️ Waiting ${waitTime}ms...`);
-                        await new Promise(r => setTimeout(r, waitTime));
-                    }
-
-                    // Send step to content script with highlight
                     await chrome.tabs.sendMessage(tabId, {
-                        action: "EXECUTE_STEP_WITH_HIGHLIGHT",
-                        step: step,
-                        stepIndex: i,
-                        totalSteps: block.steps.length
+                        action: "EXECUTE_RECIPE",
+                        recipe: {
+                            id: request.blockName,
+                            steps: block.steps,
+                            loopCount: prompts.length,
+                            variables: {
+                                prompt: prompts[0] || '',
+                                prompts: prompts,
+                                loopCount: prompts.length
+                            }
+                        }
                     });
 
-                    // Send STEP_COMPLETED
-                    chrome.runtime.sendMessage({
-                        action: "RECIPE_STATUS_UPDATE",
-                        recipeId: request.blockName,
-                        status: "STEP_COMPLETED",
-                        stepIndex: i,
-                        totalSteps: block.steps.length
+                    // Wait for completion message
+                    await new Promise((resolve) => {
+                        const listener = (msg) => {
+                            if (msg.action === "RECIPE_STATUS_UPDATE" && msg.recipeId === request.blockName) {
+                                if (msg.status === "COMPLETED" || msg.status === "FAILED") {
+                                    chrome.runtime.onMessage.removeListener(listener);
+                                    resolve();
+                                }
+                            }
+                        };
+                        chrome.runtime.onMessage.addListener(listener);
+                        // Timeout after 30 minutes
+                        setTimeout(() => {
+                            chrome.runtime.onMessage.removeListener(listener);
+                            resolve();
+                        }, 1800000);
                     });
+
+                } else {
+                    // 📋 NO LOOP - Execute steps one by one (original behavior)
+                    const variables = {
+                        prompt: prompts[0] || '',
+                        prompts: prompts
+                    };
+
+                    for (let i = 0; i < block.steps.length; i++) {
+                        const stopFlag = await chrome.storage.local.get('stopTest');
+                        if (stopFlag.stopTest) {
+                            console.log("⏹ Test stopped by user");
+                            await chrome.storage.local.remove('stopTest');
+                            return;
+                        }
+
+                        const step = block.steps[i];
+                        const stepDelay = step.delay || 1000;
+                        console.log(`▶️ Step ${i + 1}/${block.steps.length} (delay: ${stepDelay}ms):`, step);
+
+                        chrome.runtime.sendMessage({
+                            action: "RECIPE_STATUS_UPDATE",
+                            recipeId: request.blockName,
+                            status: "STEP_STARTED",
+                            stepIndex: i,
+                            totalSteps: block.steps.length,
+                            stepAction: step.action,
+                            stepSelector: step.selector || ''
+                        });
+
+                        if (i > 0) {
+                            const waitTime = Math.max(stepDelay, 500);
+                            await new Promise(r => setTimeout(r, waitTime));
+                        }
+
+                        // 🔥 NOW SENDS VARIABLES!
+                        await chrome.tabs.sendMessage(tabId, {
+                            action: "EXECUTE_STEP_WITH_HIGHLIGHT",
+                            step: step,
+                            stepIndex: i,
+                            totalSteps: block.steps.length,
+                            variables: variables
+                        });
+
+                        chrome.runtime.sendMessage({
+                            action: "RECIPE_STATUS_UPDATE",
+                            recipeId: request.blockName,
+                            status: "STEP_COMPLETED",
+                            stepIndex: i,
+                            totalSteps: block.steps.length
+                        });
+                    }
                 }
 
                 // Send COMPLETED

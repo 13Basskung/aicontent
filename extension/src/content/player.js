@@ -525,6 +525,7 @@ if (window.playerInjected) {
         // Handle EXECUTE_STEP_WITH_HIGHLIGHT for testing
         if (request.action === "EXECUTE_STEP_WITH_HIGHLIGHT") {
             const step = request.step;
+            const variables = request.variables || {}; // 🔥 NOW RECEIVES VARIABLES!
             console.log(`🧪 Test Step ${request.stepIndex + 1}/${request.totalSteps}:`, step);
 
             // Show overlay banner
@@ -549,8 +550,8 @@ if (window.playerInjected) {
                         }
                     }
 
-                    // Execute the step
-                    await executeStep(step, {});
+                    // Execute the step with variables
+                    await executeStep(step, variables);
                     sendResponse({ success: true });
                 } catch (err) {
                     console.error('Step execution error:', err);
