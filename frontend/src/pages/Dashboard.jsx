@@ -328,47 +328,100 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Main Stats Grid - Unified Color Scheme */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 relative z-10">
-                <StatCard 
-                    icon={Wallet} 
-                    label="ยอดเงินคงเหลือ" 
-                    value={`${walletBalance.toLocaleString()} ฿`}
-                    color="red"
-                    loading={loading}
-                />
-                <StatCard 
-                    icon={FolderKanban} 
-                    label="โปรเจคทั้งหมด" 
-                    value={stats.totalProjects}
-                    subValue={`${stats.activeProjects} กำลังทำงาน`}
-                    color="red"
-                    loading={loading}
-                />
-                <StatCard 
-                    icon={Share2} 
-                    label="แพลตฟอร์มเชื่อมต่อ" 
-                    value={stats.totalAccounts}
-                    subValue={`${stats.totalFollowers.toLocaleString()} ผู้ติดตาม`}
-                    color="orange"
-                    loading={loading}
-                />
-                <StatCard 
-                    icon={Layers} 
-                    label="Expanders" 
-                    value={stats.totalExpanders}
-                    subValue={`${stats.publishedExpanders} กำลังขาย/แจกฟรี`}
-                    color="orange"
-                    loading={loading}
-                />
-                <StatCard 
-                    icon={Clock} 
-                    label="คิวรอโพสต์" 
-                    value={stats.pendingQueue}
-                    subValue={`${stats.todayPosts} โพสต์วันนี้`}
-                    color="amber"
-                    loading={loading}
-                />
+            {/* 🔥 HERO SUMMARY CARDS - FastClip Style */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 relative z-10">
+                {/* Subscribers Card */}
+                <div className="group relative bg-gradient-to-br from-red-600 to-red-800 rounded-2xl p-4 md:p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 cursor-pointer shadow-xl shadow-red-500/20">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <p className="text-3xl md:text-4xl font-black text-white">
+                            {loading ? '...' : stats.totalFollowers.toLocaleString()}
+                        </p>
+                        <p className="text-red-200 text-sm font-medium mt-1">ผู้ติดตามทั้งหมด</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-red-100">
+                            <TrendingUp size={12} />
+                            <span>+0 วันนี้</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Views Card */}
+                <div className="group relative bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl p-4 md:p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 cursor-pointer shadow-xl shadow-slate-500/20">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <p className="text-3xl md:text-4xl font-black text-white">
+                            {loading ? '...' : '0'}
+                        </p>
+                        <p className="text-slate-400 text-sm font-medium mt-1">ยอดวิวทั้งหมด</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
+                            <Eye size={12} />
+                            <span>Views</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Videos Card */}
+                <div className="group relative bg-gradient-to-br from-pink-600 to-pink-800 rounded-2xl p-4 md:p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 cursor-pointer shadow-xl shadow-pink-500/20">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <p className="text-3xl md:text-4xl font-black text-white">
+                            {loading ? '...' : stats.totalVideos.toLocaleString()}
+                        </p>
+                        <p className="text-pink-200 text-sm font-medium mt-1">วีดีโอทั้งหมด</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-pink-100">
+                            <Video size={12} />
+                            <span>Videos</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Scheduled Card */}
+                <div className="group relative bg-gradient-to-br from-slate-800 to-slate-950 rounded-2xl p-4 md:p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 cursor-pointer shadow-xl shadow-slate-500/20 border border-white/10">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="relative">
+                        <p className="text-3xl md:text-4xl font-black text-white">
+                            {loading ? '...' : stats.pendingQueue}
+                        </p>
+                        <p className="text-slate-400 text-sm font-medium mt-1">รอโพสต์</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
+                            <Clock size={12} />
+                            <span>Scheduled</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 🔥 QUICK ACTIONS - Create Video & Queue */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+                {/* Create Video Button */}
+                <Link
+                    to="/projects"
+                    className="group relative flex items-center gap-4 p-5 bg-gradient-to-r from-pink-600 to-rose-600 rounded-2xl overflow-hidden hover:scale-[1.01] transition-all duration-300 shadow-xl shadow-pink-500/30"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <Play size={24} className="text-white" />
+                    </div>
+                    <div>
+                        <p className="text-lg font-bold text-white">สร้างวีดีโอใหม่</p>
+                        <p className="text-pink-200 text-sm">เริ่มสร้างคอนเทนต์</p>
+                    </div>
+                </Link>
+
+                {/* Queue Button */}
+                <Link
+                    to="/content-queue"
+                    className="group relative flex items-center gap-4 p-5 bg-gradient-to-r from-slate-700 to-slate-800 rounded-2xl overflow-hidden hover:scale-[1.01] transition-all duration-300 shadow-xl shadow-slate-500/20 border border-white/10"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                        <Clock size={24} className="text-white" />
+                    </div>
+                    <div>
+                        <p className="text-lg font-bold text-white">Queue</p>
+                        <p className="text-slate-400 text-sm">{stats.pendingQueue} รายการรอดำเนินการ</p>
+                    </div>
+                </Link>
             </div>
 
             {/* Charts & Activity Row */}
@@ -594,68 +647,215 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Platform Table */}
-            <div className="group relative bg-gradient-to-br from-green-900/20 to-slate-900/50 backdrop-blur-xl rounded-3xl border border-white/10 p-6 hover:border-green-500/30 transition-all duration-500 overflow-hidden z-10">
-                {/* Glow Effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
-                                <Share2 size={20} className="text-white" />
-                            </div>
-                            รายละเอียดแพลตฟอร์ม
-                        </h3>
-                        <p className="text-sm text-slate-400 mt-1">ข้อมูลทุกบัญชีที่เชื่อมต่อ</p>
+            {/* 🔥 PROJECTS TABLE - FastClip Style */}
+            <div className="group relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-10">
+                {/* Header */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold text-white">Projects</h3>
+                        <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded-full">{projects.length}</span>
+                        <div className="hidden md:flex items-center gap-2 ml-4">
+                            <span className="flex items-center gap-1 text-xs text-slate-400">
+                                <Youtube size={12} className="text-red-400" /> {stats.platformStats?.youtube?.count || 0}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-slate-400">
+                                <Facebook size={12} className="text-blue-400" /> {stats.platformStats?.facebook?.count || 0}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-slate-400">
+                                <Instagram size={12} className="text-pink-400" /> {stats.platformStats?.instagram?.count || 0}
+                            </span>
+                        </div>
                     </div>
                     
-                    {/* Filters */}
+                    {/* Filters & Actions */}
                     <div className="flex items-center gap-3">
-                        {/* Search */}
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                             <input
                                 type="text"
-                                placeholder="ค้นหาบัญชี..."
+                                placeholder="ค้นหา..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-green-500 transition-all w-48"
+                                className="pl-9 pr-4 py-2 bg-slate-800 border border-white/10 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:border-red-500 transition-all w-40"
                             />
                         </div>
-                        
-                        {/* Platform Filter */}
-                        <div className="relative">
-                            <GlassDropdown
-                                value={platformFilter}
-                                onChange={setPlatformFilter}
-                                options={[
-                                    { value: 'all', label: 'ทุกแพลตฟอร์ม' },
-                                    { value: 'facebook', label: 'Facebook' },
-                                    { value: 'instagram', label: 'Instagram' },
-                                    { value: 'youtube', label: 'YouTube' },
-                                    { value: 'tiktok', label: 'TikTok' }
-                                ]}
-                                buttonClassName="appearance-none pl-4 pr-10 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-green-500 cursor-pointer"
-                            />
-                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        </div>
+                        <Link
+                            to="/projects/new"
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-red-500/20"
+                        >
+                            <Sparkles size={14} />
+                            <span className="hidden sm:inline">New Project</span>
+                        </Link>
                     </div>
                 </div>
                 
                 {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-white/10">
-                                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-400">บัญชี</th>
-                                <th className="text-left py-3 px-4 text-sm font-semibold text-slate-400">แพลตฟอร์ม</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-400">ผู้ติดตามทั้งหมด</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-400">ผู้ติดตามวันนี้</th>
-                                <th className="text-right py-3 px-4 text-sm font-semibold text-slate-400">วีดีโอทั้งหมด</th>
-                                <th className="text-center py-3 px-4 text-sm font-semibold text-slate-400">สถานะ</th>
+                        <thead className="bg-slate-800/50">
+                            <tr>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Project</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-red-400 uppercase tracking-wider">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Youtube size={12} /> Subs
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Views</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-pink-400 uppercase tracking-wider">Videos</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-blue-400 uppercase tracking-wider">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Facebook size={12} /> Followers
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Scheduled</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">สถานะ</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-white/5">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={8} className="py-12 text-center">
+                                        <Loader2 size={32} className="animate-spin mx-auto text-slate-400" />
+                                    </td>
+                                </tr>
+                            ) : projects.length > 0 ? (
+                                projects.slice(0, 10).map((project) => (
+                                    <tr key={project.id} className="hover:bg-white/5 transition-colors group">
+                                        <td className="py-3 px-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center border border-white/10">
+                                                    <FolderKanban size={18} className="text-red-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-white text-sm">{project.name || 'Untitled'}</p>
+                                                    <p className="text-xs text-slate-500">{project.scenes || 0} scenes</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-white font-bold">{(project.subscribers || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-green-400">+0</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-white font-bold">{(project.views || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-slate-500">views</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-white font-bold">{project.videoCount || 0}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-white font-bold">{(project.followers || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-green-400">+0</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-xs text-slate-400">
+                                                {project.lastScheduled ? new Date(project.lastScheduled.seconds * 1000).toLocaleDateString('th-TH') : '-'}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${
+                                                project.status === 'active' 
+                                                    ? 'bg-green-500/20 text-green-400' 
+                                                    : 'bg-slate-500/20 text-slate-400'
+                                            }`}>
+                                                {project.status === 'active' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+                                                {project.status === 'active' ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <Link
+                                                    to={`/projects/${project.id}`}
+                                                    className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                                                    title="View"
+                                                >
+                                                    <Eye size={14} className="text-slate-400 hover:text-white" />
+                                                </Link>
+                                                <button className="p-2 hover:bg-red-500/20 rounded-lg transition-all" title="Play">
+                                                    <Play size={14} className="text-red-400" />
+                                                </button>
+                                                <button className="p-2 hover:bg-blue-500/20 rounded-lg transition-all" title="Share">
+                                                    <Share2 size={14} className="text-blue-400" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                                        <FolderKanban size={40} className="mx-auto mb-3 opacity-30" />
+                                        <p className="text-lg font-semibold mb-1">ยังไม่มี Project</p>
+                                        <p className="text-sm mb-4">สร้าง Project แรกของคุณเลย!</p>
+                                        <Link to="/projects/new" className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl text-sm font-semibold hover:from-red-500 hover:to-rose-500 transition-all">
+                                            <Sparkles size={16} /> สร้าง Project
+                                        </Link>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {/* Footer */}
+                {projects.length > 10 && (
+                    <div className="p-4 border-t border-white/10 text-center">
+                        <Link to="/projects" className="text-sm text-red-400 hover:text-red-300 font-semibold">
+                            ดูทั้งหมด ({projects.length}) →
+                        </Link>
+                    </div>
+                )}
+            </div>
+
+            {/* Platform Accounts Table */}
+            <div className="group relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-10">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+                            <Share2 size={18} className="text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white">Platform Accounts</h3>
+                            <p className="text-xs text-slate-400">บัญชีที่เชื่อมต่อทั้งหมด</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <GlassDropdown
+                            value={platformFilter}
+                            onChange={setPlatformFilter}
+                            options={[
+                                { value: 'all', label: 'ทุกแพลตฟอร์ม' },
+                                { value: 'facebook', label: 'Facebook' },
+                                { value: 'instagram', label: 'Instagram' },
+                                { value: 'youtube', label: 'YouTube' },
+                                { value: 'tiktok', label: 'TikTok' }
+                            ]}
+                            buttonClassName="px-4 py-2 bg-slate-800 border border-white/10 rounded-lg text-white text-sm"
+                        />
+                    </div>
+                </div>
+                
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-slate-800/50">
+                            <tr>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">บัญชี</th>
+                                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">แพลตฟอร์ม</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">ผู้ติดตาม</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">วันนี้</th>
+                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">วีดีโอ</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
                             {loading ? (
                                 <tr>
                                     <td colSpan={6} className="py-12 text-center">
@@ -664,40 +864,38 @@ export default function Dashboard() {
                                 </tr>
                             ) : filteredAccounts.length > 0 ? (
                                 filteredAccounts.map((account) => (
-                                    <tr key={account.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                        <td className="py-4 px-4">
+                                    <tr key={account.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="py-3 px-4">
                                             <div className="flex items-center gap-3">
                                                 <img 
                                                     src={account.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name || 'A')}&background=random`} 
                                                     alt={account.name}
-                                                    className="w-10 h-10 rounded-xl border border-white/10 group-hover:border-green-500/50 transition-all"
+                                                    className="w-8 h-8 rounded-lg border border-white/10"
                                                 />
                                                 <div>
-                                                    <p className="font-semibold text-white">{account.name || 'Unnamed'}</p>
-                                                    <p className="text-xs text-slate-500">{account.username || account.id}</p>
+                                                    <p className="font-medium text-white text-sm">{account.name || 'Unnamed'}</p>
+                                                    <p className="text-xs text-slate-500">{account.id.substring(0, 15)}...</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="py-4 px-4">
+                                        <td className="py-3 px-4">
                                             <div className="flex items-center gap-2">
-                                                <PlatformIcon platform={account.platform} size={18} />
-                                                <span className="text-sm text-slate-300 capitalize">{account.platform || 'Unknown'}</span>
+                                                <PlatformIcon platform={account.platform} size={16} />
+                                                <span className="text-sm text-slate-300 capitalize">{account.platform}</span>
                                             </div>
                                         </td>
-                                        <td className="py-4 px-4 text-right">
-                                            <span className="text-white font-semibold">{(account.followers || 0).toLocaleString()}</span>
+                                        <td className="py-3 px-4 text-right">
+                                            <span className="text-white font-medium">{(account.followers || 0).toLocaleString()}</span>
                                         </td>
-                                        <td className="py-4 px-4 text-right">
-                                            <span className={`font-semibold ${(account.followersToday || 0) > 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                                                {(account.followersToday || 0) > 0 ? '+' : ''}{(account.followersToday || 0).toLocaleString()}
-                                            </span>
+                                        <td className="py-3 px-4 text-right">
+                                            <span className="text-green-400 text-sm">+{account.followersToday || 0}</span>
                                         </td>
-                                        <td className="py-4 px-4 text-right">
-                                            <span className="text-white">{(account.videoCount || 0).toLocaleString()}</span>
+                                        <td className="py-3 px-4 text-right">
+                                            <span className="text-white">{account.videoCount || 0}</span>
                                         </td>
-                                        <td className="py-4 px-4 text-center">
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500/20 text-green-400 text-xs font-semibold rounded-lg">
-                                                <CheckCircle size={12} /> เชื่อมต่อแล้ว
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                                                <CheckCircle size={10} /> Connected
                                             </span>
                                         </td>
                                     </tr>
@@ -705,14 +903,11 @@ export default function Dashboard() {
                             ) : (
                                 <tr>
                                     <td colSpan={6} className="py-12 text-center text-slate-500">
-                                        <Share2 size={40} className="mx-auto mb-3 opacity-30" />
-                                        <p className="text-lg font-semibold mb-1">ไม่พบบัญชี</p>
-                                        <p className="text-sm">{searchQuery ? 'ลองค้นหาด้วยคำอื่น' : 'เพิ่มแพลตฟอร์มเพื่อเริ่มต้น'}</p>
-                                        {!searchQuery && (
-                                            <Link to="/platforms" className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-green-500/20 text-green-400 rounded-xl text-sm font-semibold hover:bg-green-500/30 transition-all">
-                                                <Share2 size={16} /> เพิ่มแพลตฟอร์ม
-                                            </Link>
-                                        )}
+                                        <Share2 size={32} className="mx-auto mb-3 opacity-30" />
+                                        <p className="font-medium mb-2">ยังไม่มีบัญชีเชื่อมต่อ</p>
+                                        <Link to="/platforms" className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-all">
+                                            <Share2 size={14} /> เพิ่มแพลตฟอร์ม
+                                        </Link>
                                     </td>
                                 </tr>
                             )}
