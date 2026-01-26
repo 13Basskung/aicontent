@@ -35,12 +35,6 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
     const [latestVersion, setLatestVersion] = useState(null);
     const [updateDismissed, setUpdateDismissed] = useState(false);
 
-    // Desktop Agent Status States
-    const [agentStatus, setAgentStatus] = useState('unknown'); // 'online' | 'offline' | 'unknown'
-    const [agentLastSeen, setAgentLastSeen] = useState(null);
-    const [showAgentCommand, setShowAgentCommand] = useState(false);
-    const [commandCopied, setCommandCopied] = useState(false);
-
     // Helper to get Auth Token
     const getAuthToken = async () => {
         try {
@@ -220,58 +214,6 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
         const interval = setInterval(fetchJobs, 30000);
         return () => clearInterval(interval);
     }, [selectedProjectId, userId]);
-
-    // Check Desktop Agent Status
-    useEffect(() => {
-        if (!selectedProjectId) return;
-
-        const checkAgentStatus = async () => {
-            try {
-                const token = await getAuthToken();
-                const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/agent_status/${selectedProjectId}?key=${API_KEY}`;
-                const res = await fetch(url, {
-                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-                });
-                const data = await res.json();
-                
-                if (data.fields && data.fields.lastSeen) {
-                    const lastSeen = new Date(data.fields.lastSeen.timestampValue);
-                    const now = new Date();
-                    const diffSeconds = (now - lastSeen) / 1000;
-                    
-                    setAgentLastSeen(lastSeen);
-                    // ถ้า lastSeen ภายใน 60 วินาที = online
-                    setAgentStatus(diffSeconds < 60 ? 'online' : 'offline');
-                } else {
-                    setAgentStatus('offline');
-                }
-            } catch (err) {
-                console.error('Error checking agent status:', err);
-                setAgentStatus('unknown');
-            }
-        };
-
-        checkAgentStatus();
-        const interval = setInterval(checkAgentStatus, 10000); // Check every 10s
-        return () => clearInterval(interval);
-    }, [selectedProjectId]);
-
-    // Launch Desktop Agent via URL protocol
-    const launchDesktopAgent = () => {
-        window.open('autopost://start', '_blank');
-        // Check status after 5 seconds
-        setTimeout(() => {
-            setAgentStatus('unknown');
-        }, 5000);
-    };
-
-    // Copy agent command to clipboard (fallback)
-    const copyAgentCommand = () => {
-        const command = `cd /d C:\\content-auto-post\\legacy_desktop_agent && python main.py`;
-        navigator.clipboard.writeText(command);
-        setCommandCopied(true);
-        setTimeout(() => setCommandCopied(false), 2000);
-    };
 
     const handleSelectProject = (projectId) => {
         const project = projects.find(p => p.id === projectId);
@@ -1308,36 +1250,6 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {/* Desktop Agent Status Card */}
-                                {selectedProjectId && (
-                                    <div className={`p-3 rounded-lg border mb-3 ${
-                                        agentStatus === 'online' 
-                                            ? 'bg-green-500/10 border-green-500/30' 
-                                            : 'bg-orange-500/10 border-orange-500/30'
-                                    }`}>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${
-                                                    agentStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-orange-500'
-                                                }`}></div>
-                                                <span className={`text-xs font-medium ${
-                                                    agentStatus === 'online' ? 'text-green-400' : 'text-orange-400'
-                                                }`}>
-                                                    🖥️ Desktop Agent: {agentStatus === 'online' ? 'ออนไลน์' : 'ออฟไลน์'}
-                                                </span>
-                                            </div>
-                                            {agentStatus !== 'online' && (
-                                                <button
-                                                    onClick={launchDesktopAgent}
-                                                    className="text-[10px] px-2 py-1 bg-green-500/20 text-green-400 rounded border border-green-500/30 hover:bg-green-500/40 font-bold"
-                                                >
-                                                    🚀 เปิด
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
                                 {projects.map(project => {
                                     const isRunning = project.status === 'running';
                                     const isSelected = selectedProjectId === project.id;
