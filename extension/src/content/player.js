@@ -558,24 +558,70 @@ if (window.playerInjected) {
             const recipe = request.recipe || {};
             const steps = recipe.steps || [];
             const variables = recipe.variables || {}; // 🧠 Receive Variables
+            const loopCount = recipe.loopCount || variables.loopCount || 1; // จำนวนรอบ loop
 
-            console.log("📜 Starting Recipe...", { stepsCount: steps.length, variables });
+            console.log("📜 Starting Recipe...", { stepsCount: steps.length, variables, loopCount });
 
             (async () => {
                 let success = true;
+                let i = 0;
+                let loopStartIndex = -1; // ตำแหน่งเริ่มต้น loop (-1 = ยังไม่เจอ)
+                let currentLoop = 0; // loop รอบปัจจุบัน
+                const maxLoops = loopCount;
 
-                for (const step of steps) {
-                    const result = await executeStep(step, variables); // Pass Variables
+                while (i < steps.length) {
+                    const step = steps[i];
+                    window.__currentStepIndex = i;
+                    
+                    console.log(`📍 Step ${i + 1}/${steps.length}: ${step.action}`);
+
+                    // 🔄 LOOP_START: บันทึกตำแหน่งเริ่มต้น loop
+                    if (step.action === 'loop_start') {
+                        loopStartIndex = i;
+                        currentLoop = 0;
+                        console.log(`🔄 LOOP_START at Step ${i + 1} - Will loop ${maxLoops} times`);
+                        i++;
+                        continue;
+                    }
+
+                    // 🏁 LOOP_END: ตรวจสอบว่าต้อง loop ต่อหรือไม่
+                    if (step.action === 'loop_end') {
+                        currentLoop++;
+                        console.log(`🏁 LOOP_END - Completed loop ${currentLoop}/${maxLoops}`);
+                        
+                        if (currentLoop < maxLoops && loopStartIndex >= 0) {
+                            // ยังไม่ครบ → กลับไปที่ step หลัง loop_start
+                            console.log(`🔁 Looping back to Step ${loopStartIndex + 2}`);
+                            i = loopStartIndex + 1;
+                            
+                            // อัปเดต prompt สำหรับ loop รอบถัดไป
+                            if (variables.prompts && variables.prompts[currentLoop]) {
+                                variables.prompt = variables.prompts[currentLoop];
+                                variables.currentPrompt = variables.prompts[currentLoop];
+                                console.log(`📝 Updated prompt for loop ${currentLoop + 1}: "${variables.prompt?.substring(0, 30)}..."`);
+                            }
+                            continue;
+                        } else {
+                            // ครบแล้ว → ไปต่อ step ถัดไป
+                            console.log(`✅ All ${maxLoops} loops completed!`);
+                            i++;
+                            continue;
+                        }
+                    }
+
+                    // Execute step ปกติ
+                    const result = await executeStep(step, variables);
                     if (!result) {
                         success = false;
                         break;
                     }
+                    
                     await sleep(1000);
+                    i++;
                 }
 
                 if (success) {
                     console.log("✅ Recipe Complete!");
-                    // 🔔 Notify Background of Success
                     chrome.runtime.sendMessage({
                         action: "RECIPE_STATUS_UPDATE",
                         status: "COMPLETED",
@@ -583,7 +629,6 @@ if (window.playerInjected) {
                     });
                 } else {
                     console.warn("⚠️ Recipe Stopped due to error.");
-                    // 🔔 Notify Background of Failure
                     chrome.runtime.sendMessage({
                         action: "RECIPE_STATUS_UPDATE",
                         status: "FAILED",
