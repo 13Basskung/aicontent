@@ -1930,16 +1930,23 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                     </div>
                                 )}
 
-                                {/* Template Name */}
+                                {/* Template Name - Dropdown */}
                                 <div className="bg-slate-800/50 border border-white/10 rounded-lg p-3">
                                     <label className="text-xs text-gray-400 block mb-1">Template Name</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         value={templateName}
                                         onChange={(e) => setTemplateName(e.target.value)}
-                                        placeholder="e.g. FLOW_TEXT_VIDEO_YOUTUBE"
                                         className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
-                                    />
+                                    >
+                                        <option value="">-- เลือก Template --</option>
+                                        <option value="ADD_SCENE_TEXT">ADD_SCENE_TEXT (สร้างวีดีโอ)</option>
+                                        <option value="EXPORT_VIDEO">EXPORT_VIDEO (Export วีดีโอ)</option>
+                                        <option value="DOWNLOAD_FILE">DOWNLOAD_FILE (Download ไฟล์)</option>
+                                        <option value="UPLOAD_FACEBOOK">UPLOAD_FACEBOOK (Upload Facebook)</option>
+                                        <option value="UPLOAD_YOUTUBE">UPLOAD_YOUTUBE (Upload YouTube)</option>
+                                        <option value="UPLOAD_TIKTOK">UPLOAD_TIKTOK (Upload TikTok)</option>
+                                        <option value="UPLOAD_INSTAGRAM">UPLOAD_INSTAGRAM (Upload Instagram)</option>
+                                    </select>
                                 </div>
 
                                 {/* Template Purpose */}
