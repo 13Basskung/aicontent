@@ -260,20 +260,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 
                 if (projectId && userId) {
                     try {
-                        // Fetch scenes from project
-                        const scenesUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${userId}/projects/${projectId}/scenes?key=${API_KEY}`;
-                        console.log(`📡 Fetching scenes from: ${scenesUrl}`);
-                        const scenesRes = await fetch(scenesUrl);
-                        const scenesData = await scenesRes.json();
-                        console.log(`📦 Scenes data:`, scenesData);
+                        // 🔧 FIX: Fetch from JOBS collection (where prompts are actually stored)
+                        const jobsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${userId}/projects/${projectId}/jobs?key=${API_KEY}`;
+                        console.log(`📡 Fetching jobs from: ${jobsUrl}`);
+                        const jobsRes = await fetch(jobsUrl);
+                        const jobsData = await jobsRes.json();
                         
-                        if (scenesData.documents) {
-                            prompts = scenesData.documents
-                                .map(doc => fromFirestoreValue(doc.fields?.prompt))
-                                .filter(p => p && p.trim());
-                            console.log(`📝 Loaded ${prompts.length} prompts:`, prompts.map(p => p.substring(0, 30) + '...'));
-                        } else {
-                            console.warn(`⚠️ No scenes found in project! scenesData:`, scenesData);
+                        if (jobsData.documents && jobsData.documents.length > 0) {
+                            // Get latest job with prompts
+                            for (const doc of jobsData.documents) {
+                                const jobPrompts = fromFirestoreValue(doc.fields?.prompts);
+                                if (jobPrompts && Array.isArray(jobPrompts) && jobPrompts.length > 0) {
+                                    prompts = jobPrompts.filter(p => p && String(p).trim());
+                                    console.log(`📝 Loaded ${prompts.length} prompts from job:`, prompts.map(p => String(p).substring(0, 30) + '...'));
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Fallback: Try readyPrompts collection
+                        if (prompts.length === 0) {
+                            const readyUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${userId}/projects/${projectId}/readyPrompts?key=${API_KEY}`;
+                            console.log(`📡 Fallback - Fetching readyPrompts from: ${readyUrl}`);
+                            const readyRes = await fetch(readyUrl);
+                            const readyData = await readyRes.json();
+                            
+                            if (readyData.documents && readyData.documents.length > 0) {
+                                for (const doc of readyData.documents) {
+                                    const readyPrompts = fromFirestoreValue(doc.fields?.prompts);
+                                    if (readyPrompts && Array.isArray(readyPrompts) && readyPrompts.length > 0) {
+                                        // Extract englishPrompt from each scene object
+                                        prompts = readyPrompts
+                                            .map(p => typeof p === 'object' ? p.englishPrompt : p)
+                                            .filter(p => p && String(p).trim());
+                                        console.log(`📝 Loaded ${prompts.length} prompts from readyPrompts`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (prompts.length === 0) {
+                            console.warn(`⚠️ No prompts found in jobs or readyPrompts!`);
                         }
                     } catch (e) {
                         console.error("❌ Could not fetch prompts:", e.message);
