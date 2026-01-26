@@ -316,30 +316,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     return;
                 }
 
-                // 🔥 CRITICAL: Check if player is injected, if not - inject it
+                // 🔥 CRITICAL: Inject player.js into tab
+                console.log("💉 Attempting to inject player script into tab:", tabId);
                 try {
-                    const [result] = await chrome.scripting.executeScript({
-                        target: { tabId: tabId },
-                        func: () => window.playerInjected === true
-                    });
+                    const manifest = chrome.runtime.getManifest();
+                    const playerFile = manifest.content_scripts?.[0]?.js?.find(f => f.includes('player'));
+                    console.log("📦 Player file from manifest:", playerFile);
                     
-                    if (!result.result) {
-                        console.log("💉 Player not found, injecting...");
-                        const manifest = chrome.runtime.getManifest();
-                        const playerFile = manifest.content_scripts[0].js.find(f => f.includes('player'));
-                        if (playerFile) {
-                            await chrome.scripting.executeScript({
-                                target: { tabId: tabId },
-                                files: [playerFile]
-                            });
-                            console.log("✅ Player script injected:", playerFile);
-                            await new Promise(r => setTimeout(r, 500));
-                        }
+                    if (playerFile) {
+                        await chrome.scripting.executeScript({
+                            target: { tabId: tabId },
+                            files: [playerFile]
+                        });
+                        console.log("✅ Player script injected successfully");
+                        await new Promise(r => setTimeout(r, 1000)); // Wait for script to initialize
                     } else {
-                        console.log("✅ Player already injected");
+                        console.error("❌ Player file not found in manifest!");
                     }
                 } catch (e) {
-                    console.warn("⚠️ Script injection check failed:", e.message);
+                    console.warn("⚠️ Script injection failed (may already be injected):", e.message);
                 }
 
                 // 🔄 CHECK IF BLOCK HAS LOOP - use EXECUTE_RECIPE for full loop support
