@@ -648,6 +648,40 @@ const extractUserPath = (fullPath) => {
     return match ? { uid: match[1], pid: match[2] } : null;
 };
 
+// --- HELPER: Check if there's a NEW PENDING Job (for cancellation check) ---
+const hasNewPendingJob = async (projectId, currentJobId) => {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery?key=${API_KEY}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({
+                structuredQuery: {
+                    from: [{ collectionId: 'agent_jobs' }],
+                    where: {
+                        compositeFilter: {
+                            op: 'AND',
+                            filters: [
+                                { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'PENDING' } } },
+                                { fieldFilter: { field: { fieldPath: 'projectId' }, op: 'EQUAL', value: { stringValue: projectId } } }
+                            ]
+                        }
+                    },
+                    limit: 1
+                }
+            })
+        });
+        const data = await response.json();
+        if (data[0] && data[0].document) {
+            const newJobId = data[0].document.name.split('/').pop();
+            return newJobId !== currentJobId; // true if different job exists
+        }
+        return false;
+    } catch (e) {
+        console.error("❌ Error checking new jobs:", e);
+        return false;
+    }
+};
+
 // --- SCHEDULER: JOB CHECKER (REST API) with BLOCK SEQUENCE SUPPORT ---
 const checkJobs = async (projectId) => {
     try {
@@ -873,25 +907,44 @@ const checkJobs = async (projectId) => {
 
                                 writeLog(`🎬 Scene ${s + 1}/${job.prompts.length}`, "INFO");
 
-                                await new Promise((resolve, reject) => {
-                                    const listener = (msg) => {
-                                        if (msg.action === "RECIPE_STATUS_UPDATE" && msg.recipeId === currentBlockId) {
-                                            chrome.runtime.onMessage.removeListener(listener);
-                                            if (msg.status === "COMPLETED") {
-                                                if (msg.videoFilePath) videoFilePath = msg.videoFilePath;
-                                                resolve();
-                                            } else {
-                                                reject(new Error(msg.error || "Scene Failed"));
-                                            }
-                                        }
-                                    };
-                                    chrome.runtime.onMessage.addListener(listener);
-                                    executeRecipeOnTab(targetTab, scenePayload);
-                                    setTimeout(() => {
-                                        chrome.runtime.onMessage.removeListener(listener);
-                                        reject(new Error("Scene Timeout (5min)"));
-                                    }, 300000);
-                                });
+                                // 🔄 RETRY SCENE UNTIL SUCCESS OR NEW JOB ARRIVES
+                                let sceneSuccess = false;
+                                while (!sceneSuccess) {
+                                    // Check if new job exists → cancel current job
+                                    const newJobExists = await hasNewPendingJob(projectId, job.id);
+                                    if (newJobExists) {
+                                        // Log CANCELLED only once with scene number
+                                        await updateJobStatus('CANCELLED', `ยกเลิก: ฉากที่ ${s + 1}/${job.prompts.length} ไม่สำเร็จ - มี Job ใหม่เข้ามา`);
+                                        console.log(`🛑 Job ${job.id} CANCELLED at Scene ${s + 1} - New Job detected`);
+                                        return; // Exit entire job processing
+                                    }
+
+                                    try {
+                                        await new Promise((resolve, reject) => {
+                                            const listener = (msg) => {
+                                                if (msg.action === "RECIPE_STATUS_UPDATE" && msg.recipeId === currentBlockId) {
+                                                    chrome.runtime.onMessage.removeListener(listener);
+                                                    if (msg.status === "COMPLETED") {
+                                                        if (msg.videoFilePath) videoFilePath = msg.videoFilePath;
+                                                        resolve();
+                                                    } else {
+                                                        reject(new Error(msg.error || "Scene Failed"));
+                                                    }
+                                                }
+                                            };
+                                            chrome.runtime.onMessage.addListener(listener);
+                                            executeRecipeOnTab(targetTab, scenePayload);
+                                            setTimeout(() => {
+                                                chrome.runtime.onMessage.removeListener(listener);
+                                                reject(new Error("Scene Timeout (5min)"));
+                                            }, 300000);
+                                        });
+                                        sceneSuccess = true; // Scene completed successfully
+                                    } catch (sceneErr) {
+                                        console.log(`⚠️ Scene ${s + 1} failed: ${sceneErr.message} - Retrying...`);
+                                        await new Promise(r => setTimeout(r, 10000)); // Wait 10 sec before retry
+                                    }
+                                }
 
                                 await new Promise(r => setTimeout(r, 3000)); // Delay between scenes
                             }

@@ -391,6 +391,13 @@ if (window.playerInjected) {
                 } else {
                     let textToType = step.value || "Test Input";
 
+                    // 📝 CHECK FOR PENDING PROMPT FROM inject_prompt ACTION
+                    if (textToType === '{{prompt}}' && window.__pendingPrompt) {
+                        textToType = window.__pendingPrompt;
+                        console.log(`📝 Using pending prompt: "${textToType.substring(0, 50)}..."`);
+                        window.__pendingPrompt = null; // Clear after use
+                    }
+
                     // 🧠 VARIABLE INJECTION LOGIC (Enhanced for Multi-Platform)
                     if (typeof textToType === 'string' && textToType.includes('{{')) {
                         console.log(`🧠 Parsing Variables in: "${textToType}"`);
