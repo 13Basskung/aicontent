@@ -80,71 +80,6 @@ const toFirestoreValue = (val) => {
     return { stringValue: String(val) };
 };
 
-// --- HELPER: Create Agent Job ---
-const createAgentJob = async (userId, projectId, recipeId, jobData = {}) => {
-    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/agent_jobs?key=${API_KEY}`;
-
-    const fields = {
-        recipeId: { stringValue: recipeId },
-        projectId: { stringValue: projectId },
-        userId: { stringValue: userId },
-        status: { stringValue: 'PENDING' },
-        createdAt: { timestampValue: new Date().toISOString() }
-    };
-
-    // Add custom job data
-    for (const key in jobData) {
-        fields[key] = toFirestoreValue(jobData[key]);
-    }
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields })
-    });
-
-    const doc = await response.json();
-    const agentJobId = doc.name.split('/').pop();
-    console.log(`📝 Created Agent Job: ${agentJobId} (${recipeId})`);
-    return agentJobId;
-};
-
-// --- HELPER: Wait for Agent Job Completion ---
-const waitForAgentJob = async (agentJobId, timeout = 600000) => {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeout) {
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/agent_jobs/${agentJobId}?key=${API_KEY}`;
-        const response = await fetch(url);
-        const doc = await response.json();
-
-        if (!doc.fields) {
-            console.warn(`⚠️ Agent Job document empty: ${agentJobId}`);
-            await new Promise(r => setTimeout(r, 3000));
-            continue;
-        }
-
-        const status = doc.fields?.status?.stringValue;
-
-        if (status === 'COMPLETED') {
-            console.log(`✅ Agent Job Completed: ${agentJobId}`);
-            return { success: true, data: doc.fields };
-        }
-
-        if (status === 'FAILED') {
-            const error = doc.fields?.error?.stringValue || 'Unknown error';
-            console.error(`❌ Agent Job Failed: ${error}`);
-            return { success: false, error };
-        }
-
-        // Still running, poll again
-        await new Promise(r => setTimeout(r, 3000));
-    }
-
-    console.error(`⏱️ Agent Job Timeout: ${agentJobId}`);
-    return { success: false, error: 'Timeout waiting for Agent' };
-};
-
 // --- HELPER: Fetch Block from global_recipe_blocks (by name field, not document ID) ---
 const fetchBlock = async (blockName) => {
     try {
@@ -846,51 +781,8 @@ const checkJobs = async (projectId) => {
                             variables: variables
                         };
 
-                        // Check if block requires Desktop Agent (e.g., STITCH_VIDEO)
-                        if (block.requiresAgent && block.agentCommand) {
-                            writeLog(`🤖 Delegating to Desktop Agent: ${block.agentCommand}`, "INFO");
-
-                            // Get ordered scene files from tracking
-                            const sceneFiles = getOrderedSceneFiles();
-
-                            if (sceneFiles.length === 0) {
-                                throw new Error("No scene files tracked for stitching");
-                            }
-
-                            writeLog(`📦 Scene files to stitch: ${sceneFiles.length}`, "INFO");
-
-                            // Create output path (Downloads folder)
-                            const outputPath = sceneFiles[0].replace(/[^\\\/]+$/, `final_${job.id}.mp4`);
-
-                            // Create agent job
-                            const userId = job.userId || 'unknown';
-                            const agentJobId = await createAgentJob(userId, job.projectId, block.agentCommand, {
-                                sceneFiles: sceneFiles,
-                                outputPath: outputPath,
-                                parentJobId: job.id
-                            });
-
-                            // Wait for agent to complete
-                            const result = await waitForAgentJob(agentJobId, 600000); // 10 min timeout
-
-                            if (result.success) {
-                                // Update latest_asset to point to stitched video
-                                chrome.storage.local.set({
-                                    latest_asset: {
-                                        filename: outputPath,
-                                        timestamp: Date.now(),
-                                        isStitched: true
-                                    }
-                                });
-                                videoFilePath = outputPath;
-                                writeLog(`✅ Video stitched: ${outputPath}`, "SUCCESS");
-                                blockSuccess = true;
-                            } else {
-                                throw new Error(`Agent failed: ${result.error}`);
-                            }
-                        }
                         // For LOOP blocks (like ADD_SCENE_TEXT), run per-scene
-                        else if (block.type === 'LOOP' && job.prompts.length > 0) {
+                        if (block.type === 'LOOP' && job.prompts.length > 0) {
                             // Initialize scene tracking for this job
                             initSceneTracking(job.id, job.prompts.length);
 
