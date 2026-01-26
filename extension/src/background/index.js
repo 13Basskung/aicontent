@@ -210,11 +210,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
                 console.log("📦 Block loaded:", block);
 
-                // 📝 FETCH PROMPTS FROM FIRESTORE (from active project)
+                // 📝 FETCH PROMPTS FROM FIRESTORE (from locked project for this window)
                 let prompts = [];
-                const storage = await chrome.storage.local.get(['activeProjectId', 'activeUserId']);
-                const projectId = storage.activeProjectId;
+                
+                // Get window ID from the tab
+                const tab = await chrome.tabs.get(request.tabId);
+                const windowId = tab.windowId;
+                
+                // Get locked project for this window
+                const storage = await chrome.storage.local.get(['windowProjects', 'activeUserId']);
+                const windowProjects = storage.windowProjects || {};
+                const locked = windowProjects[windowId];
+                const projectId = locked?.projectId;
                 const userId = storage.activeUserId;
+                
+                console.log(`🪟 Window ${windowId} → Locked Project: ${locked?.projectName || 'None'}`);
+                
+                if (!projectId) {
+                    console.warn("⚠️ No project locked to this window. Please lock a project first.");
+                }
                 
                 if (projectId && userId) {
                     try {
@@ -1030,7 +1044,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         console.log("⏰ Scheduler Tick");
 
         // 1. GARBAGE COLLECTOR (48H Cleanup)
-        chrome.storage.local.get(["latest_asset", "activeProjectId"], async (data) => {
+        chrome.storage.local.get(["latest_asset", "windowProjects"], async (data) => {
             if (data.latest_asset) {
                 const now = Date.now();
                 const assetTime = data.latest_asset.timestamp || 0;
@@ -1040,11 +1054,28 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                 }
             }
 
-            // 2. SCHEDULER CHECK
-            if (data.activeProjectId) {
-                await checkJobs(data.activeProjectId);
-            } else {
-                console.log("⚠️ No Active Project ID set.");
+            // 2. SCHEDULER CHECK - Now uses Window-based Project Locking
+            const windowProjects = data.windowProjects || {};
+            
+            // Get all Chrome windows and check jobs for each locked project
+            try {
+                const windows = await chrome.windows.getAll();
+                const processedProjects = new Set(); // Avoid duplicate processing
+                
+                for (const win of windows) {
+                    const locked = windowProjects[win.id];
+                    if (locked && locked.projectId && !processedProjects.has(locked.projectId)) {
+                        console.log(`🔒 Window ${win.id} → Project: ${locked.projectName}`);
+                        processedProjects.add(locked.projectId);
+                        await checkJobs(locked.projectId);
+                    }
+                }
+                
+                if (processedProjects.size === 0) {
+                    console.log("⚠️ No locked projects found. Please lock a project to a Chrome window.");
+                }
+            } catch (err) {
+                console.error("❌ Scheduler error:", err);
             }
         });
     }

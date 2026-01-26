@@ -22,6 +22,11 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
     const [isLoadingProjects, setIsLoadingProjects] = useState(true);
     const [isLoadingJobs, setIsLoadingJobs] = useState(false);
     const [error, setError] = useState(null);
+    
+    // 🔒 Lock Project States
+    const [currentWindowId, setCurrentWindowId] = useState(null);
+    const [lockedProjectId, setLockedProjectId] = useState(null);
+    const [lockedProjectName, setLockedProjectName] = useState(null);
 
     const FIREBASE_PROJECT_ID = "content-auto-post";
     const API_KEY = "AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE";
@@ -46,6 +51,76 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
             console.error('Auth error:', e);
             return null;
         }
+    };
+
+    // 🔒 Get Current Window ID and Load Locked Project on Mount
+    useEffect(() => {
+        // Get current window ID
+        chrome.windows.getCurrent((window) => {
+            const winId = window.id;
+            setCurrentWindowId(winId);
+            console.log(`🪟 Current Window ID: ${winId}`);
+            
+            // Load locked project for this window
+            chrome.storage.local.get(['windowProjects'], (result) => {
+                const windowProjects = result.windowProjects || {};
+                if (windowProjects[winId]) {
+                    const locked = windowProjects[winId];
+                    setLockedProjectId(locked.projectId);
+                    setLockedProjectName(locked.projectName);
+                    setSelectedProjectId(locked.projectId);
+                    setSelectedProjectName(locked.projectName);
+                    console.log(`🔒 Loaded locked project for window ${winId}: ${locked.projectName}`);
+                }
+            });
+        });
+    }, []);
+
+    // 🔒 Lock Project to Current Window
+    const lockProjectToWindow = () => {
+        if (!currentWindowId || !selectedProjectId) return;
+        
+        chrome.storage.local.get(['windowProjects'], (result) => {
+            const windowProjects = result.windowProjects || {};
+            windowProjects[currentWindowId] = {
+                projectId: selectedProjectId,
+                projectName: selectedProjectName,
+                lockedAt: Date.now()
+            };
+            
+            chrome.storage.local.set({ 
+                windowProjects,
+                // Also set activeProjectId for this specific window context
+                [`activeProjectId_${currentWindowId}`]: selectedProjectId,
+                [`activeUserId_${currentWindowId}`]: userId
+            }, () => {
+                setLockedProjectId(selectedProjectId);
+                setLockedProjectName(selectedProjectName);
+                console.log(`🔒 Locked project "${selectedProjectName}" to window ${currentWindowId}`);
+            });
+        });
+    };
+
+    // 🔓 Unlock Project from Current Window
+    const unlockProjectFromWindow = () => {
+        if (!currentWindowId) return;
+        
+        chrome.storage.local.get(['windowProjects'], (result) => {
+            const windowProjects = result.windowProjects || {};
+            delete windowProjects[currentWindowId];
+            
+            chrome.storage.local.set({ windowProjects }, () => {
+                setLockedProjectId(null);
+                setLockedProjectName(null);
+                console.log(`🔓 Unlocked project from window ${currentWindowId}`);
+            });
+        });
+        
+        // Also remove window-specific active project
+        chrome.storage.local.remove([
+            `activeProjectId_${currentWindowId}`,
+            `activeUserId_${currentWindowId}`
+        ]);
     };
 
     // Version Check on Mount
@@ -1250,20 +1325,64 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                             </div>
                         ) : (
                             <div className="space-y-2">
+                                {/* 🔒 Lock Project Banner */}
+                                {lockedProjectId ? (
+                                    <div className="bg-gradient-to-r from-green-600/30 to-emerald-600/30 border border-green-500/50 rounded-lg p-3 mb-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">🔒</span>
+                                                <div>
+                                                    <p className="text-green-400 text-xs font-bold">Chrome นี้ล็อคกับ:</p>
+                                                    <p className="text-white text-sm font-medium">{lockedProjectName}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={unlockProjectFromWindow}
+                                                className="px-2 py-1 bg-red-500/20 text-red-400 text-[10px] rounded border border-red-500/30 hover:bg-red-500/30 font-bold"
+                                            >
+                                                🔓 ปลดล็อค
+                                            </button>
+                                        </div>
+                                        <p className="text-green-300/70 text-[9px] mt-2">💡 Automation จะทำงานเฉพาะโปรเจคนี้ใน Chrome window นี้เท่านั้น</p>
+                                    </div>
+                                ) : selectedProjectId ? (
+                                    <div className="bg-gradient-to-r from-orange-600/20 to-amber-600/20 border border-orange-500/30 rounded-lg p-3 mb-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-lg">⚠️</span>
+                                                <div>
+                                                    <p className="text-orange-400 text-xs font-bold">ยังไม่ได้ล็อคโปรเจค</p>
+                                                    <p className="text-gray-400 text-[10px]">กดล็อคเพื่อผูก Chrome นี้กับโปรเจคที่เลือก</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={lockProjectToWindow}
+                                                className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] rounded border border-green-500/30 hover:bg-green-500/30 font-bold"
+                                            >
+                                                🔒 ล็อค
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : null}
+
                                 {projects.map(project => {
                                     const isRunning = project.status === 'running';
                                     const isSelected = selectedProjectId === project.id;
+                                    const isLocked = lockedProjectId === project.id;
                                     return (
                                         <div 
                                             key={project.id}
-                                            onClick={() => handleSelectProject(project.id)}
-                                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
-                                                isSelected 
-                                                    ? 'bg-green-500/20 border-green-500/50' 
-                                                    : 'bg-slate-800/50 border-white/10 hover:bg-slate-700/50'
+                                            onClick={() => !lockedProjectId && handleSelectProject(project.id)}
+                                            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                                                lockedProjectId && !isLocked 
+                                                    ? 'bg-slate-900/50 border-white/5 opacity-50 cursor-not-allowed'
+                                                    : isSelected 
+                                                        ? 'bg-green-500/20 border-green-500/50 cursor-pointer' 
+                                                        : 'bg-slate-800/50 border-white/10 hover:bg-slate-700/50 cursor-pointer'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                {isLocked && <span className="text-green-400 text-xs">🔒</span>}
                                                 {isRunning && (
                                                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
                                                 )}
@@ -1273,10 +1392,13 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                             </div>
                                             <button
                                                 onClick={(e) => toggleProjectStatus(e, project)}
+                                                disabled={lockedProjectId && !isLocked}
                                                 className={`shrink-0 ml-2 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                                    isRunning
-                                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                                                        : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                                                    lockedProjectId && !isLocked
+                                                        ? 'bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed'
+                                                        : isRunning
+                                                            ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                                                            : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
                                                 }`}
                                             >
                                                 {isRunning ? 'Stop' : 'Run'}
