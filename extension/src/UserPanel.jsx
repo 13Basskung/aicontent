@@ -25,8 +25,10 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
     
     // 🔒 Lock Project States
     const [currentWindowId, setCurrentWindowId] = useState(null);
+    const [currentWindowName, setCurrentWindowName] = useState(null);
     const [lockedProjectId, setLockedProjectId] = useState(null);
     const [lockedProjectName, setLockedProjectName] = useState(null);
+    const [allWindowProjects, setAllWindowProjects] = useState({}); // All locked projects across windows
 
     const FIREBASE_PROJECT_ID = "content-auto-post";
     const API_KEY = "AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE";
@@ -55,15 +57,28 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
 
     // 🔒 Get Current Window ID and Load Locked Project on Mount
     useEffect(() => {
-        // Get current window ID
-        chrome.windows.getCurrent((window) => {
+        // Get current window ID and active tab title
+        chrome.windows.getCurrent({ populate: true }, async (window) => {
             const winId = window.id;
             setCurrentWindowId(winId);
-            console.log(`🪟 Current Window ID: ${winId}`);
             
-            // Load locked project for this window
+            // Get window name from active tab title or generate a friendly name
+            const activeTab = window.tabs?.find(t => t.active);
+            const tabTitle = activeTab?.title || '';
+            // Extract domain or use short title
+            let windowName = `Chrome #${winId}`;
+            if (tabTitle) {
+                // Use first 20 chars of title
+                windowName = tabTitle.length > 25 ? tabTitle.substring(0, 22) + '...' : tabTitle;
+            }
+            setCurrentWindowName(windowName);
+            console.log(`🪟 Current Window: ${winId} (${windowName})`);
+            
+            // Load all locked projects
             chrome.storage.local.get(['windowProjects'], (result) => {
                 const windowProjects = result.windowProjects || {};
+                setAllWindowProjects(windowProjects);
+                
                 if (windowProjects[winId]) {
                     const locked = windowProjects[winId];
                     setLockedProjectId(locked.projectId);
@@ -74,6 +89,15 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                 }
             });
         });
+        
+        // Listen for storage changes to update allWindowProjects
+        const storageListener = (changes) => {
+            if (changes.windowProjects) {
+                setAllWindowProjects(changes.windowProjects.newValue || {});
+            }
+        };
+        chrome.storage.onChanged.addListener(storageListener);
+        return () => chrome.storage.onChanged.removeListener(storageListener);
     }, []);
 
     // 🔒 Lock Project to Current Window
@@ -85,6 +109,8 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
             windowProjects[currentWindowId] = {
                 projectId: selectedProjectId,
                 projectName: selectedProjectName,
+                windowName: currentWindowName || `Chrome #${currentWindowId}`,
+                windowId: currentWindowId,
                 lockedAt: Date.now()
             };
             
@@ -96,7 +122,8 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
             }, () => {
                 setLockedProjectId(selectedProjectId);
                 setLockedProjectName(selectedProjectName);
-                console.log(`🔒 Locked project "${selectedProjectName}" to window ${currentWindowId}`);
+                setAllWindowProjects(windowProjects);
+                console.log(`🔒 Locked project "${selectedProjectName}" to window ${currentWindowId} (${currentWindowName})`);
             });
         });
     };
@@ -1368,41 +1395,70 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                 {projects.map(project => {
                                     const isRunning = project.status === 'running';
                                     const isSelected = selectedProjectId === project.id;
-                                    const isLocked = lockedProjectId === project.id;
+                                    const isLockedByMe = lockedProjectId === project.id;
+                                    
+                                    // Find all windows that have locked this project
+                                    const lockedByWindows = Object.values(allWindowProjects)
+                                        .filter(wp => wp.projectId === project.id && wp.windowId !== currentWindowId);
+                                    const isLockedByOthers = lockedByWindows.length > 0;
+                                    
                                     return (
                                         <div 
                                             key={project.id}
                                             onClick={() => !lockedProjectId && handleSelectProject(project.id)}
-                                            className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                                                lockedProjectId && !isLocked 
+                                            className={`p-3 rounded-lg border transition-all ${
+                                                lockedProjectId && !isLockedByMe 
                                                     ? 'bg-slate-900/50 border-white/5 opacity-50 cursor-not-allowed'
                                                     : isSelected 
                                                         ? 'bg-green-500/20 border-green-500/50 cursor-pointer' 
                                                         : 'bg-slate-800/50 border-white/10 hover:bg-slate-700/50 cursor-pointer'
                                             }`}
                                         >
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                {isLocked && <span className="text-green-400 text-xs">🔒</span>}
-                                                {isRunning && (
-                                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
-                                                )}
-                                                <span className={`text-sm font-medium truncate ${isSelected ? 'text-green-400' : 'text-white'}`}>
-                                                    {project.name}
-                                                </span>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {(isLockedByMe || isLockedByOthers) && (
+                                                        <span className={`text-xs ${isLockedByMe ? 'text-green-400' : 'text-yellow-400'}`}>🔒</span>
+                                                    )}
+                                                    {isRunning && (
+                                                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
+                                                    )}
+                                                    <span className={`text-sm font-medium truncate ${isSelected ? 'text-green-400' : 'text-white'}`}>
+                                                        {project.name}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => toggleProjectStatus(e, project)}
+                                                    disabled={lockedProjectId && !isLockedByMe}
+                                                    className={`shrink-0 ml-2 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                                        lockedProjectId && !isLockedByMe
+                                                            ? 'bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed'
+                                                            : isRunning
+                                                                ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                                                                : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                                                    }`}
+                                                >
+                                                    {isRunning ? 'Stop' : 'Run'}
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={(e) => toggleProjectStatus(e, project)}
-                                                disabled={lockedProjectId && !isLocked}
-                                                className={`shrink-0 ml-2 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                                    lockedProjectId && !isLocked
-                                                        ? 'bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed'
-                                                        : isRunning
-                                                            ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                                                            : 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                                                }`}
-                                            >
-                                                {isRunning ? 'Stop' : 'Run'}
-                                            </button>
+                                            
+                                            {/* Show which Chrome windows have locked this project */}
+                                            {(isLockedByMe || isLockedByOthers) && (
+                                                <div className="mt-2 pt-2 border-t border-white/10">
+                                                    <p className="text-[9px] text-gray-500 mb-1">🔒 ล็อคกับ:</p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {isLockedByMe && (
+                                                            <span className="text-[9px] px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded border border-green-500/30">
+                                                                ✓ Chrome นี้
+                                                            </span>
+                                                        )}
+                                                        {lockedByWindows.map((wp, idx) => (
+                                                            <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded border border-yellow-500/30">
+                                                                {wp.windowName || `Chrome #${wp.windowId}`}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
