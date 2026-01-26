@@ -1608,38 +1608,92 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                     <p className="text-[9px] text-gray-500 mt-2 text-center">💡 ใช้สำหรับ Google Vids - ไม่ต้องพึ่ง class name ที่สุ่ม</p>
                                 </div>
 
-                                {/* Wait Actions - สำหรับรอ Progress และ Download */}
-                                <div className="bg-gradient-to-br from-orange-900/30 to-red-900/30 border border-orange-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-orange-300 font-bold mb-2">⏳ Wait Actions <span className="text-gray-500 font-normal">(เพิ่ม step รอการทำงาน)</span></p>
+                                {/* 🔄 Loop & Prompt Actions */}
+                                <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-lg p-3">
+                                    <p className="text-xs text-blue-300 font-bold mb-2">🔄 Loop & Prompt <span className="text-gray-500 font-normal">(วนซ้ำและดึงข้อมูล)</span></p>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => {
-                                            // ใช้ selector ของ Google Vids Progress element โดยตรง (ไม่ต้อง prompt)
+                                            setRecordedSteps(prev => [...prev, {
+                                                action: 'loop_start',
+                                                description: 'เริ่มต้น loop'
+                                            }]);
+                                            setLogs(prev => [`[ADDED] loop_start`, ...prev]);
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-all">
+                                            <span className="text-blue-400 text-xs font-bold">🔄 วนซ้ำ</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">loop_start</span>
+                                        </button>
+                                        <button onClick={() => {
+                                            setRecordedSteps(prev => [...prev, {
+                                                action: 'loop_end',
+                                                description: 'สิ้นสุด loop'
+                                            }]);
+                                            setLogs(prev => [`[ADDED] loop_end`, ...prev]);
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/20 transition-all">
+                                            <span className="text-indigo-400 text-xs font-bold">🏁 จบการวน</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">loop_end</span>
+                                        </button>
+                                        <button onClick={() => {
+                                            setRecordedSteps(prev => [...prev, {
+                                                action: 'inject_prompt',
+                                                description: 'ดึง prompt จาก Firestore'
+                                            }]);
+                                            setLogs(prev => [`[ADDED] inject_prompt (from Firestore)`, ...prev]);
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-all">
+                                            <span className="text-emerald-400 text-xs font-bold">📝 ใส่ Prompt</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">inject_prompt</span>
+                                        </button>
+                                        <button onClick={() => {
+                                            const seconds = prompt('รอกี่วินาที?', '5');
+                                            if (seconds && !isNaN(seconds)) {
+                                                setRecordedSteps(prev => [...prev, {
+                                                    action: 'wait',
+                                                    duration: parseInt(seconds) * 1000,
+                                                    description: `รอ ${seconds} วินาที`
+                                                }]);
+                                                setLogs(prev => [`[ADDED] wait: ${seconds} วินาที`, ...prev]);
+                                            }
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all">
+                                            <span className="text-amber-400 text-xs font-bold">⏳ รอ X วินาที</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">wait</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* ⏳ Wait Actions - สำหรับรอ Progress และ Download */}
+                                <div className="bg-gradient-to-br from-orange-900/30 to-red-900/30 border border-orange-500/30 rounded-lg p-3">
+                                    <p className="text-xs text-orange-300 font-bold mb-2">⏳ Wait Actions <span className="text-gray-500 font-normal">(รอการทำงาน)</span></p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => {
                                             const selector = '.sc-dd6abb21-1';
                                             setRecordedSteps(prev => [...prev, {
                                                 action: 'wait_for_progress_complete',
                                                 selector: selector,
                                                 timeout: 600000
                                             }]);
-                                            setLogs(prev => [`[ADDED] wait_for_progress_complete: ${selector}`, ...prev]);
+                                            setLogs(prev => [`[ADDED] wait_for_progress_complete`, ...prev]);
                                         }}
                                             className="flex flex-col items-center p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg hover:bg-orange-500/20 transition-all">
-                                            <span className="text-orange-400 text-xs font-bold">📊 Wait Progress</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">รอ % เสร็จ</span>
+                                            <span className="text-orange-400 text-xs font-bold">📊 รอสร้างเสร็จ</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">รอ % ขึ้น 100%</span>
                                         </button>
                                         <button onClick={() => {
-                                            const selector = prompt('ใส่ selector ของ Download button:', 'a.sc-fbdde67d-0.kUMoet');
+                                            const selector = prompt('ใส่ selector ของ Download button:', 'a[download]');
                                             if (selector) {
                                                 setRecordedSteps(prev => [...prev, {
                                                     action: 'wait_for_element_and_click',
                                                     selector: selector,
                                                     timeout: 600000
                                                 }]);
-                                                setLogs(prev => [`[ADDED] wait_for_element_and_click: ${selector}`, ...prev]);
+                                                setLogs(prev => [`[ADDED] wait_for_element_and_click`, ...prev]);
                                             }
                                         }}
                                             className="flex flex-col items-center p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-all">
-                                            <span className="text-cyan-400 text-xs font-bold">⬇️ Wait & Download</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">รอแล้วกด</span>
+                                            <span className="text-cyan-400 text-xs font-bold">⬇️ รอแล้วดาวน์โหลด</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">รอปุ่มโผล่แล้วกด</span>
                                         </button>
                                     </div>
                                 </div>

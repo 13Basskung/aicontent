@@ -288,6 +288,33 @@ if (window.playerInjected) {
                 await sleep(duration);
                 return true;
             }
+            
+            // --- LOOP CONTROL (handled at recipe level, just markers here) ---
+            if (step.action === 'loop_start') {
+                console.log(`🔄 LOOP_START marker - will be handled by recipe executor`);
+                // Store loop start position
+                window.__loopStartIndex = window.__currentStepIndex || 0;
+                return true;
+            }
+            
+            if (step.action === 'loop_end') {
+                console.log(`🏁 LOOP_END marker - will be handled by recipe executor`);
+                // This signals the recipe executor to loop back if needed
+                return { loopEnd: true, loopStartIndex: window.__loopStartIndex || 0 };
+            }
+            
+            // --- INJECT PROMPT (get prompt from current scene data) ---
+            if (step.action === 'inject_prompt') {
+                console.log(`📝 INJECT_PROMPT - fetching from Firestore context`);
+                // The prompt should be passed via variables from recipe executor
+                const prompt = variables?.prompt || variables?.currentPrompt || '';
+                if (prompt) {
+                    console.log(`📝 Prompt to inject: "${prompt.substring(0, 50)}..."`);
+                    // Store for next type action to use
+                    window.__pendingPrompt = prompt;
+                }
+                return true;
+            }
 
             // --- WAIT FOR PROGRESS COMPLETE (tracks %, waits for 100% or disappear) ---
             if (step.action === 'wait_for_progress_complete') {
