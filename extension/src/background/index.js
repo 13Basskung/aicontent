@@ -344,6 +344,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                 // 🔄 CHECK IF BLOCK HAS LOOP - use EXECUTE_RECIPE for full loop support
                 const hasLoop = block.steps.some(s => s.action === 'loop_start' || s.action === 'loop_end');
+                console.log(`🔄 hasLoop: ${hasLoop}, prompts: ${prompts.length}`);
                 
                 if (hasLoop && prompts.length > 0) {
                     // 🔥 USE EXECUTE_RECIPE for loop support with real prompts
@@ -391,7 +392,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     });
 
                 } else {
-                    // 📋 NO LOOP - Execute steps one by one (original behavior)
+                    // 📋 NO LOOP or NO PROMPTS - Execute steps one by one
+                    console.log(`📋 Executing ${block.steps.length} steps one by one...`);
+                    
                     const variables = {
                         prompt: prompts[0] || '',
                         prompts: prompts
@@ -406,8 +409,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         }
 
                         const step = block.steps[i];
+                        
+                        // Skip loop markers when no prompts available
+                        if (step.action === 'loop_start' || step.action === 'loop_end') {
+                            console.log(`⏭️ Skipping ${step.action} (no prompts)`);
+                            continue;
+                        }
+                        
                         const stepDelay = step.delay || 1000;
-                        console.log(`▶️ Step ${i + 1}/${block.steps.length} (delay: ${stepDelay}ms):`, step);
+                        console.log(`▶️ Step ${i + 1}/${block.steps.length}: ${step.action} (delay: ${stepDelay}ms)`);
 
                         chrome.runtime.sendMessage({
                             action: "RECIPE_STATUS_UPDATE",
@@ -419,19 +429,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             stepSelector: step.selector || ''
                         });
 
+                        // Wait before step (except first step)
                         if (i > 0) {
                             const waitTime = Math.max(stepDelay, 500);
+                            console.log(`⏳ Waiting ${waitTime}ms before step...`);
                             await new Promise(r => setTimeout(r, waitTime));
                         }
 
-                        // 🔥 NOW SENDS VARIABLES!
-                        await chrome.tabs.sendMessage(tabId, {
-                            action: "EXECUTE_STEP_WITH_HIGHLIGHT",
-                            step: step,
-                            stepIndex: i,
-                            totalSteps: block.steps.length,
-                            variables: variables
-                        });
+                        // 🔥 Execute step and WAIT for response
+                        try {
+                            const response = await chrome.tabs.sendMessage(tabId, {
+                                action: "EXECUTE_STEP_WITH_HIGHLIGHT",
+                                step: step,
+                                stepIndex: i,
+                                totalSteps: block.steps.length,
+                                variables: variables
+                            });
+                            console.log(`✅ Step ${i + 1} response:`, response);
+                        } catch (e) {
+                            console.error(`❌ Step ${i + 1} failed:`, e.message);
+                        }
 
                         chrome.runtime.sendMessage({
                             action: "RECIPE_STATUS_UPDATE",
