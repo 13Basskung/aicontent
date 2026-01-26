@@ -441,14 +441,16 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
     const [savedTemplates, setSavedTemplates] = useState([]);
     const [loadingTemplates, setLoadingTemplates] = useState(false);
     
-    // Purpose options for Template
+    // Purpose options for Template (ตรงกับ Template Name dropdown)
     const purposeOptions = [
         { value: '', label: '-- เลือกหน้าที่ --' },
-        { value: 'CREATE_VIDEO', label: '🎬 สร้างวีดีโอ' },
-        { value: 'UPLOAD_YOUTUBE', label: '📺 อัพโหลด YouTube' },
-        { value: 'UPLOAD_FACEBOOK', label: '📘 อัพโหลด Facebook' },
-        { value: 'UPLOAD_TIKTOK', label: '🎵 อัพโหลด TikTok' },
-        { value: 'UPLOAD_INSTAGRAM', label: '📸 อัพโหลด Instagram' }
+        { value: 'ADD_SCENE_TEXT', label: '🎬 สร้างวีดีโอ (ADD_SCENE_TEXT)' },
+        { value: 'EXPORT_VIDEO', label: '📤 Export วีดีโอ (EXPORT_VIDEO)' },
+        { value: 'DOWNLOAD_FILE', label: '💾 Download ไฟล์ (DOWNLOAD_FILE)' },
+        { value: 'UPLOAD_FACEBOOK', label: '📘 อัพโหลด Facebook (UPLOAD_FACEBOOK)' },
+        { value: 'UPLOAD_YOUTUBE', label: '📺 อัพโหลด YouTube (UPLOAD_YOUTUBE)' },
+        { value: 'UPLOAD_TIKTOK', label: '🎵 อัพโหลด TikTok (UPLOAD_TIKTOK)' },
+        { value: 'UPLOAD_INSTAGRAM', label: '📸 อัพโหลด Instagram (UPLOAD_INSTAGRAM)' }
     ];
 
     // Testing States
