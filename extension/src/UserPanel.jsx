@@ -1398,8 +1398,9 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                     const isLockedByMe = lockedProjectId === project.id;
                                     
                                     // Find all windows that have locked this project (use entries to get windowId as key)
+                                    // Note: winId from Object.entries is string, currentWindowId is number
                                     const lockedByWindows = Object.entries(allWindowProjects)
-                                        .filter(([winId, wp]) => wp.projectId === project.id && parseInt(winId) !== currentWindowId)
+                                        .filter(([winId, wp]) => wp.projectId === project.id && String(winId) !== String(currentWindowId))
                                         .map(([winId, wp]) => ({ ...wp, windowId: winId }));
                                     const isLockedByOthers = lockedByWindows.length > 0;
                                     
