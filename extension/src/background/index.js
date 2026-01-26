@@ -120,9 +120,12 @@ const fetchBlock = async (blockName) => {
             name: f.name?.stringValue || blockName,
             type: f.type?.stringValue || 'ONCE',
             category: f.category?.stringValue || 'general',
+            purpose: f.purpose?.stringValue || '',
             startUrl: f.startUrl?.stringValue || '',
             variables: f.variables?.arrayValue?.values?.map(v => v.stringValue) || [],
-            steps: f.steps?.arrayValue?.values?.map(fromFirestoreValue) || []
+            steps: f.steps?.arrayValue?.values?.map(fromFirestoreValue) || [],
+            // 🔧 FIX: Add blocks field for Templates with nested blocks
+            blocks: f.blocks?.arrayValue?.values?.map(v => v.stringValue) || []
         };
     } catch (err) {
         console.error(`❌ Failed to fetch block ${blockName}:`, err);
@@ -878,12 +881,30 @@ const checkJobs = async (projectId) => {
 
                 writeLog(`▶️ [${i + 1}/${job.blockSequence.length}] Running Block: ${currentBlockId}`, "INFO");
 
-                // Fetch Block from global_recipe_blocks
-                const block = await fetchBlock(currentBlockId);
+                // Fetch Block/Template from global_recipe_blocks
+                let block = await fetchBlock(currentBlockId);
                 if (!block) {
                     writeLog(`❌ Block not found: ${currentBlockId}`, "ERROR");
                     await updateJobStatus('FAILED', `Block not found: ${currentBlockId}`);
                     return;
+                }
+
+                // 🔧 FIX: If this is a Template with nested blocks, fetch the actual block
+                if (block.blocks && block.blocks.length > 0 && (!block.steps || block.steps.length === 0)) {
+                    writeLog(`📦 Template "${currentBlockId}" has ${block.blocks.length} nested blocks: ${block.blocks.join(', ')}`, "INFO");
+                    
+                    // Get the first nested block (primary action)
+                    const nestedBlockName = block.blocks[0];
+                    const nestedBlock = await fetchBlock(nestedBlockName);
+                    
+                    if (!nestedBlock) {
+                        writeLog(`❌ Nested block not found: ${nestedBlockName}`, "ERROR");
+                        await updateJobStatus('FAILED', `Nested block not found: ${nestedBlockName}`);
+                        return;
+                    }
+                    
+                    writeLog(`✅ Using nested block: ${nestedBlockName} (${nestedBlock.steps?.length || 0} steps)`, "INFO");
+                    block = nestedBlock;
                 }
 
                 // Determine platform for upload blocks
