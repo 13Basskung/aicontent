@@ -97,7 +97,18 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
             }
         };
         chrome.storage.onChanged.addListener(storageListener);
-        return () => chrome.storage.onChanged.removeListener(storageListener);
+        
+        // Also poll every 3 seconds to ensure sync across windows
+        const pollInterval = setInterval(() => {
+            chrome.storage.local.get(['windowProjects'], (result) => {
+                setAllWindowProjects(result.windowProjects || {});
+            });
+        }, 3000);
+        
+        return () => {
+            chrome.storage.onChanged.removeListener(storageListener);
+            clearInterval(pollInterval);
+        };
     }, []);
 
     // 🔒 Lock Project to Current Window
