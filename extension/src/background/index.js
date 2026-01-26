@@ -250,22 +250,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.warn("⚠️ No project locked to this window. Please lock a project first.");
                 }
                 
+                console.log(`🔑 projectId: ${projectId}, userId: ${userId}`);
+                
                 if (projectId && userId) {
                     try {
                         // Fetch scenes from project
                         const scenesUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${userId}/projects/${projectId}/scenes?key=${API_KEY}`;
+                        console.log(`📡 Fetching scenes from: ${scenesUrl}`);
                         const scenesRes = await fetch(scenesUrl);
                         const scenesData = await scenesRes.json();
+                        console.log(`📦 Scenes data:`, scenesData);
                         
                         if (scenesData.documents) {
                             prompts = scenesData.documents
                                 .map(doc => fromFirestoreValue(doc.fields?.prompt))
                                 .filter(p => p && p.trim());
-                            console.log(`📝 Loaded ${prompts.length} prompts from Firestore`);
+                            console.log(`📝 Loaded ${prompts.length} prompts:`, prompts.map(p => p.substring(0, 30) + '...'));
+                        } else {
+                            console.warn(`⚠️ No scenes found in project! scenesData:`, scenesData);
                         }
                     } catch (e) {
-                        console.warn("⚠️ Could not fetch prompts:", e.message);
+                        console.error("❌ Could not fetch prompts:", e.message);
                     }
+                } else {
+                    console.warn(`⚠️ Missing projectId (${projectId}) or userId (${userId}) - prompts will be empty!`);
                 }
 
                 // Smart Tab: Check existing tabs first, then use startUrl if needed
