@@ -127,13 +127,27 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                     console.log('📋 Project list:', projectList);
                     setProjects(projectList);
 
-                    // Auto-select first project
+                    // Auto-select first project ONLY if no project is currently selected
                     if (projectList.length > 0) {
-                        setSelectedProjectId(projectList[0].id);
-                        setSelectedProjectName(projectList[0].name);
-                        chrome.storage.local.set({ 
-                            activeProjectId: projectList[0].id,
-                            activeProjectName: projectList[0].name 
+                        chrome.storage.local.get(['activeProjectId'], (result) => {
+                            const savedProjectId = result.activeProjectId;
+                            // Check if saved project still exists in the list
+                            const savedExists = savedProjectId && projectList.find(p => p.id === savedProjectId);
+                            
+                            if (savedExists) {
+                                // Restore previously selected project
+                                const savedProject = projectList.find(p => p.id === savedProjectId);
+                                setSelectedProjectId(savedProjectId);
+                                setSelectedProjectName(savedProject.name);
+                            } else {
+                                // No saved project or it doesn't exist anymore, select first
+                                setSelectedProjectId(projectList[0].id);
+                                setSelectedProjectName(projectList[0].name);
+                                chrome.storage.local.set({ 
+                                    activeProjectId: projectList[0].id,
+                                    activeProjectName: projectList[0].name 
+                                });
+                            }
                         });
                     }
                 } else {
@@ -1555,6 +1569,43 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                         </button>
                                     </div>
                                     <p className="text-[9px] text-gray-500 mt-2 text-center">💡 คลิกที่ช่อง input ในหน้าเว็บก่อน แล้วกดปุ่มด้านบน</p>
+                                </div>
+
+                                {/* 🎬 Scene Actions - สำหรับเลือกฉากตามตำแหน่ง */}
+                                <div className="bg-gradient-to-br from-violet-900/30 to-purple-900/30 border border-violet-500/30 rounded-lg p-3">
+                                    <p className="text-xs text-violet-300 font-bold mb-2">🎬 Scene Actions <span className="text-gray-500 font-normal">(เลือกฉากตามตำแหน่ง)</span></p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => {
+                                            // ใช้ Smart Selector กดฉากสุดท้าย
+                                            setRecordedSteps(prev => [...prev, {
+                                                action: 'click',
+                                                selector: '$scene:last',
+                                                description: 'คลิกฉากสุดท้าย'
+                                            }]);
+                                            setLogs(prev => [`[ADDED] click: $scene:last (ฉากสุดท้าย)`, ...prev]);
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-violet-500/10 border border-violet-500/30 rounded-lg hover:bg-violet-500/20 transition-all">
+                                            <span className="text-violet-400 text-xs font-bold">🎬 กดฉากสุดท้าย</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">$scene:last</span>
+                                        </button>
+                                        <button onClick={() => {
+                                            const n = prompt('ต้องการกดฉากที่เท่าไหร่?', '3');
+                                            if (n && !isNaN(n)) {
+                                                // ใช้ Smart Selector กดฉากที่ N
+                                                setRecordedSteps(prev => [...prev, {
+                                                    action: 'click',
+                                                    selector: `$[role="listitem"]:nth(${n})`,
+                                                    description: `คลิกฉากที่ ${n}`
+                                                }]);
+                                                setLogs(prev => [`[ADDED] click: ฉากที่ ${n}`, ...prev]);
+                                            }
+                                        }}
+                                            className="flex flex-col items-center p-2 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-lg hover:bg-fuchsia-500/20 transition-all">
+                                            <span className="text-fuchsia-400 text-xs font-bold">🔢 กดฉากที่ N</span>
+                                            <span className="text-gray-400 text-[9px] mt-0.5">เลือกเลขฉาก</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] text-gray-500 mt-2 text-center">💡 ใช้สำหรับ Google Vids - ไม่ต้องพึ่ง class name ที่สุ่ม</p>
                                 </div>
 
                                 {/* Wait Actions - สำหรับรอ Progress และ Download */}

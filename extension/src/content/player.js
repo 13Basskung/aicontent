@@ -19,7 +19,86 @@ if (window.playerInjected) {
             let el = null;
             try {
                 // 🛠️ CUSTOM SELECTOR HANDLING
-                if (selector.includes('::text=')) {
+                
+                // 🎬 SMART POSITION SELECTORS (for dynamic class names like styled-components)
+                // Format: $parent_selector:last-child or $parent_selector:nth-child(n)
+                if (selector.startsWith('$')) {
+                    const selectorWithoutDollar = selector.substring(1);
+                    
+                    // Preset: $scene:last - เลือกฉากสุดท้ายใน Google Vids
+                    if (selectorWithoutDollar === 'scene:last') {
+                        // Google Vids scene container - look for scene thumbnails
+                        const sceneContainers = document.querySelectorAll('[data-scene-index], [role="listitem"], [class*="scene"], [class*="thumbnail"]');
+                        if (sceneContainers.length > 0) {
+                            el = sceneContainers[sceneContainers.length - 1];
+                            console.log(`🎬 Found last scene (${sceneContainers.length} total)`);
+                        }
+                        // Fallback: find parent with multiple similar children
+                        if (!el) {
+                            const allDivs = document.querySelectorAll('div');
+                            for (const div of allDivs) {
+                                const children = div.children;
+                                if (children.length >= 2) {
+                                    const firstChild = children[0];
+                                    const lastChild = children[children.length - 1];
+                                    // Check if children look like scene thumbnails (similar structure)
+                                    if (firstChild.tagName === lastChild.tagName && 
+                                        firstChild.querySelector('img, video, canvas')) {
+                                        el = lastChild;
+                                        console.log(`🎬 Found last scene via structure analysis`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Format: $parent_selector:last-child
+                    else if (selectorWithoutDollar.includes(':last-child')) {
+                        const parentSelector = selectorWithoutDollar.replace(':last-child', '').trim();
+                        const parent = document.querySelector(parentSelector);
+                        if (parent && parent.lastElementChild) {
+                            el = parent.lastElementChild;
+                            console.log(`🎯 Found last-child of "${parentSelector}"`);
+                        }
+                    }
+                    // Format: $parent_selector:nth-child(n)
+                    else if (selectorWithoutDollar.includes(':nth-child(')) {
+                        const match = selectorWithoutDollar.match(/(.+):nth-child\((\d+)\)/);
+                        if (match) {
+                            const parentSelector = match[1].trim();
+                            const childIndex = parseInt(match[2]) - 1; // Convert to 0-indexed
+                            const parent = document.querySelector(parentSelector);
+                            if (parent && parent.children[childIndex]) {
+                                el = parent.children[childIndex];
+                                console.log(`🎯 Found nth-child(${childIndex + 1}) of "${parentSelector}"`);
+                            }
+                        }
+                    }
+                    // Format: $selector:last (select last matching element)
+                    else if (selectorWithoutDollar.includes(':last')) {
+                        const baseSelector = selectorWithoutDollar.replace(':last', '').trim();
+                        const allMatches = document.querySelectorAll(baseSelector);
+                        if (allMatches.length > 0) {
+                            el = allMatches[allMatches.length - 1];
+                            console.log(`🎯 Found last of "${baseSelector}" (${allMatches.length} total)`);
+                        }
+                    }
+                    // Format: $selector:nth(n) (select nth matching element)
+                    else if (selectorWithoutDollar.includes(':nth(')) {
+                        const match = selectorWithoutDollar.match(/(.+):nth\((\d+)\)/);
+                        if (match) {
+                            const baseSelector = match[1].trim();
+                            const index = parseInt(match[2]) - 1; // Convert to 0-indexed
+                            const allMatches = document.querySelectorAll(baseSelector);
+                            if (allMatches[index]) {
+                                el = allMatches[index];
+                                console.log(`🎯 Found nth(${index + 1}) of "${baseSelector}"`);
+                            }
+                        }
+                    }
+                }
+                
+                else if (selector.includes('::text=')) {
                     // Format: "tag::text="value""
                     const parts = selector.split('::text=');
                     const tag = parts[0] || '*';
