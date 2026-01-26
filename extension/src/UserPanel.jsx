@@ -1477,24 +1477,6 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                         disabled={isRecording}
                                         className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500"
                                     />
-                                    <div className="flex gap-2 mt-2">
-                                        <button
-                                            onClick={() => setRecipeType('LOOP')}
-                                            className={`flex-1 py-1.5 text-xs font-bold rounded ${
-                                                recipeType === 'LOOP' ? 'bg-blue-500 text-white' : 'bg-white/10 text-gray-400'
-                                            }`}
-                                        >
-                                            🔁 LOOP
-                                        </button>
-                                        <button
-                                            onClick={() => setRecipeType('ONCE')}
-                                            className={`flex-1 py-1.5 text-xs font-bold rounded ${
-                                                recipeType === 'ONCE' ? 'bg-green-500 text-white' : 'bg-white/10 text-gray-400'
-                                            }`}
-                                        >
-                                            ⏺ ONCE
-                                        </button>
-                                    </div>
                                 </div>
 
                                 <button
