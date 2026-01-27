@@ -33,50 +33,78 @@ export default function OAuthCallback() {
             }
 
             try {
-                // Decode state to get accountId
-                const stateData = JSON.parse(atob(state));
-                const accountId = stateData.accountId;
+                // Decode state - it's URL encoded JSON string
+                const stateData = JSON.parse(decodeURIComponent(state));
+                const { platform, userId, accountId } = stateData;
 
-                // Get account credentials from Firestore
-                const accountRef = doc(db, 'users', user.uid, 'accounts', accountId);
-                const accountDoc = await getDoc(accountRef);
-
-                if (!accountDoc.exists()) {
-                    throw new Error('Account not found');
-                }
-
-                const account = accountDoc.data();
-
-                // Call Cloud Function to exchange code for token
+                // Call appropriate Cloud Function based on platform
                 const functions = getFunctions();
-                const youtubeAuthCallback = httpsCallable(functions, 'youtubeAuthCallback');
+                const redirectUri = `${window.location.origin}/oauth/callback`;
 
                 setMessage('กำลังแลกเปลี่ยน Token...');
 
-                const result = await youtubeAuthCallback({
-                    code,
-                    state,
-                    clientId: account.clientId,
-                    clientSecret: account.clientSecret,
-                    redirectUri: `${window.location.origin}/oauth/callback`
-                });
+                let result;
 
-                if (result.data.success) {
-                    setStatus('success');
-                    setMessage('เชื่อมต่อสำเร็จ!');
-                    setChannelInfo({
-                        name: result.data.channelName,
-                        channelId: result.data.channelId,
-                        subscribers: result.data.subscribers
+                if (platform === 'youtube') {
+                    const youtubeAuthCallback = httpsCallable(functions, 'youtubeAuthCallback');
+                    result = await youtubeAuthCallback({
+                        code,
+                        redirectUri
                     });
 
-                    // Redirect to platforms page after 3 seconds
-                    setTimeout(() => {
-                        navigate('/platforms');
-                    }, 3000);
+                    if (result.data.success) {
+                        setStatus('success');
+                        setMessage('เชื่อมต่อ YouTube สำเร็จ!');
+                        setChannelInfo({
+                            name: result.data.channelName,
+                            channelId: result.data.channelId,
+                            subscribers: result.data.subscribers
+                        });
+                    } else {
+                        throw new Error(result.data.error || 'Failed to connect YouTube');
+                    }
+                } else if (platform === 'facebook' || platform === 'instagram') {
+                    const facebookAuthCallback = httpsCallable(functions, 'facebookAuthCallback');
+                    result = await facebookAuthCallback({
+                        code,
+                        redirectUri,
+                        platform
+                    });
+
+                    if (result.data.success) {
+                        setStatus('success');
+                        setMessage(`เชื่อมต่อ ${platform === 'facebook' ? 'Facebook' : 'Instagram'} สำเร็จ!`);
+                        setChannelInfo({
+                            name: result.data.pageName || result.data.accountName,
+                            pageId: result.data.pageId
+                        });
+                    } else {
+                        throw new Error(result.data.error || `Failed to connect ${platform}`);
+                    }
+                } else if (platform === 'tiktok') {
+                    const tiktokAuthCallback = httpsCallable(functions, 'tiktokAuthCallback');
+                    result = await tiktokAuthCallback({
+                        code,
+                        redirectUri
+                    });
+
+                    if (result.data.success) {
+                        setStatus('success');
+                        setMessage('เชื่อมต่อ TikTok สำเร็จ!');
+                        setChannelInfo({
+                            name: result.data.username
+                        });
+                    } else {
+                        throw new Error(result.data.error || 'Failed to connect TikTok');
+                    }
                 } else {
-                    throw new Error('Failed to connect');
+                    throw new Error('Unknown platform: ' + platform);
                 }
+
+                // Redirect to platforms page after 3 seconds
+                setTimeout(() => {
+                    navigate('/platforms');
+                }, 3000);
 
             } catch (err) {
                 console.error('OAuth callback error:', err);
