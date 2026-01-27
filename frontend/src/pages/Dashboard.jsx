@@ -1090,6 +1090,16 @@ export default function Dashboard() {
                                         <Eye size={12} /> Views <ChevronDown size={12} />
                                     </div>
                                 </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-emerald-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <MessageCircle size={12} /> Comments <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-pink-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <Repeat2 size={12} /> Shares <ChevronDown size={12} />
+                                    </div>
+                                </th>
                                 <th className="text-center py-3 px-4 text-xs font-semibold text-orange-400 uppercase">
                                     <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
                                         <Calendar size={12} /> Last Scheduled <ChevronDown size={12} />
@@ -1111,7 +1121,7 @@ export default function Dashboard() {
                         <tbody className="divide-y divide-white/5">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={10} className="py-12 text-center">
+                                    <td colSpan={12} className="py-12 text-center">
                                         <Loader2 size={32} className="animate-spin mx-auto text-slate-400" />
                                     </td>
                                 </tr>
@@ -1148,6 +1158,12 @@ export default function Dashboard() {
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <span className="text-cyan-400 font-medium">{(account.views || 0).toLocaleString()}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-emerald-400 font-medium">{(account.comments || 0).toLocaleString()}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-pink-400 font-medium">{(account.shares || 0).toLocaleString()}</span>
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <span className="text-orange-400 text-xs">
