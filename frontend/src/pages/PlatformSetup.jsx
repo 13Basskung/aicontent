@@ -48,14 +48,15 @@ const PLATFORM_CONFIG = {
         color: 'orange',
         bgGradient: 'from-orange-600 to-blue-800',
         description: 'เชื่อมต่อ Facebook Page เพื่อดึงข้อมูล Followers และโพสต์อัตโนมัติ',
-        consoleUrl: 'https://developers.facebook.com/apps/',
+        consoleUrl: 'https://developers.facebook.com/apps/create/',
         docsUrl: 'https://developers.facebook.com/docs/facebook-login/',
         steps: [
-            'กดปุ่ม "Developer Console" ไปที่ Meta Developer Portal',
-            'สร้าง App ใหม่ และเลือก Business Type',
-            'ไปที่ Facebook Login > Settings',
-            'เพิ่ม Redirect URI และคัดลอก App ID, App Secret มาใส่ด้านล่าง',
-            'กดปุ่ม "บันทึกการตั้งค่า" และ "เชื่อมต่อ"'
+            'กดปุ่ม "Developer Console" จะเปิดหน้าสร้าง App ใหม่ (ต้อง Login Facebook ก่อน)',
+            'กรอก App name, Email → Use case เลือก "Other" → กด Next จนจบ → กด "Create app"',
+            'ที่ Dashboard ไปที่ App settings → Basic → Copy "App ID" และกด Show เพื่อ Copy "App secret"',
+            'ไปที่ Use cases → กด Customize → Facebook Login → Settings → ใส่ Redirect URI ด้านล่างนี้',
+            'Copy URL ด้านล่างไปใส่ช่อง "Valid OAuth Redirect URIs" → กด Save changes',
+            'กลับมาที่หน้านี้ กรอก App ID และ App Secret → กดบันทึกการตั้งค่า → กดเชื่อมต่อ'
         ],
         fields: [
             { id: 'appId', label: 'App ID', placeholder: '1234567890', type: 'text' },
