@@ -864,8 +864,8 @@ export default function Dashboard() {
                                         <Loader2 size={32} className="animate-spin mx-auto text-slate-400" />
                                     </td>
                                 </tr>
-                            ) : projects.length > 0 ? (
-                                projects.slice(0, 10).map((project) => (
+                            ) : projectsWithStats.length > 0 ? (
+                                projectsWithStats.slice(0, 10).map((project) => (
                                     <tr key={project.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="py-3 px-4">
                                             <div 
@@ -891,23 +891,23 @@ export default function Dashboard() {
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <div className="flex flex-col items-center">
-                                                <span className="text-white font-bold">{(project.subscribers || 0).toLocaleString()}</span>
-                                                <span className="text-xs text-green-400">+0</span>
+                                                <span className="text-white font-bold">{(project.calculatedSubs || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-green-400">+{project.linkedAccountsCount || 0}</span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <div className="flex flex-col items-center">
-                                                <span className="text-white font-bold">{(project.views || 0).toLocaleString()}</span>
+                                                <span className="text-white font-bold">{(project.calculatedViews || 0).toLocaleString()}</span>
                                                 <span className="text-xs text-slate-500">views</span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
-                                            <span className="text-white font-bold">{project.videoCount || 0}</span>
+                                            <span className="text-white font-bold">{project.calculatedVideos || 0}</span>
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <div className="flex flex-col items-center">
-                                                <span className="text-white font-bold">{(project.followers || 0).toLocaleString()}</span>
-                                                <span className="text-xs text-green-400">+0</span>
+                                                <span className="text-white font-bold">{(project.calculatedFollowers || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-green-400">+{project.linkedAccountsCount || 0}</span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
@@ -916,13 +916,14 @@ export default function Dashboard() {
                                             </span>
                                         </td>
                                         <td className="py-3 px-4 text-center">
+                                            {/* สถานะตามเงื่อนไขจริง: มี slots = Active, ไม่มี = Inactive */}
                                             <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${
-                                                project.status === 'active' 
+                                                project.hasActiveSlots
                                                     ? 'bg-green-500/20 text-green-400' 
                                                     : 'bg-slate-500/20 text-slate-400'
                                             }`}>
-                                                {project.status === 'active' ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
-                                                {project.status === 'active' ? 'Active' : 'Inactive'}
+                                                {project.hasActiveSlots ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
+                                                {project.hasActiveSlots ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
                                         <td className="py-3 px-4 text-center">
@@ -930,14 +931,26 @@ export default function Dashboard() {
                                                 <Link
                                                     to={`/projects/${project.id}`}
                                                     className="p-2 hover:bg-white/10 rounded-lg transition-all"
-                                                    title="View"
+                                                    title="ดูรายละเอียด Project"
                                                 >
                                                     <Eye size={14} className="text-slate-400 hover:text-white" />
                                                 </Link>
-                                                <button className="p-2 hover:bg-red-500/20 rounded-lg transition-all" title="Play">
+                                                <Link
+                                                    to={`/projects/${project.id}?tab=schedule`}
+                                                    className={`p-2 rounded-lg transition-all ${project.hasActiveSlots ? 'hover:bg-red-500/20 cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
+                                                    title={project.hasActiveSlots ? 'ไปยัง Posting Schedule' : 'ยังไม่มี Schedule'}
+                                                    onClick={(e) => !project.hasActiveSlots && e.preventDefault()}
+                                                >
                                                     <Play size={14} className="text-red-400" />
-                                                </button>
-                                                <button className="p-2 hover:bg-blue-500/20 rounded-lg transition-all" title="Share">
+                                                </Link>
+                                                <button 
+                                                    className="p-2 hover:bg-blue-500/20 rounded-lg transition-all" 
+                                                    title="Copy Project Link"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(`${window.location.origin}/projects/${project.id}`);
+                                                        alert('คัดลอกลิงก์แล้ว!');
+                                                    }}
+                                                >
                                                     <Share2 size={14} className="text-blue-400" />
                                                 </button>
                                             </div>
