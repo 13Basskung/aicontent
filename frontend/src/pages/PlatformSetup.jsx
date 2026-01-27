@@ -49,14 +49,19 @@ const PLATFORM_CONFIG = {
         bgGradient: 'from-orange-600 to-blue-800',
         description: 'เชื่อมต่อ Facebook Page เพื่อดึงข้อมูล Followers และโพสต์อัตโนมัติ',
         consoleUrl: 'https://developers.facebook.com/apps/create/',
+        enableApiUrl: 'https://developers.facebook.com/apps/',
         docsUrl: 'https://developers.facebook.com/docs/facebook-login/',
         steps: [
-            'กดปุ่ม "Developer Console" จะเปิดหน้าสร้าง App ใหม่ (ต้อง Login Facebook ก่อน)',
-            'กรอก App name, Email → Use case เลือก "Other" → กด Next จนจบ → กด "Create app"',
-            'ที่ Dashboard ไปที่ App settings → Basic → Copy "App ID" และกด Show เพื่อ Copy "App secret"',
-            'ไปที่ Use cases → กด Customize → Facebook Login → Settings → ใส่ Redirect URI ด้านล่างนี้',
-            'Copy URL ด้านล่างไปใส่ช่อง "Valid OAuth Redirect URIs" → กด Save changes',
-            'กลับมาที่หน้านี้ กรอก App ID และ App Secret → กดบันทึกการตั้งค่า → กดเชื่อมต่อ'
+            'กดปุ่ม "Developer Console" เพื่อสร้าง App การเชื่อมต่อ (ต้อง Login Facebook ก่อน)',
+            'เลือก "ผู้บริโภค" และกดถัดไป',
+            'กรอกชื่อแอพ และกรอกอีเมลติดต่อของแอพ → กดสร้างแอพ → ใส่รหัสผ่าน Facebook → กดส่ง',
+            'กดเมนูซ้าย "การตั้งค่าแอพ" → เลือก "ข้อมูลพื้นฐาน" → ช่อง App secret กด "แสดง" → กดบันทึกการเปลี่ยนแปลง',
+            'กดไปที่ "เพิ่มผลิตภัณฑ์" → หา "การเข้าสู่ระบบ Facebook" → กด "ตั้งค่า" → เลือก "Web"',
+            'ช่อง Site URL ใส่: https://aicontents.vip → กด Save → กด Continue → กด Next ไปเรื่อยๆ จนถึงขั้นตอนที่ 5',
+            'ดูเมนูซ้าย → เลือก "การเข้าสู่ระบบ Facebook" → เลือก "การตั้งค่า"',
+            'เลื่อนลงมาหาช่อง "Valid OAuth Redirect URIs" → Copy URL ด้านล่างนี้ไปใส่',
+            'เลื่อนลงไปล่างสุด → กด "Save changes" (ปุ่มสีน้ำเงิน)',
+            'ดูเมนูซ้าย → "การตั้งค่าแอพ" → "ข้อมูลพื้นฐาน" → Copy App ID และ App Secret มากรอกช่องด้านขวา'
         ],
         fields: [
             { id: 'appId', label: 'App ID', placeholder: '1234567890', type: 'text' },
@@ -65,9 +70,10 @@ const PLATFORM_CONFIG = {
         ],
         pageIdHelp: [
             { text: 'กดลิงก์นี้เพื่อไปหน้า Facebook Pages ของคุณ', link: 'https://www.facebook.com/pages/?category=your_pages' },
-            { text: 'เลือก Page ที่ต้องการ → กดที่ About → Page transparency' },
+            { text: 'เลือก Page ที่ต้องการ → กดที่ "About" → หา "Page transparency"' },
             { text: 'Copy Page ID มาใส่ในช่อง Page ID (Optional) ด้านล่าง' },
-            { text: 'กดปุ่มเชื่อมต่อ จะมีหน้าต่างเด้งขึ้นมาให้กด Continue with Facebook → เลือก Page ที่ต้องการ → Continue (รอให้ระบบดึงข้อมูลเสร็จ) การเชื่อมต่อ Page ของคุณก็จะสำเร็จ' }
+            { text: 'หรือปล่อยว่างไว้ → กดเชื่อมต่อ → ระบบจะให้เลือก Page หลังจาก Login' },
+            { text: 'กดปุ่มเชื่อมต่อ → Continue with Facebook → เลือก Page → Continue (รอดึงข้อมูล) → สำเร็จ!' }
         ]
     },
     instagram: {
