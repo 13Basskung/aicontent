@@ -22,11 +22,12 @@ const PLATFORM_CONFIG = {
         docsUrl: 'https://developers.google.com/youtube/v3/getting-started',
         channelSelectUrl: 'https://www.youtube.com/channel_switcher',
         steps: [
-            'กดปุ่ม "Enable API" เพื่อเปิดใช้งาน YouTube Data API v3',
-            'กดปุ่ม "Developer Console" เพื่อสร้าง OAuth 2.0 Client ID',
-            'เลือก Application type: Web Application',
-            'เพิ่ม Redirect URI และคัดลอก Client ID, Client Secret มาใส่ด้านล่าง',
-            'กดปุ่ม "บันทึกการตั้งค่า" และ "เชื่อมต่อ" เพื่อเริ่ม OAuth'
+            'กดปุ่ม "Enable API" เพื่อเปิดใช้งาน YouTube Data API v3 จะมีหน้าต่างเปิดขึ้นมาให้กดคำว่า Enable',
+            'กดปุ่ม "Developer Console" เพื่อสร้าง OAuth 2.0 Client ID จะมีหน้าต่างเปิดขึ้นมา',
+            'กดคำว่า Create client และเลือก Application type เป็น Web Application',
+            'ช่อง Name ใส่ชื่ออะไรก็ได้ ในหัวข้อ Authorized redirect URIs ให้กด +Add URI',
+            'Copy URL ด้านล่างนี้ไปใส่ช่อง URIs 1*',
+            'กด Create จะได้ Client ID และ Client Secret ไปกรอกช่องด้านขวา'
         ],
         fields: [
             { id: 'clientId', label: 'Client ID', placeholder: 'xxxx.apps.googleusercontent.com', type: 'text' },
@@ -37,7 +38,8 @@ const PLATFORM_CONFIG = {
             { text: 'กดลิงก์นี้เพื่อไปหน้า YouTube เลือกบัญชี', link: 'https://www.youtube.com/channel_switcher' },
             { text: 'ดูที่มุมขวาบนจะมีรูป Avatar YouTube ของคุณ กดที่รูปนั้น แล้วกด "Settings"' },
             { text: 'กดที่ "View advanced settings"' },
-            { text: 'Copy Channel ID มาใส่ในช่อง Channel ID (Optional) ด้านบน' }
+            { text: 'Copy Channel ID มาใส่ในช่อง Channel ID (Optional) ด้านล่าง' },
+            { text: 'กดเชื่อมต่อ (รอให้ระบบดึงข้อมูลเสร็จ) แล้วกดบันทึกการตั้งค่า' }
         ]
     },
     facebook: {
@@ -324,8 +326,8 @@ export default function PlatformSetup() {
                                     </span>
                                     <div className="text-slate-300 text-sm">
                                         {step}
-                                        {/* Show Redirect URI in step 4 */}
-                                        {idx === 3 && (
+                                        {/* Show Redirect URI in step 5 (idx=4) */}
+                                        {idx === 4 && (
                                             <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
                                                 <code className="text-green-400 text-xs flex-1 break-all">
                                                     {window.location.origin}/oauth/callback
@@ -360,9 +362,9 @@ export default function PlatformSetup() {
                                 href={config.consoleUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="flex-1 py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl transition-all text-xs"
+                                className="flex-1 py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl transition-all text-xs text-center"
                             >
-                                <ExternalLink size={14} /> Developer Console
+                                <ExternalLink size={14} /> <span>Developer Console</span>
                             </a>
                             <a 
                                 href={config.docsUrl} 
