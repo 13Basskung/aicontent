@@ -3,10 +3,28 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Clock, AlertTriangle, Loader2, Check, ChevronDown, MonitorPlay, Pencil, X, Save } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { db, auth } from '../../firebase';
-import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, collectionGroup, query, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+// Thai day names mapping
+const DAY_NAMES_TH = {
+    mon: 'จันทร์',
+    tue: 'อังคาร',
+    wed: 'พุธ',
+    thu: 'พฤหัส',
+    fri: 'ศุกร์',
+    sat: 'เสาร์',
+    sun: 'อาทิตย์'
+};
+
+// Get current day key
+const getCurrentDayKey = () => {
+    const dayIndex = new Date().getDay(); // 0 = Sunday
+    const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    return dayMap[dayIndex];
+};
 
 // Platform Definition
 const PLATFORMS_LIST = [
@@ -137,6 +155,7 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
 
     const [currentUser, setCurrentUser] = useState(null);
     const [availableAccounts, setAvailableAccounts] = useState([]);
+    const [usedAccountIds, setUsedAccountIds] = useState(new Set()); // Accounts ที่ถูกใช้ใน Project อื่น
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
 
@@ -212,6 +231,49 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
         });
         return () => unsubscribeAuth();
     }, [projectId]);
+
+    // Fetch accounts used in OTHER projects (not this one)
+    useEffect(() => {
+        if (!currentUser || !projectId) return;
+        
+        const fetchUsedAccounts = async () => {
+            try {
+                // ดึง projects ทั้งหมดของ user
+                const projectsRef = collection(db, 'users', currentUser.uid, 'projects');
+                const unsubProjects = onSnapshot(projectsRef, async (projectsSnapshot) => {
+                    const usedIds = new Set();
+                    
+                    // วนลูปทุก project ยกเว้น project ปัจจุบัน
+                    for (const projectDoc of projectsSnapshot.docs) {
+                        if (projectDoc.id === projectId) continue; // ข้าม project ปัจจุบัน
+                        
+                        // ดึง slots ของ project นี้
+                        const slotsRef = collection(db, 'users', currentUser.uid, 'projects', projectDoc.id, 'slots');
+                        const slotsSnapshot = await getDocs(slotsRef);
+                        
+                        slotsSnapshot.forEach(slotDoc => {
+                            const slotData = slotDoc.data();
+                            if (slotData.platforms && Array.isArray(slotData.platforms)) {
+                                slotData.platforms.forEach(p => {
+                                    if (p.accountId) {
+                                        usedIds.add(p.accountId);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    setUsedAccountIds(usedIds);
+                });
+                
+                return () => unsubProjects();
+            } catch (error) {
+                console.error('Error fetching used accounts:', error);
+            }
+        };
+        
+        fetchUsedAccounts();
+    }, [currentUser, projectId]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -315,12 +377,20 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
             return;
         }
 
-        // Check available accounts for this platform
-        const platformAccounts = availableAccounts.filter(acc => acc.platform === platformId);
+        // Check available accounts for this platform (กรอง accounts ที่ถูกใช้ใน Project อื่นออก)
+        const platformAccounts = availableAccounts.filter(acc => 
+            acc.platform === platformId && !usedAccountIds.has(acc.id)
+        );
 
-        // SCENARIO A: No Accounts
+        // SCENARIO A: No Accounts Available
         if (platformAccounts.length === 0) {
-            setError(`No connected ${platformId} account found. Please go to Platforms page.`);
+            // ตรวจสอบว่ามี account แต่ถูกใช้หมดแล้ว
+            const allPlatformAccounts = availableAccounts.filter(acc => acc.platform === platformId);
+            if (allPlatformAccounts.length > 0) {
+                setError(`${platformId} accounts ทั้งหมดถูกใช้ใน Project อื่นแล้ว`);
+            } else {
+                setError(`ไม่พบ ${platformId} account กรุณาเพิ่มในหน้า Platforms`);
+            }
             return;
         }
 
@@ -332,8 +402,6 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
         }
 
         // SCENARIO C: Multiple Accounts -> Open Dropdown
-        // Store position relative to button
-        // Simple approximation: open dropdown near the button
         setAccountDropdown({
             platformId,
             accounts: platformAccounts
@@ -545,7 +613,7 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
                 <div className="flex items-end justify-between gap-4">
                     {/* LEFT: Platforms Grid */}
                     <div className="flex-shrink-0">
-                        <label className="text-xs text-gray-400 mb-2 block uppercase tracking-wider font-semibold">{t('timeslot.platforms')} (1-4)</label>
+                        <label className="text-xs text-gray-400 mb-2 block uppercase tracking-wider font-semibold">{t('timeslot.platforms')}</label>
                         <div className="flex gap-2">
                             {PLATFORMS_LIST.map(platform => {
                                 const selectedObj = newSlot.platforms.find(p => p.platformId === platform.id);
@@ -588,28 +656,33 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
             <div>
                 {/* Days Tabs */}
                 <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide border-b border-white/10">
-                    {DAYS.map(day => (
-                        <button
-                            key={day}
-                            onClick={() => setSelectedDay(day)}
-                            className={twMerge(
-                                "px-6 py-3 rounded-t-xl font-medium transition-all whitespace-nowrap relative top-[1px]",
-                                selectedDay === day
-                                    ? "bg-white/10 text-white border-x border-t border-white/10"
-                                    : "text-gray-400 hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            {t(`days.${day}`)}
-                            {(schedule[day]?.length || 0) > 0 && (
-                                <span className={twMerge(
-                                    "ml-2 px-1.5 py-0.5 text-xs rounded-full",
-                                    selectedDay === day ? "bg-red-500 text-white" : "bg-white/10 text-gray-400"
-                                )}>
-                                    {schedule[day].length}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+                    {DAYS.map(day => {
+                        const isToday = day === getCurrentDayKey();
+                        return (
+                            <button
+                                key={day}
+                                onClick={() => setSelectedDay(day)}
+                                className={twMerge(
+                                    "px-6 py-3 rounded-t-xl font-medium transition-all whitespace-nowrap relative top-[1px]",
+                                    selectedDay === day
+                                        ? "bg-white/10 text-white border-x border-t border-white/10"
+                                        : "text-gray-400 hover:text-white hover:bg-white/5",
+                                    isToday && selectedDay !== day && "border-2 border-blue-500 text-blue-400",
+                                    isToday && selectedDay === day && "border-2 border-blue-500 bg-blue-500/20 text-blue-300"
+                                )}
+                            >
+                                {DAY_NAMES_TH[day]}
+                                {(schedule[day]?.length || 0) > 0 && (
+                                    <span className={twMerge(
+                                        "ml-2 px-1.5 py-0.5 text-xs rounded-full",
+                                        selectedDay === day ? "bg-red-500 text-white" : "bg-white/10 text-gray-400"
+                                    )}>
+                                        {schedule[day].length}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* --- NEW TIMELINE VISUALIZER --- */}
