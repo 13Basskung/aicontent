@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
     LayoutDashboard, Wallet, FolderKanban, Share2, Layers, TrendingUp, TrendingDown,
-    Clock, Users, Video, Eye, Heart, Play, Search, ChevronDown, Filter,
-    Facebook, Instagram, Youtube, Loader2, ArrowUpRight, ArrowDownRight,
+    Clock, Users, Video, Eye, Heart, Play, Search, ChevronDown, Filter, ExternalLink,
+    Facebook, Instagram, Youtube, Loader2, ArrowUpRight, ArrowDownRight, Link2,
     ShoppingBag, Gift, DollarSign, Activity, BarChart3, PieChart, Calendar,
     CheckCircle, AlertCircle, Zap, Target, Award, Sparkles, CalendarDays, CalendarRange, Download
 } from 'lucide-react';
@@ -814,7 +814,7 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Platform Accounts Table */}
+            {/* Platform Accounts Table - FastClip Style */}
             <div className="group relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-10">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 border-b border-white/10">
                     <div className="flex items-center gap-3">
@@ -849,16 +849,48 @@ export default function Dashboard() {
                             <tr>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">บัญชี</th>
                                 <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase">แพลตฟอร์ม</th>
-                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">ผู้ติดตาม</th>
-                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">วันนี้</th>
-                                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase">วีดีโอ</th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        ผู้ติดตาม <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        วันนี้ <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        วีดีโอ <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-cyan-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <Eye size={12} /> Views <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-orange-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <Calendar size={12} /> Last Scheduled <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-yellow-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <Clock size={12} /> รอโพสต์ <ChevronDown size={12} />
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-purple-400 uppercase">
+                                    <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors">
+                                        <Link2 size={12} /> Links <ChevronDown size={12} />
+                                    </div>
+                                </th>
                                 <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase">สถานะ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="py-12 text-center">
+                                    <td colSpan={10} className="py-12 text-center">
                                         <Loader2 size={32} className="animate-spin mx-auto text-slate-400" />
                                     </td>
                                 </tr>
@@ -884,14 +916,62 @@ export default function Dashboard() {
                                                 <span className="text-sm text-slate-300 capitalize">{account.platform}</span>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
+                                        <td className="py-3 px-4 text-center">
                                             <span className="text-white font-medium">{(account.followers || 0).toLocaleString()}</span>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
-                                            <span className="text-green-400 text-sm">+{account.followersToday || 0}</span>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-green-400 text-sm font-medium">+{account.followersToday || 0}</span>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
+                                        <td className="py-3 px-4 text-center">
                                             <span className="text-white">{account.videoCount || 0}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-cyan-400 font-medium">{(account.views || 0).toLocaleString()}</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className="text-orange-400 text-xs">
+                                                {account.lastScheduled 
+                                                    ? new Date(account.lastScheduled.seconds ? account.lastScheduled.seconds * 1000 : account.lastScheduled).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                                    : '-'
+                                                }
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                                (account.pendingPosts || 0) > 0 
+                                                    ? 'bg-yellow-500/20 text-yellow-400' 
+                                                    : 'bg-slate-500/20 text-slate-400'
+                                            }`}>
+                                                {account.pendingPosts || 0}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                                {account.platform?.toLowerCase() === 'youtube' && account.channelUrl && (
+                                                    <a href={account.channelUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-red-500/20 rounded-lg transition-all" title="YouTube">
+                                                        <Youtube size={14} className="text-red-400" />
+                                                    </a>
+                                                )}
+                                                {account.platform?.toLowerCase() === 'facebook' && account.pageUrl && (
+                                                    <a href={account.pageUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-blue-500/20 rounded-lg transition-all" title="Facebook">
+                                                        <Facebook size={14} className="text-blue-400" />
+                                                    </a>
+                                                )}
+                                                {account.platform?.toLowerCase() === 'instagram' && account.profileUrl && (
+                                                    <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-pink-500/20 rounded-lg transition-all" title="Instagram">
+                                                        <Instagram size={14} className="text-pink-400" />
+                                                    </a>
+                                                )}
+                                                {account.platform?.toLowerCase() === 'tiktok' && account.profileUrl && (
+                                                    <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-cyan-500/20 rounded-lg transition-all" title="TikTok">
+                                                        <Video size={14} className="text-cyan-400" />
+                                                    </a>
+                                                )}
+                                                {/* Default link icon if no specific URL */}
+                                                {!account.channelUrl && !account.pageUrl && !account.profileUrl && (
+                                                    <span className="text-slate-600 text-xs">-</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
@@ -902,7 +982,7 @@ export default function Dashboard() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                                    <td colSpan={10} className="py-12 text-center text-slate-500">
                                         <Share2 size={32} className="mx-auto mb-3 opacity-30" />
                                         <p className="font-medium mb-2">ยังไม่มีบัญชีเชื่อมต่อ</p>
                                         <Link to="/platforms" className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-all">
