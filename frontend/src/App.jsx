@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Platforms from './pages/Platforms';
 import PlatformSetup from './pages/PlatformSetup';
+import PlatformSetupUser from './pages/PlatformSetupUser';
 import OAuthCallback from './pages/OAuthCallback';
 import Admin from './pages/Admin';
 
@@ -330,7 +331,8 @@ return (
           <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/platforms" element={<Platforms />} />
-          <Route path="/platforms/setup/:platform/:accountId" element={<PlatformSetup />} />
+          <Route path="/platforms/setup/:platform/:accountId" element={<PlatformSetupUser />} />
+          {isAdmin && <Route path="/platforms/setup-admin/:platform/:accountId" element={<PlatformSetup />} />}
           <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/mode-creator" element={<ModeCreator />} />
           <Route path="/expander" element={<ExpanderCreator />} />

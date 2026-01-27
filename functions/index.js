@@ -3899,3 +3899,9 @@ exports.youtubeRefreshToken = functions.https.onCall(async (data, context) => {
 // ============================================
 const dataDeletionModule = require('./dataDeletion');
 exports.dataDeletion = dataDeletionModule.dataDeletion;
+
+// ============================================
+// GET APP SETTINGS: Retrieve API Credentials
+// ============================================
+const getAppSettingsModule = require('./getAppSettings');
+exports.getAppSettings = getAppSettingsModule.getAppSettings;
