@@ -258,7 +258,6 @@ return (
         <NavItem to="/platforms" icon={Share2} label={t('common.platforms', 'Platforms')} />
         <NavItem to="/payments" icon={Coins} label="Payments" />
         {isAdmin && <NavItem to="/admin" icon={Shield} label="Admin Panel" />}
-        {isAdmin && <NavItem to="/app-settings" icon={Sliders} label="App Settings" />}
         <NavItem to="/settings" icon={Settings} label={t('common.settings')} />
         
         {/* Coming Soon Dropdown */}
@@ -342,7 +341,6 @@ return (
           <Route path="/podcast-creator" element={<PodcastCreator />} />
           <Route path="/music-creator" element={<MusicCreator />} />
           {isAdmin && <Route path="/admin" element={<Admin />} />}
-          {isAdmin && <Route path="/app-settings" element={<AppSettings />} />}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
