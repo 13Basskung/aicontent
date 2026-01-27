@@ -85,6 +85,7 @@ export default function Dashboard() {
     const [transactions, setTransactions] = useState([]);
     const [contentQueue, setContentQueue] = useState([]);
     const [projectSlots, setProjectSlots] = useState([]); // Slots ของ Project ที่เลือก
+    const [allProjectsSlots, setAllProjectsSlots] = useState({}); // Slots ของทุก Projects { projectId: [slots] }
     
     // Filter States
     const [platformFilter, setPlatformFilter] = useState('all');
@@ -178,6 +179,76 @@ export default function Dashboard() {
         
         return () => unsubscribe();
     }, [currentUser, selectedProjectId]);
+    
+    // Fetch slots for ALL projects (for stats calculation)
+    useEffect(() => {
+        if (!currentUser || projects.length === 0) {
+            setAllProjectsSlots({});
+            return;
+        }
+        
+        const unsubscribes = [];
+        const slotsData = {};
+        
+        projects.forEach(project => {
+            const slotsRef = collection(db, 'users', currentUser.uid, 'projects', project.id, 'slots');
+            const unsub = onSnapshot(slotsRef, (snapshot) => {
+                const slots = [];
+                snapshot.forEach(doc => {
+                    slots.push({ id: doc.id, ...doc.data() });
+                });
+                slotsData[project.id] = slots;
+                setAllProjectsSlots({ ...slotsData });
+            });
+            unsubscribes.push(unsub);
+        });
+        
+        return () => unsubscribes.forEach(unsub => unsub());
+    }, [currentUser, projects]);
+    
+    // Calculate project stats from platforms in Posting Schedule
+    const projectsWithStats = useMemo(() => {
+        return projects.map(project => {
+            const slots = allProjectsSlots[project.id] || [];
+            
+            // รวบรวม accountIds จากทุก slots
+            const accountIds = new Set();
+            slots.forEach(slot => {
+                if (slot.platforms && Array.isArray(slot.platforms)) {
+                    slot.platforms.forEach(p => {
+                        if (p.accountId) accountIds.add(p.accountId);
+                    });
+                }
+            });
+            
+            // หา accounts จริงและรวมข้อมูล
+            let totalSubs = 0;
+            let totalViews = 0;
+            let totalVideos = 0;
+            let totalFollowers = 0;
+            let hasActiveSlots = slots.length > 0;
+            
+            accountIds.forEach(accountId => {
+                const account = accounts.find(a => a.id === accountId);
+                if (account) {
+                    totalSubs += account.followers || 0; // YouTube subs
+                    totalViews += account.views || 0;
+                    totalVideos += account.videoCount || 0;
+                    totalFollowers += account.followers || 0;
+                }
+            });
+            
+            return {
+                ...project,
+                calculatedSubs: totalSubs,
+                calculatedViews: totalViews,
+                calculatedVideos: totalVideos,
+                calculatedFollowers: totalFollowers,
+                hasActiveSlots,
+                linkedAccountsCount: accountIds.size
+            };
+        });
+    }, [projects, allProjectsSlots, accounts]);
     
     // Computed Statistics
     const stats = useMemo(() => {
