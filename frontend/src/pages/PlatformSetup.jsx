@@ -342,14 +342,103 @@ export default function PlatformSetup() {
                                     </span>
                                     <div className="text-slate-300 text-sm">
                                         {step}
-                                        {/* Show Redirect URI in step 5 (idx=4) */}
-                                        {idx === 4 && (
+                                        {/* Show Site URL in step 6 (idx=5) */}
+                                        {idx === 5 && (
+                                            <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                <code className="text-green-400 text-xs flex-1 break-all">
+                                                    https://aicontents.vip
+                                                </code>
+                                                <button 
+                                                    onClick={() => copyToClipboard('https://aicontents.vip')}
+                                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                    title="คัดลอก"
+                                                >
+                                                    <Copy size={12} className="text-slate-400" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {/* Show Redirect URI in step 8 (idx=7) */}
+                                        {idx === 7 && (
                                             <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
                                                 <code className="text-green-400 text-xs flex-1 break-all">
                                                     {window.location.origin}/oauth/callback
                                                 </code>
                                                 <button 
                                                     onClick={() => copyToClipboard(`${window.location.origin}/oauth/callback`)}
+                                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                    title="คัดลอก"
+                                                >
+                                                    <Copy size={12} className="text-slate-400" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {/* Show App Domain in step 11 (idx=10) */}
+                                        {idx === 10 && (
+                                            <div className="mt-2 space-y-2">
+                                                <div className="flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                    <code className="text-green-400 text-xs flex-1 break-all">
+                                                        https://aicontents.vip
+                                                    </code>
+                                                    <button 
+                                                        onClick={() => copyToClipboard('https://aicontents.vip')}
+                                                        className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                        title="คัดลอก"
+                                                    >
+                                                        <Copy size={12} className="text-slate-400" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                    <code className="text-green-400 text-xs flex-1 break-all">
+                                                        aicontents.vip
+                                                    </code>
+                                                    <button 
+                                                        onClick={() => copyToClipboard('aicontents.vip')}
+                                                        className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                        title="คัดลอก"
+                                                    >
+                                                        <Copy size={12} className="text-slate-400" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {/* Show Privacy Policy URL in step 12 (idx=11) */}
+                                        {idx === 11 && (
+                                            <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                <code className="text-green-400 text-xs flex-1 break-all">
+                                                    https://aicontents.vip/privacy-policy
+                                                </code>
+                                                <button 
+                                                    onClick={() => copyToClipboard('https://aicontents.vip/privacy-policy')}
+                                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                    title="คัดลอก"
+                                                >
+                                                    <Copy size={12} className="text-slate-400" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {/* Show Terms of Service URL in step 13 (idx=12) */}
+                                        {idx === 12 && (
+                                            <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                <code className="text-green-400 text-xs flex-1 break-all">
+                                                    https://aicontents.vip/terms-of-service
+                                                </code>
+                                                <button 
+                                                    onClick={() => copyToClipboard('https://aicontents.vip/terms-of-service')}
+                                                    className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                                    title="คัดลอก"
+                                                >
+                                                    <Copy size={12} className="text-slate-400" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {/* Show Data Deletion URL in step 14 (idx=13) */}
+                                        {idx === 13 && (
+                                            <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                                                <code className="text-green-400 text-xs flex-1 break-all">
+                                                    https://aicontents.vip/data-deletion
+                                                </code>
+                                                <button 
+                                                    onClick={() => copyToClipboard('https://aicontents.vip/data-deletion')}
                                                     className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
                                                     title="คัดลอก"
                                                 >
