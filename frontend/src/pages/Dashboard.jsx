@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
     LayoutDashboard, Wallet, FolderKanban, Share2, Layers, TrendingUp, TrendingDown,
-    Clock, Users, Video, Eye, Heart, Play, Search, ChevronDown, Filter, ExternalLink,
+    Clock, Users, Video, Eye, Heart, Play, Search, ChevronDown, Filter, ExternalLink, X,
     Facebook, Instagram, Youtube, Loader2, ArrowUpRight, ArrowDownRight, Link2,
     ShoppingBag, Gift, DollarSign, Activity, BarChart3, PieChart, Calendar,
     CheckCircle, AlertCircle, Zap, Target, Award, Sparkles, CalendarDays, CalendarRange, Download
@@ -88,6 +88,8 @@ export default function Dashboard() {
     // Filter States
     const [platformFilter, setPlatformFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
+    const [selectedProjectName, setSelectedProjectName] = useState('');
     
     // Chart Filter States
     const [chartPeriod, setChartPeriod] = useState('7d');
@@ -196,6 +198,17 @@ export default function Dashboard() {
     const filteredAccounts = useMemo(() => {
         let filtered = [...accounts];
         
+        // Filter by selected project
+        if (selectedProjectId) {
+            const selectedProject = projects.find(p => p.id === selectedProjectId);
+            if (selectedProject?.linkedAccounts?.length > 0) {
+                filtered = filtered.filter(acc => selectedProject.linkedAccounts.includes(acc.id));
+            } else {
+                // ถ้า Project ไม่มี linkedAccounts ให้แสดงทั้งหมด (หรือไม่แสดงเลย)
+                filtered = [];
+            }
+        }
+        
         if (platformFilter !== 'all') {
             filtered = filtered.filter(acc => acc.platform?.toLowerCase() === platformFilter);
         }
@@ -209,7 +222,7 @@ export default function Dashboard() {
         }
         
         return filtered;
-    }, [accounts, platformFilter, searchQuery]);
+    }, [accounts, projects, platformFilter, searchQuery, selectedProjectId]);
     
     // Activity Badge Style
     const getActivityBadge = (type) => {
@@ -224,47 +237,43 @@ export default function Dashboard() {
         return badges[type] || { bg: 'bg-slate-500/20', text: 'text-slate-400', icon: '📋', label: type };
     };
     
-    // Chart data based on period filter
+    // Chart data based on period filter - ใช้ข้อมูลจริง (ตอนนี้ยังไม่มีข้อมูล)
     const chartData = useMemo(() => {
-        const now = new Date();
         let labels = [];
         let postsData = [];
         let followersData = [];
         
+        // TODO: เชื่อม API จริงเพื่อดึงข้อมูลสถิติ
         switch (chartPeriod) {
             case '1d':
-                // 24 ชั่วโมง
                 labels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
-                postsData = Array.from({ length: 24 }, () => Math.floor(Math.random() * 10));
-                followersData = Array.from({ length: 24 }, () => Math.floor(Math.random() * 50));
+                postsData = Array.from({ length: 24 }, () => 0);
+                followersData = Array.from({ length: 24 }, () => 0);
                 break;
             case '7d':
-                // 7 วัน
                 labels = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-                postsData = [12, 19, 8, 25, 15, 22, 18];
-                followersData = [150, 220, 180, 350, 280, 420, 380];
+                postsData = [0, 0, 0, 0, 0, 0, 0];
+                followersData = [0, 0, 0, 0, 0, 0, 0];
                 break;
             case '1m':
-                // 30 วัน (แบ่งเป็น 4 สัปดาห์)
                 labels = ['สัปดาห์ 1', 'สัปดาห์ 2', 'สัปดาห์ 3', 'สัปดาห์ 4'];
-                postsData = [85, 92, 78, 110];
-                followersData = [1200, 1450, 980, 1680];
+                postsData = [0, 0, 0, 0];
+                followersData = [0, 0, 0, 0];
                 break;
             case '1y':
-                // 12 เดือน
                 labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-                postsData = [320, 280, 350, 420, 380, 450, 520, 480, 390, 410, 460, 500];
-                followersData = [4500, 5200, 4800, 6100, 5800, 7200, 8100, 7500, 6800, 7100, 7800, 8500];
+                postsData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                followersData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                 break;
             case 'custom':
                 labels = ['ช่วงที่เลือก'];
-                postsData = [Math.floor(Math.random() * 100)];
-                followersData = [Math.floor(Math.random() * 1000)];
+                postsData = [0];
+                followersData = [0];
                 break;
             default:
                 labels = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-                postsData = [12, 19, 8, 25, 15, 22, 18];
-                followersData = [150, 220, 180, 350, 280, 420, 380];
+                postsData = [0, 0, 0, 0, 0, 0, 0];
+                followersData = [0, 0, 0, 0, 0, 0, 0];
         }
         
         const maxPosts = Math.max(...postsData, 1);
@@ -723,12 +732,23 @@ export default function Dashboard() {
                                 projects.slice(0, 10).map((project) => (
                                     <tr key={project.id} className="hover:bg-white/5 transition-colors group">
                                         <td className="py-3 px-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center border border-white/10">
+                                            <div 
+                                                className="flex items-center gap-3 cursor-pointer group/project"
+                                                onClick={() => {
+                                                    if (selectedProjectId === project.id) {
+                                                        setSelectedProjectId(null);
+                                                        setSelectedProjectName('');
+                                                    } else {
+                                                        setSelectedProjectId(project.id);
+                                                        setSelectedProjectName(project.name);
+                                                    }
+                                                }}
+                                            >
+                                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center border transition-all ${selectedProjectId === project.id ? 'border-red-500 ring-2 ring-red-500/30' : 'border-white/10 group-hover/project:border-red-500/50'}`}>
                                                     <FolderKanban size={18} className="text-red-400" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold text-white text-sm">{project.name || 'Untitled'}</p>
+                                                    <p className={`font-semibold text-sm transition-colors ${selectedProjectId === project.id ? 'text-red-400' : 'text-white group-hover/project:text-red-400'}`}>{project.name || 'Untitled'}</p>
                                                     <p className="text-xs text-slate-500">{project.scenes || 0} scenes</p>
                                                 </div>
                                             </div>
@@ -815,19 +835,42 @@ export default function Dashboard() {
             </div>
 
             {/* Platform Accounts Table - FastClip Style */}
-            <div className="group relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden z-10">
+            <div className={`group relative bg-slate-900/80 backdrop-blur-xl rounded-2xl border overflow-hidden z-10 transition-all ${selectedProjectId ? 'border-red-500/50 ring-2 ring-red-500/20' : 'border-white/10'}`}>
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 border-b border-white/10">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all ${selectedProjectId ? 'bg-gradient-to-br from-red-500 to-rose-600 shadow-red-500/20' : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20'}`}>
                             <Share2 size={18} className="text-white" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Platform Accounts</h3>
-                            <p className="text-xs text-slate-400">บัญชีที่เชื่อมต่อทั้งหมด</p>
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                Platform Accounts
+                                {selectedProjectId && (
+                                    <span className="text-sm font-normal text-red-400">
+                                        → {selectedProjectName}
+                                    </span>
+                                )}
+                            </h3>
+                            <p className="text-xs text-slate-400">
+                                {selectedProjectId 
+                                    ? `แสดงเฉพาะ Account ที่เชื่อมกับ "${selectedProjectName}"`
+                                    : 'บัญชีที่เชื่อมต่อทั้งหมด'
+                                }
+                            </p>
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-3">
+                        {selectedProjectId && (
+                            <button
+                                onClick={() => {
+                                    setSelectedProjectId(null);
+                                    setSelectedProjectName('');
+                                }}
+                                className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+                            >
+                                <X size={14} /> ดูทั้งหมด
+                            </button>
+                        )}
                         <GlassDropdown
                             value={platformFilter}
                             onChange={setPlatformFilter}
