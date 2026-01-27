@@ -17,13 +17,14 @@ const PLATFORM_CONFIG = {
         color: 'red',
         bgGradient: 'from-red-600 to-red-800',
         description: 'เชื่อมต่อ YouTube Channel เพื่อดึงข้อมูล Subscribers, Views และอัพโหลดวิดีโอ',
-        consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+        consoleUrl: 'https://console.cloud.google.com/auth/clients?project=content-auto-post',
+        enableApiUrl: 'https://console.cloud.google.com/apis/api/youtube.googleapis.com/metrics?project=content-auto-post',
         docsUrl: 'https://developers.google.com/youtube/v3/getting-started',
         steps: [
-            'ไปที่ Google Cloud Console และสร้าง Project ใหม่',
-            'เปิดใช้งาน YouTube Data API v3',
-            'สร้าง OAuth 2.0 Client ID (Web Application)',
-            'เพิ่ม Redirect URI: ' + window.location.origin + '/api/auth/youtube/callback',
+            'กดปุ่ม "Enable API" เพื่อเปิดใช้งาน YouTube Data API v3',
+            'กดปุ่ม "Developer Console" เพื่อสร้าง OAuth 2.0 Client ID',
+            'เลือก Application type: Web Application',
+            'เพิ่ม Redirect URI: ' + window.location.origin + '/oauth/callback',
             'คัดลอก Client ID และ Client Secret มาใส่ด้านล่าง'
         ],
         fields: [
@@ -312,23 +313,36 @@ export default function PlatformSetup() {
                             </div>
                         </div>
 
-                        <div className="flex gap-3 mt-4">
-                            <a 
-                                href={config.consoleUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className={`flex-1 py-3 flex items-center justify-center gap-2 bg-${config.color}-500 hover:bg-${config.color}-400 text-white font-bold rounded-xl transition-all text-sm`}
-                            >
-                                <ExternalLink size={16} /> เปิด Developer Console
-                            </a>
-                            <a 
-                                href={config.docsUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="px-4 py-3 border border-white/20 hover:bg-white/10 text-white rounded-xl transition-all text-sm"
-                            >
-                                Docs
-                            </a>
+                        <div className="flex flex-col gap-3 mt-4">
+                            {/* Enable API Button (YouTube only) */}
+                            {config.enableApiUrl && (
+                                <a 
+                                    href={config.enableApiUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="w-full py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all text-sm"
+                                >
+                                    <Shield size={16} /> Enable YouTube Data API v3
+                                </a>
+                            )}
+                            <div className="flex gap-3">
+                                <a 
+                                    href={config.consoleUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className={`flex-1 py-3 flex items-center justify-center gap-2 bg-${config.color}-500 hover:bg-${config.color}-400 text-white font-bold rounded-xl transition-all text-sm`}
+                                >
+                                    <ExternalLink size={16} /> Developer Console
+                                </a>
+                                <a 
+                                    href={config.docsUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="px-4 py-3 border border-white/20 hover:bg-white/10 text-white rounded-xl transition-all text-sm"
+                                >
+                                    Docs
+                                </a>
+                            </div>
                         </div>
                     </div>
 

@@ -199,13 +199,21 @@ const AccountCard = ({ account, userId, onRemove, onShowToast, onNavigateSetup }
                 </div>
             )}
 
-            <button
-                onClick={() => onRemove(account.id)}
-                className="group/btn relative w-full py-3 flex items-center justify-center gap-2 text-red-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold overflow-hidden border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/20 hover:shadow-lg hover:shadow-red-500/20"
-            >
-                <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/10 to-red-500/0 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
-                <Trash2 size={16} className="group-hover/btn:rotate-12 transition-transform duration-300" /> Remove
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+                <button
+                    onClick={handleConnect}
+                    className="flex-1 py-3 flex items-center justify-center gap-2 text-blue-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold border border-blue-500/20 hover:border-blue-500/40 hover:bg-blue-500/20"
+                >
+                    <Settings size={16} /> แก้ไข
+                </button>
+                <button
+                    onClick={() => onRemove(account.id)}
+                    className="flex-1 py-3 flex items-center justify-center gap-2 text-red-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/20"
+                >
+                    <Trash2 size={16} /> Remove
+                </button>
+            </div>
         </div>
     );
 };
