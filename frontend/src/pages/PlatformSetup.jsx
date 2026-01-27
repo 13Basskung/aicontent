@@ -49,7 +49,7 @@ const PLATFORM_CONFIG = {
         bgGradient: 'from-orange-600 to-blue-800',
         description: 'เชื่อมต่อ Facebook Page เพื่อดึงข้อมูล Followers และโพสต์อัตโนมัติ',
         consoleUrl: 'https://developers.facebook.com/apps/create/',
-        enableApiUrl: 'https://developers.facebook.com/apps/',
+        enableApiUrl: 'https://developers.facebook.com/apps/1428394719026952/settings/basic/',
         docsUrl: 'https://developers.facebook.com/docs/facebook-login/',
         steps: [
             'กดปุ่ม "Developer Console" เพื่อสร้าง App การเชื่อมต่อ (ต้อง Login Facebook ก่อน)',
