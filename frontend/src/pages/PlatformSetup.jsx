@@ -353,26 +353,29 @@ export default function PlatformSetup() {
                                     href={config.enableApiUrl} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="flex-1 py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold rounded-xl transition-all text-xs"
+                                    className="flex-1 py-3 flex flex-col items-center justify-center gap-1 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white font-bold rounded-xl transition-all text-xs"
                                 >
-                                    <Shield size={14} /> Enable API
+                                    <Shield size={14} />
+                                    <span>Enable API</span>
                                 </a>
                             )}
                             <a 
                                 href={config.consoleUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="flex-1 py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl transition-all text-xs text-center"
+                                className="flex-1 py-3 flex flex-col items-center justify-center gap-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl transition-all text-xs"
                             >
-                                <ExternalLink size={14} /> <span>Developer Console</span>
+                                <ExternalLink size={14} />
+                                <span>Developer Console</span>
                             </a>
                             <a 
                                 href={config.docsUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="flex-1 py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-bold rounded-xl transition-all text-xs"
+                                className="flex-1 py-3 flex flex-col items-center justify-center gap-1 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-bold rounded-xl transition-all text-xs"
                             >
-                                <ExternalLink size={14} /> Docs
+                                <ExternalLink size={14} />
+                                <span>Docs</span>
                             </a>
                         </div>
                     </div>
