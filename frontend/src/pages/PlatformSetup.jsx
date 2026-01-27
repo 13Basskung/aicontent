@@ -69,11 +69,12 @@ const PLATFORM_CONFIG = {
             { id: 'pageId', label: 'Page ID (Optional)', placeholder: '1234567890', type: 'text', hasHelp: true }
         ],
         pageIdHelp: [
-            { text: 'กดลิงก์นี้เพื่อไปหน้า Facebook Pages ของคุณ', link: 'https://www.facebook.com/pages/?category=your_pages' },
-            { text: 'เลือก Page ที่ต้องการ → กดที่ "About" → หา "Page transparency"' },
-            { text: 'Copy Page ID มาใส่ในช่อง Page ID (Optional) ด้านล่าง' },
-            { text: 'หรือปล่อยว่างไว้ → กดเชื่อมต่อ → ระบบจะให้เลือก Page หลังจาก Login' },
-            { text: 'กดปุ่มเชื่อมต่อ → Continue with Facebook → เลือก Page → Continue (รอดึงข้อมูล) → สำเร็จ!' }
+            { text: 'วิธีหา Page ID (Desktop): Login Facebook → กดรูปโปรไฟล์มุมขวาบน → "See all profiles" → เลือก Page' },
+            { text: 'กดชื่อ Page ในเมนูซ้าย → กดแท็บ "About" (ใต้รูปปก Page)' },
+            { text: 'Scroll ลงมาหา "Page Transparency" → จะเห็น Page ID ตรงนั้น → Copy มาใส่' },
+            { text: 'วิธีหา Page ID (Mobile): เปิด App → Menu → Options → เลือก Page → Menu อีกครั้ง → กดชื่อ Page' },
+            { text: 'กด "See your About info" → Scroll หา "Page Transparency" → Copy Page ID' },
+            { text: '⚠️ หรือปล่อยช่อง Page ID ว่างไว้ → กดเชื่อมต่อ → ระบบจะให้เลือก Page หลัง Login (แนะนำ)' }
         ]
     },
     instagram: {
