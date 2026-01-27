@@ -3906,6 +3906,212 @@ exports.youtubeRefreshToken = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================
+// FACEBOOK OAuth: Exchange Code for Token
+// ============================================
+exports.facebookAuthCallback = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { code, redirectUri, platform } = data;
+
+  if (!code || !redirectUri) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+  }
+
+  try {
+    // Get Facebook credentials from appSettings
+    const settingsRef = admin.firestore().collection('appSettings').doc('facebook');
+    const settingsSnap = await settingsRef.get();
+
+    if (!settingsSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'Facebook app settings not found. Please contact admin.');
+    }
+
+    const settings = settingsSnap.data();
+    const clientId = settings.clientId || settings.appId;
+    const clientSecret = settings.clientSecret || settings.appSecret;
+
+    if (!clientId || !clientSecret) {
+      throw new functions.https.HttpsError('failed-precondition', 'Facebook credentials not configured. Please contact admin.');
+    }
+
+    // Generate new accountId for this connection
+    const accountId = admin.firestore().collection('users').doc(context.auth.uid).collection('accounts').doc().id;
+
+    console.log('🔑 Exchanging Facebook code for token...');
+
+    // Exchange code for access token
+    const tokenResponse = await new Promise((resolve, reject) => {
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        code: code
+      }).toString();
+
+      const options = {
+        hostname: 'graph.facebook.com',
+        port: 443,
+        path: `/v18.0/oauth/access_token?${params}`,
+        method: 'GET'
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          console.log(`📡 Facebook Token Response Status: ${res.statusCode}`);
+          console.log(`📡 Facebook Token Response: ${body.substring(0, 300)}`);
+          try {
+            const parsed = JSON.parse(body);
+            if (res.statusCode === 200 && parsed.access_token) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed.error?.message || 'Token exchange failed'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse token response'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.end();
+    });
+
+    console.log('✅ Got Facebook access token');
+
+    // Get user's Facebook Pages
+    console.log('🔍 Fetching Facebook Pages...');
+    const pagesResponse = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'graph.facebook.com',
+        port: 443,
+        path: `/v18.0/me/accounts?fields=id,name,access_token,picture,followers_count,fan_count&access_token=${tokenResponse.access_token}`,
+        method: 'GET'
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          console.log(`📡 Facebook Pages Response Status: ${res.statusCode}`);
+          console.log(`📡 Facebook Pages Response: ${body.substring(0, 500)}`);
+          try {
+            const parsed = JSON.parse(body);
+            if (res.statusCode === 200) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed.error?.message || 'Failed to get pages'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse pages response'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.end();
+    });
+
+    // Use the first page (or handle multiple pages in UI later)
+    const page = pagesResponse.data?.[0];
+    
+    if (!page) {
+      throw new functions.https.HttpsError('not-found', 'No Facebook Pages found. Make sure you manage at least one Facebook Page.');
+    }
+
+    console.log(`✅ Found Facebook Page: ${page.name} (ID: ${page.id})`);
+
+    // Get page insights (engagement data)
+    let pageInsights = { views: 0, comments: 0, shares: 0 };
+    try {
+      const insightsResponse = await new Promise((resolve, reject) => {
+        const options = {
+          hostname: 'graph.facebook.com',
+          port: 443,
+          path: `/v18.0/${page.id}?fields=engagement,posts.limit(10){comments.summary(true),shares}&access_token=${page.access_token}`,
+          method: 'GET'
+        };
+
+        const req = https.request(options, (res) => {
+          let body = '';
+          res.on('data', (chunk) => body += chunk);
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(body);
+              if (res.statusCode === 200) {
+                resolve(parsed);
+              } else {
+                resolve(null);
+              }
+            } catch (e) {
+              resolve(null);
+            }
+          });
+        });
+
+        req.on('error', () => resolve(null));
+        req.end();
+      });
+
+      if (insightsResponse?.posts?.data) {
+        let totalComments = 0;
+        let totalShares = 0;
+        insightsResponse.posts.data.forEach(post => {
+          totalComments += post.comments?.summary?.total_count || 0;
+          totalShares += post.shares?.count || 0;
+        });
+        pageInsights.comments = totalComments;
+        pageInsights.shares = totalShares;
+      }
+    } catch (e) {
+      console.log('⚠️ Could not fetch page insights:', e.message);
+    }
+
+    // Calculate token expiry (Facebook tokens typically last 60 days for long-lived)
+    const tokenExpiry = new Date(Date.now() + (tokenResponse.expires_in || 5184000) * 1000);
+
+    // Save account to Firestore
+    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/accounts/${accountId}`);
+    
+    const updateData = {
+      platform: platform || 'facebook',
+      accessToken: page.access_token, // Use page access token for page operations
+      userAccessToken: tokenResponse.access_token, // Keep user token for reference
+      tokenExpiry: tokenExpiry,
+      connectionStatus: 'connected',
+      connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      pageId: page.id,
+      name: page.name,
+      avatar: page.picture?.data?.url || `https://graph.facebook.com/${page.id}/picture?type=large`,
+      followers: page.followers_count || page.fan_count || 0,
+      views: pageInsights.views,
+      comments: pageInsights.comments,
+      shares: pageInsights.shares,
+      videoCount: 0
+    };
+
+    await accountRef.set(updateData, { merge: true });
+
+    console.log(`✅ Saved Facebook Page account: ${page.name}`);
+
+    return {
+      success: true,
+      pageId: page.id,
+      pageName: page.name,
+      followers: page.followers_count || page.fan_count || 0
+    };
+
+  } catch (error) {
+    console.error('Facebook OAuth callback error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================
 // DATA DELETION CALLBACK: Facebook Data Deletion
 // ============================================
 const dataDeletionModule = require('./dataDeletion');
