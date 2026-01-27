@@ -3670,21 +3670,31 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { code, state, clientId, clientSecret, redirectUri } = data;
+  const { code, redirectUri } = data;
 
-  if (!code || !state || !clientId || !clientSecret) {
+  if (!code || !redirectUri) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
   }
 
   try {
-    // Decode and verify state
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-    
-    if (stateData.uid !== context.auth.uid) {
-      throw new functions.https.HttpsError('permission-denied', 'Invalid state');
+    // Get YouTube credentials from appSettings
+    const settingsRef = admin.firestore().collection('appSettings').doc('youtube');
+    const settingsSnap = await settingsRef.get();
+
+    if (!settingsSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'YouTube app settings not found. Please contact admin.');
     }
 
-    const accountId = stateData.accountId;
+    const settings = settingsSnap.data();
+    const clientId = settings.clientId;
+    const clientSecret = settings.clientSecret;
+
+    if (!clientId || !clientSecret) {
+      throw new functions.https.HttpsError('failed-precondition', 'YouTube credentials not configured. Please contact admin.');
+    }
+
+    // Generate new accountId for this connection
+    const accountId = admin.firestore().collection('users').doc(context.auth.uid).collection('platforms').doc('youtube').collection('accounts').doc().id;
 
     // Exchange code for tokens
     const tokenResponse = await new Promise((resolve, reject) => {
@@ -3774,8 +3784,8 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     // Calculate token expiry
     const tokenExpiry = new Date(Date.now() + (tokenResponse.expires_in * 1000));
 
-    // Update account in Firestore
-    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/accounts/${accountId}`);
+    // Save account to Firestore under platforms/youtube/accounts
+    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/platforms/youtube/accounts/${accountId}`);
     
     const updateData = {
       accessToken: tokenResponse.access_token,
@@ -3797,7 +3807,7 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
       updateData.views = parseInt(channelInfo.statistics?.viewCount || 0);
     }
 
-    await accountRef.update(updateData);
+    await accountRef.set(updateData, { merge: true });
 
     return {
       success: true,
