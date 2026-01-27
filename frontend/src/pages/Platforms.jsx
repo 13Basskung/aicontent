@@ -1,10 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Share2, Plus, Trash2, CheckCircle, AlertCircle, Facebook, Instagram, Youtube, Video, Pencil, Check, X } from 'lucide-react';
+import { Share2, Plus, Trash2, CheckCircle, AlertCircle, Facebook, Instagram, Youtube, Video, Pencil, Check, X, Settings, ExternalLink, Clock, Link2 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+
+// Platform OAuth URLs (จะใช้เมื่อ implement จริง)
+const PLATFORM_CONNECT_INFO = {
+    youtube: {
+        name: 'YouTube',
+        color: 'red',
+        description: 'เชื่อมต่อ YouTube Channel เพื่อดึงข้อมูล Subscribers และ Views',
+        scopes: ['yt-analytics-read', 'youtube-upload'],
+        icon: Youtube
+    },
+    facebook: {
+        name: 'Facebook',
+        color: 'blue',
+        description: 'เชื่อมต่อ Facebook Page เพื่อดึงข้อมูล Followers และโพสต์อัตโนมัติ',
+        scopes: ['pages_read_engagement', 'pages_manage_posts'],
+        icon: Facebook
+    },
+    instagram: {
+        name: 'Instagram',
+        color: 'pink',
+        description: 'เชื่อมต่อ Instagram Business Account ผ่าน Facebook',
+        scopes: ['instagram_basic', 'instagram_content_publish'],
+        icon: Instagram
+    },
+    tiktok: {
+        name: 'TikTok',
+        color: 'cyan',
+        description: 'เชื่อมต่อ TikTok Account สำหรับอัพโหลดวิดีโอ (Coming Soon)',
+        scopes: ['video.upload'],
+        icon: Video
+    }
+};
 
 const TABS = [
     { id: 'all', label: 'All Platforms' },
@@ -28,6 +60,11 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempName, setTempName] = useState(account.name);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // ตรวจสอบว่าเชื่อมต่อจริงหรือไม่
+    const isConnected = account.accessToken || account.channelId || account.pageId || account.igUserId;
+    const platformInfo = PLATFORM_CONNECT_INFO[account.platform?.toLowerCase()] || {};
+    const PlatformIcon = platformInfo.icon || Share2;
 
     const handleSave = async () => {
         if (!tempName.trim()) return;
@@ -44,16 +81,36 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
             setIsSaving(false);
         }
     };
+    
+    const handleConnect = () => {
+        // TODO: Implement OAuth flow for each platform
+        const platform = account.platform?.toLowerCase();
+        onShowToast(`กำลังเปิดหน้าเชื่อมต่อ ${platformInfo.name}... (Coming Soon)`);
+        
+        // ตัวอย่าง: เปิด OAuth URL
+        // window.open(`/api/auth/${platform}?accountId=${account.id}`, '_blank');
+    };
 
     return (
-        <div className="group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-green-500/30 hover:shadow-2xl hover:shadow-green-500/10 transition-all duration-500 overflow-hidden hover:scale-[1.02]">
+        <div className={`group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl border rounded-2xl p-6 hover:shadow-2xl transition-all duration-500 overflow-hidden hover:scale-[1.02] ${
+            isConnected 
+                ? 'border-green-500/30 hover:border-green-400/50 hover:shadow-green-500/10' 
+                : 'border-yellow-500/30 hover:border-yellow-400/50 hover:shadow-yellow-500/10'
+        }`}>
             {/* Glow Effect on Hover */}
-            <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/5 to-green-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            <div className={`absolute inset-0 bg-gradient-to-r ${isConnected ? 'from-green-500/0 via-green-500/5 to-green-500/0' : 'from-yellow-500/0 via-yellow-500/5 to-yellow-500/0'} translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000`} />
+            
             <div className="flex items-start justify-between mb-4 relative">
                 <div className="flex items-center gap-4 w-full">
                     <div className="relative">
-                        <img src={account.avatar} alt={account.name} className="w-14 h-14 rounded-2xl border-2 border-green-500/30 shadow-lg shadow-green-500/20 group-hover:border-green-400/50 transition-all duration-300" />
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-slate-900 animate-pulse" />
+                        <img src={account.avatar} alt={account.name} className={`w-14 h-14 rounded-2xl border-2 shadow-lg transition-all duration-300 ${
+                            isConnected 
+                                ? 'border-green-500/30 shadow-green-500/20 group-hover:border-green-400/50' 
+                                : 'border-yellow-500/30 shadow-yellow-500/20 group-hover:border-yellow-400/50'
+                        }`} />
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 ${
+                            isConnected ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'
+                        }`} />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -85,7 +142,9 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 group/edit">
-                                <h3 className="font-bold text-white text-lg truncate">{account.name}</h3>
+                                <h3 className="font-bold text-white text-lg truncate">
+                                    {isConnected && account.channelName ? account.channelName : account.name}
+                                </h3>
                                 <button
                                     onClick={() => setIsEditing(true)}
                                     className="text-slate-400 hover:text-white transition-colors opacity-0 group-hover/edit:opacity-100 p-1.5 hover:bg-white/5 rounded-full"
@@ -97,21 +156,54 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
                         )}
 
                         <span className="text-xs text-gray-400 capitalize flex items-center gap-1 mt-0.5">
-                            {account.platform} <CheckCircle size={12} className="text-green-500" />
+                            <PlatformIcon size={12} className={`text-${platformInfo.color}-400`} />
+                            {account.platform} 
+                            {isConnected ? (
+                                <CheckCircle size={12} className="text-green-500" />
+                            ) : (
+                                <Clock size={12} className="text-yellow-500" />
+                            )}
                         </span>
                     </div>
                 </div>
 
                 {!isEditing && (
-                    <div className={`ml-2 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg ${account.status === 'active' ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border border-green-500/30 shadow-green-500/20' : 'bg-gradient-to-r from-red-500/30 to-rose-500/30 text-red-300 border border-red-500/30 shadow-red-500/20'}`}>
-                        {account.status}
+                    <div className={`ml-2 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg ${
+                        isConnected 
+                            ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border border-green-500/30 shadow-green-500/20' 
+                            : 'bg-gradient-to-r from-yellow-500/30 to-amber-500/30 text-yellow-300 border border-yellow-500/30 shadow-yellow-500/20'
+                    }`}>
+                        {isConnected ? 'Connected' : 'Pending'}
                     </div>
                 )}
             </div>
+            
+            {/* Connection Info */}
+            {isConnected ? (
+                <div className="mb-4 p-3 bg-green-500/10 rounded-xl border border-green-500/20">
+                    <div className="flex items-center gap-2 text-green-400 text-xs">
+                        <CheckCircle size={14} />
+                        <span>เชื่อมต่อแล้ว</span>
+                        {account.followers && (
+                            <span className="ml-auto text-white font-bold">{account.followers.toLocaleString()} followers</span>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <div className="mb-4 p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+                    <p className="text-yellow-400 text-xs mb-2">{platformInfo.description}</p>
+                    <button
+                        onClick={handleConnect}
+                        className="w-full py-2 flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-lg text-sm hover:from-yellow-400 hover:to-amber-400 transition-all"
+                    >
+                        <Link2 size={14} /> เชื่อมต่อ {platformInfo.name}
+                    </button>
+                </div>
+            )}
 
             <button
                 onClick={() => onRemove(account.id)}
-                className="group/btn relative w-full mt-4 py-3 flex items-center justify-center gap-2 text-red-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold overflow-hidden border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/20 hover:shadow-lg hover:shadow-red-500/20"
+                className="group/btn relative w-full py-3 flex items-center justify-center gap-2 text-red-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold overflow-hidden border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/20 hover:shadow-lg hover:shadow-red-500/20"
             >
                 <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/10 to-red-500/0 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-500" />
                 <Trash2 size={16} className="group-hover/btn:rotate-12 transition-transform duration-300" /> Remove
