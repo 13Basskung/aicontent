@@ -3789,10 +3789,12 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     // Add channel info if available
     if (channelInfo) {
       updateData.channelId = channelInfo.id;
+      updateData.channelName = channelInfo.snippet?.title;
       updateData.name = channelInfo.snippet?.title || updateData.name;
       updateData.avatar = channelInfo.snippet?.thumbnails?.default?.url;
       updateData.followers = parseInt(channelInfo.statistics?.subscriberCount || 0);
       updateData.videoCount = parseInt(channelInfo.statistics?.videoCount || 0);
+      updateData.views = parseInt(channelInfo.statistics?.viewCount || 0);
     }
 
     await accountRef.update(updateData);

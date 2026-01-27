@@ -299,6 +299,32 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
         return (scenes * 5) + (platformsCount * 3) + 15;
     };
 
+    // Filter slots to only show platforms that still exist
+    const filteredSchedule = useMemo(() => {
+        const availableAccountIds = new Set(availableAccounts.map(a => a.id));
+        const result = {};
+        
+        Object.keys(schedule).forEach(day => {
+            result[day] = schedule[day]
+                .map(slot => {
+                    if (!slot.platforms || !Array.isArray(slot.platforms)) return slot;
+                    
+                    // Filter platforms to only include existing accounts
+                    const validPlatforms = slot.platforms.filter(p => availableAccountIds.has(p.accountId));
+                    
+                    return {
+                        ...slot,
+                        platforms: validPlatforms,
+                        platformsCount: validPlatforms.length
+                    };
+                })
+                // Remove slots with no valid platforms
+                .filter(slot => !slot.platforms || slot.platforms.length > 0);
+        });
+        
+        return result;
+    }, [schedule, availableAccounts]);
+
     // Derived Values
     const duration = useMemo(() => calculateDuration(newSlot.scenes, newSlot.platforms.length), [newSlot.scenes, newSlot.platforms]);
     const endTime = useMemo(() => addMinutes(newSlot.start, duration), [newSlot.start, duration]);
@@ -686,17 +712,17 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
                 </div>
 
                 {/* --- NEW TIMELINE VISUALIZER --- */}
-                <TimelineVisualizer slots={schedule[selectedDay]} />
+                <TimelineVisualizer slots={filteredSchedule[selectedDay]} />
 
                 <div className="space-y-3">
-                    {(schedule[selectedDay]?.length || 0) === 0 ? (
+                    {(filteredSchedule[selectedDay]?.length || 0) === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-white/20 border-2 border-dashed border-white/10 rounded-xl">
                             <Clock size={48} className="mb-4 opacity-50" />
                             <p className="text-lg">{t('timeslot.no_slots')}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {schedule[selectedDay]?.map((slot, index) => (
+                            {filteredSchedule[selectedDay]?.map((slot, index) => (
                                 <div key={index} className={twMerge(
                                     "flex flex-col p-5 bg-white/5 rounded-2xl border transition-all shadow-sm relative overflow-hidden group",
                                     editingSlotId === slot._docId

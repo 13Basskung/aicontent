@@ -208,7 +208,7 @@ const AccountCard = ({ account, userId, onRemove, onShowToast, onNavigateSetup }
                     <Settings size={16} /> แก้ไข
                 </button>
                 <button
-                    onClick={() => onRemove(account.id)}
+                    onClick={() => onRemove(account.id, account.name)}
                     className="flex-1 py-3 flex items-center justify-center gap-2 text-red-300 hover:text-white rounded-xl transition-all duration-300 text-sm font-bold border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/20"
                 >
                     <Trash2 size={16} /> Remove
@@ -226,6 +226,7 @@ export default function Platforms() {
     const [accounts, setAccounts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [toast, setToast] = useState({ message: '', isVisible: false });
+    const [confirmDelete, setConfirmDelete] = useState({ show: false, accountId: null, accountName: '' });
 
     // Toast Helper
     const showToast = (message) => {
@@ -280,14 +281,25 @@ export default function Platforms() {
         }
     };
 
-    const handleRemove = async (accountId) => {
-        if (!currentUser) return;
+    const handleRemoveClick = (accountId, accountName) => {
+        setConfirmDelete({ show: true, accountId, accountName });
+    };
+
+    const handleConfirmRemove = async () => {
+        if (!currentUser || !confirmDelete.accountId) return;
         try {
-            await deleteDoc(doc(db, 'users', currentUser.uid, 'accounts', accountId));
-            showToast("Account label removed successfully.");
+            await deleteDoc(doc(db, 'users', currentUser.uid, 'accounts', confirmDelete.accountId));
+            showToast("ลบบัญชีเรียบร้อยแล้ว");
         } catch (error) {
             console.error("Error removing account:", error);
+            showToast("เกิดข้อผิดพลาดในการลบ");
+        } finally {
+            setConfirmDelete({ show: false, accountId: null, accountName: '' });
         }
+    };
+
+    const handleCancelRemove = () => {
+        setConfirmDelete({ show: false, accountId: null, accountName: '' });
     };
 
     const filteredAccounts = activeTab === 'all'
@@ -297,6 +309,39 @@ export default function Platforms() {
     return (
         <div className="p-8 max-w-6xl mx-auto relative">
             <Toast message={toast.message} isVisible={toast.isVisible} />
+
+            {/* Confirmation Modal */}
+            {confirmDelete.show && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={32} className="text-red-400" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">ยืนยันการลบ?</h3>
+                            <p className="text-slate-400 mb-6">
+                                คุณต้องการลบบัญชี <span className="text-white font-bold">"{confirmDelete.accountName}"</span> หรือไม่?
+                                <br />
+                                <span className="text-red-400 text-sm">การดำเนินการนี้ไม่สามารถย้อนกลับได้</span>
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleCancelRemove}
+                                    className="flex-1 py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all"
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={handleConfirmRemove}
+                                    className="flex-1 py-3 px-4 bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Trash2 size={18} /> ลบเลย
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header - Unified Style */}
             <header className="mb-8 relative bg-white/5 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-xl overflow-hidden">
@@ -373,7 +418,7 @@ export default function Platforms() {
                             key={account.id}
                             account={account}
                             userId={currentUser?.uid}
-                            onRemove={handleRemove}
+                            onRemove={handleRemoveClick}
                             onShowToast={showToast}
                             onNavigateSetup={handleNavigateSetup}
                         />
