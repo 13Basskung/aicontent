@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, FolderKanban, Settings, LogIn, LogOut, User, Share2, Wand2, ShoppingBag, Shield, Users, Sparkles, Coins, Video, ChevronDown, Mic, Music, Clock, BookOpen, Download, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Settings, LogIn, LogOut, User, Share2, Wand2, ShoppingBag, Shield, Users, Sparkles, Coins, Video, ChevronDown, Mic, Music, Clock, BookOpen, Download, Menu, X, Sliders } from 'lucide-react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -25,6 +25,7 @@ import MusicCreator from './pages/MusicCreator';
 import Learn from './pages/Learn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import AppSettings from './pages/AppSettings';
 
 const SettingsPage = () => (
   <div className="p-8">
@@ -256,6 +257,7 @@ return (
         <NavItem to="/platforms" icon={Share2} label={t('common.platforms', 'Platforms')} />
         <NavItem to="/payments" icon={Coins} label="Payments" />
         {isAdmin && <NavItem to="/admin" icon={Shield} label="Admin Panel" />}
+        {isAdmin && <NavItem to="/app-settings" icon={Sliders} label="App Settings" />}
         <NavItem to="/settings" icon={Settings} label={t('common.settings')} />
         
         {/* Coming Soon Dropdown */}
@@ -338,6 +340,7 @@ return (
           <Route path="/podcast-creator" element={<PodcastCreator />} />
           <Route path="/music-creator" element={<MusicCreator />} />
           {isAdmin && <Route path="/admin" element={<Admin />} />}
+          {isAdmin && <Route path="/app-settings" element={<AppSettings />} />}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
