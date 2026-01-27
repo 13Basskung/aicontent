@@ -615,7 +615,11 @@ export default function Dashboard() {
                                     facebook: 'blue', instagram: 'pink', youtube: 'red', tiktok: 'cyan'
                                 };
                                 const color = colors[platform] || 'slate';
-                                const percentage = stats.totalAccounts > 0 ? Math.round((data.count / stats.totalAccounts) * 100) : 0;
+                                // ใช้ข้อมูลจริง - คำนวณ % จาก followers (ถ้ามี) หรือจากจำนวน Account
+                                const totalFollowersAll = stats.totalFollowers || 1;
+                                const percentage = stats.totalFollowers > 0 
+                                    ? Math.round((data.followers / totalFollowersAll) * 100) 
+                                    : Math.round((data.count / stats.totalAccounts) * 100);
                                 
                                 return (
                                     <div key={platform} className="group/item p-3 bg-black/20 rounded-xl hover:bg-black/30 transition-all duration-300 cursor-pointer hover:scale-[1.02]">
@@ -626,17 +630,23 @@ export default function Dashboard() {
                                                 </div>
                                                 <span className="text-sm font-semibold text-white capitalize">{platform}</span>
                                             </div>
-                                            <span className="text-sm font-bold text-white">{percentage}%</span>
+                                            <span className="text-xs text-slate-400">{data.count} บัญชี</span>
                                         </div>
                                         <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
                                             <div 
                                                 className={`h-full bg-gradient-to-r from-${color}-600 to-${color}-400 rounded-full transition-all duration-500 group-hover/item:shadow-lg group-hover/item:shadow-${color}-500/30`}
-                                                style={{ width: `${percentage}%` }}
+                                                style={{ width: `${Math.max(percentage, 5)}%` }}
                                             />
                                         </div>
                                         <div className="flex justify-between text-xs text-slate-400 mt-2">
-                                            <span className="flex items-center gap-1"><Users size={12} /> {data.followers?.toLocaleString() || 0}</span>
-                                            <span className="flex items-center gap-1"><Video size={12} /> {data.videos || 0} วีดีโอ</span>
+                                            <span className="flex items-center gap-1">
+                                                <Users size={12} /> 
+                                                {data.followers > 0 ? data.followers.toLocaleString() : 'รอข้อมูล'}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Video size={12} /> 
+                                                {data.videos > 0 ? `${data.videos} วีดีโอ` : 'รอข้อมูล'}
+                                            </span>
                                         </div>
                                     </div>
                                 );
@@ -845,7 +855,7 @@ export default function Dashboard() {
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                 Platform Accounts
                                 {selectedProjectId && (
-                                    <span className="text-sm font-normal text-red-400">
+                                    <span className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 animate-pulse">
                                         → {selectedProjectName}
                                     </span>
                                 )}
@@ -1060,9 +1070,7 @@ export default function Dashboard() {
                                     <td colSpan={10} className="py-12 text-center text-slate-500">
                                         <Share2 size={32} className="mx-auto mb-3 opacity-30" />
                                         <p className="font-medium mb-2">ยังไม่มีบัญชีเชื่อมต่อ</p>
-                                        <Link to="/platforms" className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium hover:bg-green-500/30 transition-all">
-                                            <Share2 size={14} /> เพิ่มแพลตฟอร์ม
-                                        </Link>
+                                        <p className="text-xs text-slate-600">ระบบจะดึงข้อมูลอัตโนมัติจาก Posting Schedule</p>
                                     </td>
                                 </tr>
                             )}
