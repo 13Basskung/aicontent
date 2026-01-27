@@ -3730,6 +3730,7 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     });
 
     // Get channel info
+    console.log('🔍 Fetching YouTube channel info...');
     const channelInfo = await new Promise((resolve, reject) => {
       const options = {
         hostname: 'www.googleapis.com',
@@ -3745,20 +3746,28 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
         let body = '';
         res.on('data', (chunk) => body += chunk);
         res.on('end', () => {
+          console.log(`📡 YouTube API Response Status: ${res.statusCode}`);
+          console.log(`📡 YouTube API Response Body: ${body.substring(0, 500)}`);
           try {
             const parsed = JSON.parse(body);
             if (res.statusCode === 200 && parsed.items?.length > 0) {
+              console.log(`✅ Found channel: ${parsed.items[0].snippet?.title}`);
               resolve(parsed.items[0]);
             } else {
+              console.log(`⚠️ No channel found or API error: ${parsed.error?.message || 'Unknown'}`);
               resolve(null);
             }
           } catch (e) {
+            console.log(`❌ Parse error: ${e.message}`);
             resolve(null);
           }
         });
       });
 
-      req.on('error', () => resolve(null));
+      req.on('error', (e) => {
+        console.log(`❌ Request error: ${e.message}`);
+        resolve(null);
+      });
       req.end();
     });
 
