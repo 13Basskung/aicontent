@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate App Icon</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 40px;
+            background: #1a1a2e;
+            color: white;
+        }
+        canvas { 
+            border: 2px solid #333; 
+            border-radius: 20px;
+            margin: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #7c3aed, #dc2626);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <h1>AI Content App Icon Generator</h1>
+    <canvas id="canvas" width="1024" height="1024"></canvas>
+    <button onclick="downloadIcon()">📥 Download PNG (1024x1024)</button>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Background gradient
+        const bgGradient = ctx.createLinearGradient(0, 0, 1024, 1024);
+        bgGradient.addColorStop(0, '#7c3aed');
+        bgGradient.addColorStop(0.5, '#dc2626');
+        bgGradient.addColorStop(1, '#ea580c');
+        
+        // Draw rounded rectangle background
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 1024, 1024, 200);
+        ctx.fillStyle = bgGradient;
+        ctx.fill();
+        
+        // Draw outer ring
+        ctx.beginPath();
+        ctx.arc(512, 480, 280, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 30;
+        ctx.stroke();
+        
+        // Draw play triangle
+        ctx.beginPath();
+        ctx.moveTo(420, 330);
+        ctx.lineTo(680, 480);
+        ctx.lineTo(420, 630);
+        ctx.closePath();
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        
+        // Draw content lines
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath();
+        ctx.roundRect(260, 260, 100, 18, 9);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath();
+        ctx.roundRect(260, 290, 70, 18, 9);
+        ctx.fill();
+        
+        // Draw AI sparkle
+        ctx.beginPath();
+        ctx.arc(700, 300, 35, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        
+        ctx.strokeStyle = '#7c3aed';
+        ctx.lineWidth = 10;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(700, 265);
+        ctx.lineTo(700, 335);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(665, 300);
+        ctx.lineTo(735, 300);
+        ctx.stroke();
+        
+        // Draw text
+        ctx.font = 'bold 100px Arial Black';
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.textAlign = 'center';
+        ctx.fillText('AI CONTENT', 512, 880);
+        
+        function downloadIcon() {
+            const link = document.createElement('a');
+            link.download = 'aicontent-app-icon-1024x1024.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>

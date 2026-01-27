@@ -4,7 +4,8 @@ import {
     Clock, Users, Video, Eye, Heart, Play, Search, ChevronDown, Filter, ExternalLink, X,
     Facebook, Instagram, Youtube, Loader2, ArrowUpRight, ArrowDownRight, Link2,
     ShoppingBag, Gift, DollarSign, Activity, BarChart3, PieChart, Calendar,
-    CheckCircle, AlertCircle, Zap, Target, Award, Sparkles, CalendarDays, CalendarRange, Download
+    CheckCircle, AlertCircle, Zap, Target, Award, Sparkles, CalendarDays, CalendarRange, Download,
+    MessageCircle, Repeat2
 } from 'lucide-react';
 import GlassDropdown from '../components/ui/GlassDropdown';
 import { useTranslation } from 'react-i18next';
@@ -226,6 +227,8 @@ export default function Dashboard() {
             let totalViews = 0;
             let totalVideos = 0;
             let totalFollowers = 0;
+            let totalComments = 0;
+            let totalShares = 0;
             let hasActiveSlots = slots.length > 0;
             
             accountIds.forEach(accountId => {
@@ -235,6 +238,8 @@ export default function Dashboard() {
                     totalViews += account.views || 0;
                     totalVideos += account.videoCount || 0;
                     totalFollowers += account.followers || 0;
+                    totalComments += account.comments || 0; // Comments from all platforms
+                    totalShares += account.shares || 0; // Shares from all platforms
                 }
             });
             
@@ -244,6 +249,8 @@ export default function Dashboard() {
                 calculatedViews: totalViews,
                 calculatedVideos: totalVideos,
                 calculatedFollowers: totalFollowers,
+                calculatedComments: totalComments,
+                calculatedShares: totalShares,
                 hasActiveSlots,
                 linkedAccountsCount: accountIds.size
             };
@@ -852,6 +859,16 @@ export default function Dashboard() {
                                         <Facebook size={12} /> Followers
                                     </div>
                                 </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <MessageCircle size={12} /> Comments
+                                    </div>
+                                </th>
+                                <th className="text-center py-3 px-4 text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <Repeat2 size={12} /> Shares
+                                    </div>
+                                </th>
                                 <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Scheduled</th>
                                 <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">สถานะ</th>
                                 <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
@@ -860,7 +877,7 @@ export default function Dashboard() {
                         <tbody className="divide-y divide-white/5">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center">
+                                    <td colSpan={10} className="py-12 text-center">
                                         <Loader2 size={32} className="animate-spin mx-auto text-slate-400" />
                                     </td>
                                 </tr>
@@ -908,6 +925,18 @@ export default function Dashboard() {
                                             <div className="flex flex-col items-center">
                                                 <span className="text-white font-bold">{(project.calculatedFollowers || 0).toLocaleString()}</span>
                                                 <span className="text-xs text-green-400">+{project.linkedAccountsCount || 0}</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-white font-bold">{(project.calculatedComments || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-emerald-500">comments</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-white font-bold">{(project.calculatedShares || 0).toLocaleString()}</span>
+                                                <span className="text-xs text-cyan-500">shares</span>
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
