@@ -39,7 +39,7 @@ const PLATFORM_CONFIG = {
             { text: 'ดูที่มุมขวาบนจะมีรูป Avatar YouTube ของคุณ กดที่รูปนั้น แล้วกด "Settings"' },
             { text: 'กดที่ "View advanced settings"' },
             { text: 'Copy Channel ID มาใส่ในช่อง Channel ID (Optional) ด้านล่าง' },
-            { text: 'กดเชื่อมต่อ (รอให้ระบบดึงข้อมูลเสร็จ) แล้วกดบันทึกการตั้งค่า' }
+            { text: 'กดปุ่มเชื่อมต่อ จะมีหน้าต่างเด้งขึ้นมาให้กด Advanced → Go to aicontents.vip (unsafe) → Select all → Continue (รอให้ระบบดึงข้อมูลเสร็จ) การเชื่อมต่อช่องของคุณก็จะสำเร็จ' }
         ]
     },
     facebook: {
@@ -63,9 +63,10 @@ const PLATFORM_CONFIG = {
             { id: 'pageId', label: 'Page ID (Optional)', placeholder: '1234567890', type: 'text', hasHelp: true }
         ],
         pageIdHelp: [
-            { text: 'ไปที่ Facebook Page ของคุณ', link: 'https://www.facebook.com/pages/?category=your_pages' },
-            { text: 'กดที่ชื่อ Page → About → Page transparency' },
-            { text: 'Copy Page ID มาใส่ในช่อง Page ID ด้านบน' }
+            { text: 'กดลิงก์นี้เพื่อไปหน้า Facebook Pages ของคุณ', link: 'https://www.facebook.com/pages/?category=your_pages' },
+            { text: 'เลือก Page ที่ต้องการ → กดที่ About → Page transparency' },
+            { text: 'Copy Page ID มาใส่ในช่อง Page ID (Optional) ด้านล่าง' },
+            { text: 'กดปุ่มเชื่อมต่อ จะมีหน้าต่างเด้งขึ้นมาให้กด Continue with Facebook → เลือก Page ที่ต้องการ → Continue (รอให้ระบบดึงข้อมูลเสร็จ) การเชื่อมต่อ Page ของคุณก็จะสำเร็จ' }
         ]
     },
     instagram: {
@@ -89,10 +90,11 @@ const PLATFORM_CONFIG = {
             { id: 'igUserId', label: 'Instagram User ID (Optional)', placeholder: '17841400000000', type: 'text', hasHelp: true }
         ],
         igUserIdHelp: [
-            { text: 'ไปที่ Instagram → Settings → Account' },
-            { text: 'กดที่ "Switch to Professional Account" (ถ้ายังไม่ได้เปลี่ยน)' },
-            { text: 'เชื่อมต่อกับ Facebook Page ของคุณ' },
-            { text: 'ใช้ Graph API Explorer เพื่อดึง Instagram User ID' }
+            { text: 'Instagram ต้องเป็น Business Account และเชื่อมกับ Facebook Page ก่อน' },
+            { text: 'ไปที่ Instagram App → Settings → Account → Switch to Professional Account' },
+            { text: 'เลือก Business และเชื่อมต่อ Facebook Page ที่สร้างไว้' },
+            { text: 'Instagram User ID จะถูกดึงอัตโนมัติหลังเชื่อมต่อสำเร็จ (ไม่ต้องกรอก)' },
+            { text: 'กดปุ่มเชื่อมต่อ จะมีหน้าต่างเด้งขึ้นมาให้กด Continue with Facebook → เลือก Page/IG → Continue (รอให้ระบบดึงข้อมูลเสร็จ)' }
         ]
     },
     tiktok: {
