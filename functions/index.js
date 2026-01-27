@@ -3694,7 +3694,7 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     }
 
     // Generate new accountId for this connection
-    const accountId = admin.firestore().collection('users').doc(context.auth.uid).collection('platforms').doc('youtube').collection('accounts').doc().id;
+    const accountId = admin.firestore().collection('users').doc(context.auth.uid).collection('accounts').doc().id;
 
     // Exchange code for tokens
     const tokenResponse = await new Promise((resolve, reject) => {
@@ -3784,10 +3784,11 @@ exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
     // Calculate token expiry
     const tokenExpiry = new Date(Date.now() + (tokenResponse.expires_in * 1000));
 
-    // Save account to Firestore under platforms/youtube/accounts
-    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/platforms/youtube/accounts/${accountId}`);
+    // Save account to Firestore
+    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/accounts/${accountId}`);
     
     const updateData = {
+      platform: 'youtube',
       accessToken: tokenResponse.access_token,
       refreshToken: tokenResponse.refresh_token || null,
       tokenExpiry: tokenExpiry,
