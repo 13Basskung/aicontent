@@ -9,23 +9,24 @@ const PLATFORMS = [
     name: 'YouTube',
     icon: Youtube,
     color: 'red',
-    bgGradient: 'from-red-600 to-red-800',
+    bgGradient: 'from-orange-600 to-red-800',
     fields: [
-      { id: 'clientId', label: 'Client ID', placeholder: 'xxxxxxxx.apps.googleusercontent.com', type: 'text' },
-      { id: 'clientSecret', label: 'Client Secret', placeholder: 'GOCSPX-xxxxxxxxxxxxxxxx', type: 'password' }
+      { id: 'clientId', label: 'Client ID', placeholder: 'xxxx.apps.googleusercontent.com', type: 'text' },
+      { id: 'clientSecret', label: 'Client Secret', placeholder: 'GOCSPX-xxxxxxxxx', type: 'password' }
     ],
-    consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-    enableApiUrl: 'https://console.cloud.google.com/apis/library/youtube.googleapis.com',
+    consoleUrl: 'https://console.cloud.google.com/auth/clients?project=content-auto-post',
+    enableApiUrl: 'https://console.cloud.google.com/apis/api/youtube.googleapis.com/metrics?project=content-auto-post',
     docsUrl: 'https://developers.google.com/youtube/v3/getting-started',
     steps: [
-      'ไปที่ Google Cloud Console → เลือกโปรเจค หรือสร้างใหม่',
-      'กด "Enable APIs and Services" → ค้นหา "YouTube Data API v3" → กด Enable',
-      'ไปที่ "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"',
-      'Application type: "Web application"',
-      'Authorized redirect URIs: เพิ่ม https://aicontents.vip/oauth/callback',
-      'กด "Create" → Copy Client ID และ Client Secret มาใส่ด้านล่าง',
-      'กด "Save" เพื่อบันทึกการตั้งค่า'
-    ]
+      'กดปุ่ม "Enable API" เพื่อเปิดใช้งาน YouTube Data API v3 จะมีหน้าต่างเปิดขึ้นมาให้กดคำว่า Enable',
+      'กดปุ่ม "Developer Console" เพื่อสร้าง OAuth 2.0 Client ID จะมีหน้าต่างเปิดขึ้นมา',
+      'กดคำว่า Create client และเลือก Application type เป็น Web Application',
+      'ช่อง Name ใส่ชื่ออะไรก็ได้ ในหัวข้อ Authorized redirect URIs ให้กด +Add URI',
+      'Copy URL ด้านล่างนี้ไปใส่ช่อง URIs 1*',
+      'กด Create จะได้ Client ID และ Client Secret ไปกรอกช่องด้านขวา'
+    ],
+    copyUrl: 'https://aicontents.vip/oauth/callback',
+    copyUrlStep: 4
   },
   {
     id: 'facebook',
@@ -196,7 +197,128 @@ export default function AppSettings() {
                   <span className={`w-6 h-6 rounded-full bg-${currentPlatform.color}-500/20 text-${currentPlatform.color}-400 flex items-center justify-center text-sm font-bold flex-shrink-0`}>
                     {idx + 1}
                   </span>
-                  <span className="text-slate-300 text-sm">{step}</span>
+                  <div className="text-slate-300 text-sm">
+                    {step}
+                    {/* Copy URL Box for YouTube step 5 (idx=4) */}
+                    {selectedPlatform === 'youtube' && idx === 4 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip/oauth/callback
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip/oauth/callback')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 6 (idx=5) - Site URL */}
+                    {selectedPlatform === 'facebook' && idx === 5 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 8 (idx=7) - Redirect URI */}
+                    {selectedPlatform === 'facebook' && idx === 7 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip/oauth/callback
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip/oauth/callback')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 11 (idx=10) - App Domain */}
+                    {selectedPlatform === 'facebook' && idx === 10 && (
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                          <code className="text-green-400 text-xs flex-1 break-all">
+                            https://aicontents.vip
+                          </code>
+                          <button 
+                            onClick={() => copyToClipboard('https://aicontents.vip')}
+                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                            title="คัดลอก"
+                          >
+                            <Copy size={12} className="text-slate-400" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                          <code className="text-green-400 text-xs flex-1 break-all">
+                            aicontents.vip
+                          </code>
+                          <button 
+                            onClick={() => copyToClipboard('aicontents.vip')}
+                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                            title="คัดลอก"
+                          >
+                            <Copy size={12} className="text-slate-400" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 12 (idx=11) - Privacy Policy */}
+                    {selectedPlatform === 'facebook' && idx === 11 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip/privacy-policy
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip/privacy-policy')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 13 (idx=12) - Terms of Service */}
+                    {selectedPlatform === 'facebook' && idx === 12 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip/terms-of-service
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip/terms-of-service')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Copy URL Box for Facebook step 14 (idx=13) - Data Deletion */}
+                    {selectedPlatform === 'facebook' && idx === 13 && (
+                      <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                        <code className="text-green-400 text-xs flex-1 break-all">
+                          https://aicontents.vip/data-deletion
+                        </code>
+                        <button 
+                          onClick={() => copyToClipboard('https://aicontents.vip/data-deletion')}
+                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                          title="คัดลอก"
+                        >
+                          <Copy size={12} className="text-slate-400" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ol>
