@@ -23,6 +23,8 @@ import Payments from './pages/Payments';
 import PodcastCreator from './pages/PodcastCreator';
 import MusicCreator from './pages/MusicCreator';
 import Learn from './pages/Learn';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 const SettingsPage = () => (
   <div className="p-8">
@@ -172,6 +174,19 @@ if (loading) {
   );
 }
 
+// Public routes (accessible without login)
+const location = window.location.pathname;
+if (!user && (location === '/privacy-policy' || location === '/terms-of-service')) {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+      </Routes>
+    </Router>
+  );
+}
+
 // Show landing page if not logged in
 if (!user) {
   return <LandingPage />;
@@ -317,6 +332,8 @@ return (
           {isAdmin && <Route path="/admin" element={<Admin />} />}
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
