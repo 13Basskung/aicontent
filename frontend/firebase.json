@@ -1,6 +1,6 @@
 ﻿{
   "hosting": {
-    "site": "aicontents-vip",
+    "site": "aicreators-vip",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{"source": "**", "destination": "/index.html"}]
