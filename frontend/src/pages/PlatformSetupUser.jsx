@@ -7,6 +7,7 @@ import {
 import { db, auth } from '../firebase';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Platform Configuration (User View - No API Credentials)
 const PLATFORM_CONFIG = {
@@ -116,6 +117,12 @@ export default function PlatformSetupUser() {
         setLoading(true);
 
         try {
+            // Get App Settings from Firestore via Cloud Function
+            const functions = getFunctions();
+            const getAppSettings = httpsCallable(functions, 'getAppSettings');
+            const result = await getAppSettings({ platform });
+            const credentials = result.data;
+
             // Redirect to OAuth
             const redirectUri = `${window.location.origin}/oauth/callback`;
             const state = JSON.stringify({
@@ -129,7 +136,7 @@ export default function PlatformSetupUser() {
             switch (platform) {
                 case 'youtube':
                     authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-                        `client_id=YOUR_CLIENT_ID&` +
+                        `client_id=${credentials.clientId}&` +
                         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                         `response_type=code&` +
                         `scope=${encodeURIComponent('https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.upload')}&` +
@@ -140,7 +147,7 @@ export default function PlatformSetupUser() {
 
                 case 'facebook':
                     authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
-                        `client_id=YOUR_APP_ID&` +
+                        `client_id=${credentials.appId}&` +
                         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                         `scope=${encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts')}&` +
                         `state=${encodeURIComponent(state)}`;
@@ -148,7 +155,7 @@ export default function PlatformSetupUser() {
 
                 case 'instagram':
                     authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
-                        `client_id=YOUR_APP_ID&` +
+                        `client_id=${credentials.appId}&` +
                         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                         `scope=${encodeURIComponent('instagram_basic,instagram_content_publish,pages_show_list')}&` +
                         `state=${encodeURIComponent(state)}`;
@@ -156,7 +163,7 @@ export default function PlatformSetupUser() {
 
                 case 'tiktok':
                     authUrl = `https://www.tiktok.com/auth/authorize/?` +
-                        `client_key=YOUR_CLIENT_KEY&` +
+                        `client_key=${credentials.clientKey}&` +
                         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
                         `response_type=code&` +
                         `scope=user.info.basic,video.list,video.upload&` +
@@ -168,7 +175,7 @@ export default function PlatformSetupUser() {
 
         } catch (error) {
             console.error('Connection error:', error);
-            alert('เกิดข้อผิดพลาด: ' + error.message);
+            alert('เกิดข้อผิดพลาด: ' + (error.message || 'กรุณาติดต่อ Admin เพื่อตั้งค่า API Credentials'));
             setLoading(false);
         }
     };
