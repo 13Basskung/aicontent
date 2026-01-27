@@ -3894,3 +3894,8 @@ exports.youtubeRefreshToken = functions.https.onCall(async (data, context) => {
   }
 });
 
+// ============================================
+// DATA DELETION CALLBACK: Facebook Data Deletion
+// ============================================
+const dataDeletionModule = require('./dataDeletion');
+exports.dataDeletion = dataDeletionModule.dataDeletion;
