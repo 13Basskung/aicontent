@@ -245,8 +245,21 @@ export default function Dashboard() {
         let filtered;
         
         // ถ้าเลือก Project ให้แสดงเฉพาะ platforms จาก Posting Schedule
+        // แต่ต้องดึงข้อมูลจริงจาก accounts มา merge
         if (selectedProjectId) {
-            filtered = projectPlatforms.length > 0 ? [...projectPlatforms] : [];
+            if (projectPlatforms.length > 0) {
+                // Map projectPlatforms กับข้อมูลจริงจาก accounts
+                filtered = projectPlatforms.map(pp => {
+                    // หา account จริงจาก accounts array
+                    const realAccount = accounts.find(acc => acc.id === pp.id);
+                    if (realAccount) {
+                        return { ...realAccount, fromSlot: true };
+                    }
+                    return pp;
+                }).filter(acc => accounts.some(a => a.id === acc.id)); // กรองเฉพาะที่มีอยู่จริง
+            } else {
+                filtered = [];
+            }
         } else {
             filtered = [...accounts];
         }
@@ -1042,28 +1055,28 @@ export default function Dashboard() {
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                             <div className="flex items-center justify-center gap-1">
-                                                {account.platform?.toLowerCase() === 'youtube' && account.channelUrl && (
-                                                    <a href={account.channelUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-red-500/20 rounded-lg transition-all" title="YouTube">
+                                                {account.platform?.toLowerCase() === 'youtube' && account.channelId && (
+                                                    <a href={`https://www.youtube.com/channel/${account.channelId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-red-500/20 rounded-lg transition-all" title="ไปยัง YouTube Channel">
                                                         <Youtube size={14} className="text-red-400" />
                                                     </a>
                                                 )}
-                                                {account.platform?.toLowerCase() === 'facebook' && account.pageUrl && (
-                                                    <a href={account.pageUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-blue-500/20 rounded-lg transition-all" title="Facebook">
+                                                {account.platform?.toLowerCase() === 'facebook' && account.pageId && (
+                                                    <a href={`https://www.facebook.com/${account.pageId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-blue-500/20 rounded-lg transition-all" title="ไปยัง Facebook Page">
                                                         <Facebook size={14} className="text-blue-400" />
                                                     </a>
                                                 )}
-                                                {account.platform?.toLowerCase() === 'instagram' && account.profileUrl && (
-                                                    <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-pink-500/20 rounded-lg transition-all" title="Instagram">
+                                                {account.platform?.toLowerCase() === 'instagram' && account.igUserId && (
+                                                    <a href={`https://www.instagram.com/${account.igUsername || account.igUserId}`} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-pink-500/20 rounded-lg transition-all" title="ไปยัง Instagram">
                                                         <Instagram size={14} className="text-pink-400" />
                                                     </a>
                                                 )}
-                                                {account.platform?.toLowerCase() === 'tiktok' && account.profileUrl && (
-                                                    <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-cyan-500/20 rounded-lg transition-all" title="TikTok">
+                                                {account.platform?.toLowerCase() === 'tiktok' && account.tiktokUsername && (
+                                                    <a href={`https://www.tiktok.com/@${account.tiktokUsername}`} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-cyan-500/20 rounded-lg transition-all" title="ไปยัง TikTok">
                                                         <Video size={14} className="text-cyan-400" />
                                                     </a>
                                                 )}
-                                                {/* Default link icon if no specific URL */}
-                                                {!account.channelUrl && !account.pageUrl && !account.profileUrl && (
+                                                {/* Default - no link available */}
+                                                {!account.channelId && !account.pageId && !account.igUserId && !account.tiktokUsername && (
                                                     <span className="text-slate-600 text-xs">-</span>
                                                 )}
                                             </div>

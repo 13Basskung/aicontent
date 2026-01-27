@@ -698,12 +698,12 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
                                 )}
                             >
                                 {DAY_NAMES_TH[day]}
-                                {(schedule[day]?.length || 0) > 0 && (
+                                {(filteredSchedule[day]?.length || 0) > 0 && (
                                     <span className={twMerge(
                                         "ml-2 px-1.5 py-0.5 text-xs rounded-full",
                                         selectedDay === day ? "bg-red-500 text-white" : "bg-white/10 text-gray-400"
                                     )}>
-                                        {schedule[day].length}
+                                        {filteredSchedule[day].length}
                                     </span>
                                 )}
                             </button>
