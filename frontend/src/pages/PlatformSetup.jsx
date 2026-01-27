@@ -7,6 +7,7 @@ import {
 import { db, auth } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Platform Configuration
 const PLATFORM_CONFIG = {
@@ -103,6 +104,7 @@ export default function PlatformSetup() {
     const [account, setAccount] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [testing, setTesting] = useState(false);
     const [formData, setFormData] = useState({});
     const [toast, setToast] = useState({ message: '', type: '', visible: false });
     
@@ -158,8 +160,50 @@ export default function PlatformSetup() {
     };
 
     const handleTestConnection = async () => {
-        showToast('กำลังทดสอบการเชื่อมต่อ... (Coming Soon)', 'info');
-        // TODO: Implement actual OAuth test
+        if (!currentUser || !accountId) return;
+        
+        // Validate credentials first
+        if (platform === 'youtube') {
+            if (!formData.clientId || !formData.clientSecret) {
+                showToast('กรุณากรอก Client ID และ Client Secret ก่อน', 'error');
+                return;
+            }
+        }
+
+        setTesting(true);
+        try {
+            // Save credentials first
+            const accountRef = doc(db, 'users', currentUser.uid, 'accounts', accountId);
+            await updateDoc(accountRef, {
+                ...formData,
+                setupComplete: true,
+                updatedAt: new Date()
+            });
+
+            // Start OAuth flow
+            const functions = getFunctions();
+            const youtubeAuthStart = httpsCallable(functions, 'youtubeAuthStart');
+            
+            const redirectUri = `${window.location.origin}/oauth/callback`;
+            
+            const result = await youtubeAuthStart({
+                accountId,
+                clientId: formData.clientId,
+                redirectUri
+            });
+
+            if (result.data.authUrl) {
+                // Redirect to Google OAuth
+                window.location.href = result.data.authUrl;
+            } else {
+                throw new Error('Failed to get auth URL');
+            }
+
+        } catch (error) {
+            console.error('OAuth start error:', error);
+            showToast(error.message || 'เกิดข้อผิดพลาดในการเริ่ม OAuth', 'error');
+            setTesting(false);
+        }
     };
 
     const copyToClipboard = (text) => {
@@ -257,10 +301,10 @@ export default function PlatformSetup() {
                             <p className="text-slate-400 text-xs mb-3">Redirect URI (คัดลอกไปใส่ใน Developer Console):</p>
                             <div className="flex items-center gap-2 bg-black/30 rounded-lg p-3">
                                 <code className="text-green-400 text-xs flex-1 break-all">
-                                    {window.location.origin}/api/auth/{platform}/callback
+                                    {window.location.origin}/oauth/callback
                                 </code>
                                 <button 
-                                    onClick={() => copyToClipboard(`${window.location.origin}/api/auth/${platform}/callback`)}
+                                    onClick={() => copyToClipboard(`${window.location.origin}/oauth/callback`)}
                                     className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                                 >
                                     <Copy size={14} className="text-slate-400" />
@@ -321,9 +365,11 @@ export default function PlatformSetup() {
                             </button>
                             <button
                                 onClick={handleTestConnection}
-                                className="px-4 py-3 border border-white/20 hover:bg-white/10 text-white rounded-xl transition-all flex items-center gap-2"
+                                disabled={testing}
+                                className="px-4 py-3 border border-white/20 hover:bg-white/10 text-white rounded-xl transition-all flex items-center gap-2 disabled:opacity-50"
                             >
-                                <RefreshCw size={16} /> ทดสอบ
+                                {testing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                                {testing ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ'}
                             </button>
                         </div>
                     </div>

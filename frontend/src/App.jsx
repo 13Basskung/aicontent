@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Platforms from './pages/Platforms';
 import PlatformSetup from './pages/PlatformSetup';
+import OAuthCallback from './pages/OAuthCallback';
 import Admin from './pages/Admin';
 
 import ModeCreator from './pages/ModeCreator';
@@ -305,6 +306,7 @@ return (
           <Route path="/projects" element={<Projects />} />
           <Route path="/platforms" element={<Platforms />} />
           <Route path="/platforms/setup/:platform/:accountId" element={<PlatformSetup />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route path="/mode-creator" element={<ModeCreator />} />
           <Route path="/expander" element={<ExpanderCreator />} />
           <Route path="/characters" element={<Characters />} />

@@ -3621,3 +3621,265 @@ exports.aiBlockEditor = functions
     }
   });
 
+// ============================================
+// YOUTUBE OAUTH API
+// ============================================
+
+// YouTube OAuth: Start Authorization
+exports.youtubeAuthStart = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { accountId, clientId, redirectUri } = data;
+  
+  if (!accountId || !clientId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing accountId or clientId');
+  }
+
+  // Store state for security (accountId + random string)
+  const state = Buffer.from(JSON.stringify({
+    accountId,
+    uid: context.auth.uid,
+    timestamp: Date.now()
+  })).toString('base64');
+
+  // YouTube OAuth scopes
+  const scopes = [
+    'https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.force-ssl'
+  ].join(' ');
+
+  // Build OAuth URL
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=${encodeURIComponent(scopes)}` +
+    `&access_type=offline` +
+    `&prompt=consent` +
+    `&state=${encodeURIComponent(state)}`;
+
+  return { authUrl, state };
+});
+
+// YouTube OAuth: Exchange Code for Token
+exports.youtubeAuthCallback = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { code, state, clientId, clientSecret, redirectUri } = data;
+
+  if (!code || !state || !clientId || !clientSecret) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required parameters');
+  }
+
+  try {
+    // Decode and verify state
+    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+    
+    if (stateData.uid !== context.auth.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Invalid state');
+    }
+
+    const accountId = stateData.accountId;
+
+    // Exchange code for tokens
+    const tokenResponse = await new Promise((resolve, reject) => {
+      const postData = new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      }).toString();
+
+      const options = {
+        hostname: 'oauth2.googleapis.com',
+        port: 443,
+        path: '/token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            if (res.statusCode === 200) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed.error_description || parsed.error || 'Token exchange failed'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse token response'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+
+    // Get channel info
+    const channelInfo = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'www.googleapis.com',
+        port: 443,
+        path: '/youtube/v3/channels?part=snippet,statistics&mine=true',
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenResponse.access_token}`
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            if (res.statusCode === 200 && parsed.items?.length > 0) {
+              resolve(parsed.items[0]);
+            } else {
+              resolve(null);
+            }
+          } catch (e) {
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', () => resolve(null));
+      req.end();
+    });
+
+    // Calculate token expiry
+    const tokenExpiry = new Date(Date.now() + (tokenResponse.expires_in * 1000));
+
+    // Update account in Firestore
+    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/accounts/${accountId}`);
+    
+    const updateData = {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token || null,
+      tokenExpiry: tokenExpiry,
+      connectionStatus: 'connected',
+      connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Add channel info if available
+    if (channelInfo) {
+      updateData.channelId = channelInfo.id;
+      updateData.name = channelInfo.snippet?.title || updateData.name;
+      updateData.avatar = channelInfo.snippet?.thumbnails?.default?.url;
+      updateData.followers = parseInt(channelInfo.statistics?.subscriberCount || 0);
+      updateData.videoCount = parseInt(channelInfo.statistics?.videoCount || 0);
+    }
+
+    await accountRef.update(updateData);
+
+    return {
+      success: true,
+      channelId: channelInfo?.id,
+      channelName: channelInfo?.snippet?.title,
+      subscribers: channelInfo?.statistics?.subscriberCount
+    };
+
+  } catch (error) {
+    console.error('YouTube OAuth callback error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// YouTube: Refresh Access Token
+exports.youtubeRefreshToken = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { accountId } = data;
+
+  try {
+    // Get account data
+    const accountRef = admin.firestore().doc(`users/${context.auth.uid}/accounts/${accountId}`);
+    const accountDoc = await accountRef.get();
+
+    if (!accountDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Account not found');
+    }
+
+    const account = accountDoc.data();
+
+    if (!account.refreshToken || !account.clientId || !account.clientSecret) {
+      throw new functions.https.HttpsError('failed-precondition', 'Missing refresh token or credentials');
+    }
+
+    // Refresh token
+    const tokenResponse = await new Promise((resolve, reject) => {
+      const postData = new URLSearchParams({
+        refresh_token: account.refreshToken,
+        client_id: account.clientId,
+        client_secret: account.clientSecret,
+        grant_type: 'refresh_token'
+      }).toString();
+
+      const options = {
+        hostname: 'oauth2.googleapis.com',
+        port: 443,
+        path: '/token',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            if (res.statusCode === 200) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed.error_description || 'Token refresh failed'));
+            }
+          } catch (e) {
+            reject(new Error('Failed to parse token response'));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+
+    // Update token in Firestore
+    const tokenExpiry = new Date(Date.now() + (tokenResponse.expires_in * 1000));
+
+    await accountRef.update({
+      accessToken: tokenResponse.access_token,
+      tokenExpiry: tokenExpiry,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true, expiresIn: tokenResponse.expires_in };
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
