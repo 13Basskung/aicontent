@@ -84,6 +84,7 @@ export default function Dashboard() {
     const [expanders, setExpanders] = useState([]);
     const [transactions, setTransactions] = useState([]);
     const [contentQueue, setContentQueue] = useState([]);
+    const [projectSlots, setProjectSlots] = useState([]); // Slots ของ Project ที่เลือก
     
     // Filter States
     const [platformFilter, setPlatformFilter] = useState('all');
@@ -159,6 +160,25 @@ export default function Dashboard() {
         return () => unsubscribes.forEach(unsub => unsub());
     }, [currentUser]);
     
+    // Fetch slots when project is selected
+    useEffect(() => {
+        if (!currentUser || !selectedProjectId) {
+            setProjectSlots([]);
+            return;
+        }
+        
+        const slotsRef = collection(db, 'users', currentUser.uid, 'projects', selectedProjectId, 'slots');
+        const unsubscribe = onSnapshot(slotsRef, (snapshot) => {
+            const slots = [];
+            snapshot.forEach(doc => {
+                slots.push({ id: doc.id, ...doc.data() });
+            });
+            setProjectSlots(slots);
+        });
+        
+        return () => unsubscribe();
+    }, [currentUser, selectedProjectId]);
+    
     // Computed Statistics
     const stats = useMemo(() => {
         const totalAccounts = accounts.length;
@@ -194,19 +214,41 @@ export default function Dashboard() {
         };
     }, [accounts, projects, expanders, contentQueue]);
     
+    // ดึง platforms จาก Posting Schedule slots ของ Project ที่เลือก
+    const projectPlatforms = useMemo(() => {
+        if (!selectedProjectId || projectSlots.length === 0) return [];
+        
+        // รวบรวม platforms จากทุก slots
+        const platformMap = new Map();
+        projectSlots.forEach(slot => {
+            if (slot.platforms && Array.isArray(slot.platforms)) {
+                slot.platforms.forEach(p => {
+                    // ใช้ accountId เป็น key เพื่อไม่ให้ซ้ำ
+                    if (p.accountId && !platformMap.has(p.accountId)) {
+                        platformMap.set(p.accountId, {
+                            id: p.accountId,
+                            name: p.name || 'Unknown',
+                            platform: p.platformId,
+                            avatar: p.avatar,
+                            fromSlot: true // บอกว่ามาจาก Posting Schedule
+                        });
+                    }
+                });
+            }
+        });
+        
+        return Array.from(platformMap.values());
+    }, [selectedProjectId, projectSlots]);
+    
     // Filtered Accounts for Table
     const filteredAccounts = useMemo(() => {
-        let filtered = [...accounts];
+        let filtered;
         
-        // Filter by selected project
+        // ถ้าเลือก Project ให้แสดงเฉพาะ platforms จาก Posting Schedule
         if (selectedProjectId) {
-            const selectedProject = projects.find(p => p.id === selectedProjectId);
-            if (selectedProject?.linkedAccounts?.length > 0) {
-                filtered = filtered.filter(acc => selectedProject.linkedAccounts.includes(acc.id));
-            } else {
-                // ถ้า Project ไม่มี linkedAccounts ให้แสดงทั้งหมด (หรือไม่แสดงเลย)
-                filtered = [];
-            }
+            filtered = projectPlatforms.length > 0 ? [...projectPlatforms] : [];
+        } else {
+            filtered = [...accounts];
         }
         
         if (platformFilter !== 'all') {
@@ -222,7 +264,7 @@ export default function Dashboard() {
         }
         
         return filtered;
-    }, [accounts, projects, platformFilter, searchQuery, selectedProjectId]);
+    }, [accounts, projectPlatforms, platformFilter, searchQuery, selectedProjectId]);
     
     // Activity Badge Style
     const getActivityBadge = (type) => {
@@ -1069,8 +1111,17 @@ export default function Dashboard() {
                                 <tr>
                                     <td colSpan={10} className="py-12 text-center text-slate-500">
                                         <Share2 size={32} className="mx-auto mb-3 opacity-30" />
-                                        <p className="font-medium mb-2">ยังไม่มีบัญชีเชื่อมต่อ</p>
-                                        <p className="text-xs text-slate-600">ระบบจะดึงข้อมูลอัตโนมัติจาก Posting Schedule</p>
+                                        {selectedProjectId ? (
+                                            <>
+                                                <p className="font-medium mb-2">ไม่พบ Platform ใน Posting Schedule</p>
+                                                <p className="text-xs text-slate-600">กรุณาเพิ่ม Time Slot และเลือก Platform ในหน้า Project</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="font-medium mb-2">ยังไม่มีบัญชีเชื่อมต่อ</p>
+                                                <p className="text-xs text-slate-600">คลิกชื่อ Project ด้านบนเพื่อดู Platform ที่ตั้งค่าไว้</p>
+                                            </>
+                                        )}
                                     </td>
                                 </tr>
                             )}
