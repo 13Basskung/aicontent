@@ -1,6 +1,7 @@
 # 📊 Dashboard Upgrade Task - Content Auto Post
 
 **สร้างเมื่อ:** 27 มกราคม 2568  
+**อัปเดตล่าสุด:** 27 มกราคม 2568 (19:45)  
 **สถานะ:** กำลังดำเนินการ  
 **ไฟล์หลัก:** `frontend/src/pages/Dashboard.jsx`
 
@@ -23,35 +24,20 @@
 - [x] ปุ่ม View, Play, Share สำหรับแต่ละ Project
 - [x] ปุ่ม "New Project"
 
-### 4. Platform Accounts Table
+### 4. Platform Accounts Table (อัปเดต 27 ม.ค. 19:45)
 - [x] คอลัมน์: บัญชี, แพลตฟอร์ม, ผู้ติดตาม, วันนี้, วีดีโอ, สถานะ
 - [x] Filter ตาม Platform
+- [x] **เพิ่มคอลัมน์ Views** - แสดงยอดวิวแต่ละ Account (สี cyan)
+- [x] **เพิ่มคอลัมน์ Last Scheduled** - แสดงวันที่ Schedule ล่าสุด (สี orange)
+- [x] **เพิ่มคอลัมน์ รอโพสต์** - แสดงจำนวน Pending Posts (สี yellow)
+- [x] **เพิ่มคอลัมน์ Links** - แสดงไอคอน Platform (YouTube, Facebook, IG, TikTok) พร้อมลิงก์ (สี purple)
+- [x] **เพิ่ม Dropdown Icon** - ทุกคอลัมน์มี ChevronDown สำหรับ Sort
 
 ---
 
-## 🔧 สิ่งที่ต้องทำต่อ (พรุ่งนี้)
+## 🔧 สิ่งที่ต้องทำต่อ
 
-### Phase 1.1: เพิ่มคอลัมน์ Views ใน Platform Accounts Table
-**ไฟล์:** `frontend/src/pages/Dashboard.jsx`
-**รายละเอียด:**
-- เพิ่มคอลัมน์ "Views" ในตาราง Platform Accounts
-- แสดงยอด Views ของแต่ละ Account
-- ตำแหน่ง: หลังคอลัมน์ "ผู้ติดตาม" หรือก่อน "สถานะ"
-
-**โค้ดที่ต้องแก้ไข (บรรทัดประมาณ 848-856):**
-```jsx
-<thead className="bg-slate-800/50">
-    <tr>
-        <th>บัญชี</th>
-        <th>แพลตฟอร์ม</th>
-        <th>ผู้ติดตาม</th>
-        <th>วันนี้</th>
-        <th>วีดีโอ</th>
-        <th>Views</th>  <!-- เพิ่มใหม่ -->
-        <th>สถานะ</th>
-    </tr>
-</thead>
-```
+### ✅ Phase 1.1: เพิ่มคอลัมน์ Views - ทำเสร็จแล้ว!
 
 ---
 
@@ -73,7 +59,6 @@ const [selectedProjectName, setSelectedProjectName] = useState('');
 // Filter Logic
 const filteredAccountsByProject = useMemo(() => {
     if (!selectedProjectId) return filteredAccounts;
-    // Filter accounts ที่ผูกกับ project นี้
     return filteredAccounts.filter(acc => 
         acc.projectIds?.includes(selectedProjectId)
     );
@@ -89,6 +74,40 @@ const filteredAccountsByProject = useMemo(() => {
 ```
 
 **หมายเหตุ:** ต้องตรวจสอบโครงสร้างข้อมูลว่า Account มี field `projectIds` หรือไม่ ถ้าไม่มีต้องเพิ่มใน Firestore Schema
+
+---
+
+### Phase 1.3: ทำ Dropdown Sorting ให้ใช้งานได้จริง
+**ไฟล์:** `frontend/src/pages/Dashboard.jsx`
+**รายละเอียด:**
+1. เพิ่ม State: `sortColumn`, `sortDirection`
+2. เมื่อคลิก Header → Toggle Sort Direction
+3. Sort ข้อมูลตาม Column ที่เลือก
+
+**โค้ดที่ต้องเพิ่ม:**
+```jsx
+const [sortColumn, setSortColumn] = useState(null);
+const [sortDirection, setSortDirection] = useState('desc');
+
+const handleSort = (column) => {
+    if (sortColumn === column) {
+        setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+        setSortColumn(column);
+        setSortDirection('desc');
+    }
+};
+
+// Sort Logic
+const sortedAccounts = useMemo(() => {
+    if (!sortColumn) return filteredAccounts;
+    return [...filteredAccounts].sort((a, b) => {
+        const aVal = a[sortColumn] || 0;
+        const bVal = b[sortColumn] || 0;
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+}, [filteredAccounts, sortColumn, sortDirection]);
+```
 
 ---
 
