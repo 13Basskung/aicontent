@@ -2430,7 +2430,8 @@ const AppSettingsTab = ({ selectedPlatform, setSelectedPlatform, appSettings, se
                 { id: 'appSecret', label: 'App Secret', placeholder: 'xxxxxxxxxxxxxxxx', type: 'password' }
             ],
             consoleUrl: 'https://developers.facebook.com/apps/create/',
-            enableApiUrl: 'https://developers.facebook.com/apps/',
+            enableApiUrl: 'https://developers.facebook.com/apps/1428394719026952/settings/basic/',
+            enableApiLabel: 'Setting App',
             docsUrl: 'https://developers.facebook.com/docs/facebook-login/',
             steps: [
                 'กดปุ่ม Developer Console ด้านล่าง',
@@ -2632,7 +2633,7 @@ const AppSettingsTab = ({ selectedPlatform, setSelectedPlatform, appSettings, se
                             <a href={currentPlatform.enableApiUrl} target="_blank" rel="noopener noreferrer"
                                 className="flex-1 flex flex-col items-center justify-center gap-2 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl transition-all text-green-400 hover:text-green-300">
                                 <CheckCircle size={20} />
-                                <span className="text-xs font-semibold">Enable API</span>
+                                <span className="text-xs font-semibold">{currentPlatform.enableApiLabel || 'Enable API'}</span>
                             </a>
                         )}
                         <a href={currentPlatform.consoleUrl} target="_blank" rel="noopener noreferrer"
