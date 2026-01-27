@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Share2, Plus, Trash2, CheckCircle, AlertCircle, Facebook, Instagram, Youtube, Video, Pencil, Check, X, Settings, ExternalLink, Clock, Link2 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { db, auth } from '../firebase';
@@ -56,7 +57,7 @@ const Toast = ({ message, isVisible }) => {
     );
 };
 
-const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
+const AccountCard = ({ account, userId, onRemove, onShowToast, onNavigateSetup }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempName, setTempName] = useState(account.name);
     const [isSaving, setIsSaving] = useState(false);
@@ -83,12 +84,9 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
     };
     
     const handleConnect = () => {
-        // TODO: Implement OAuth flow for each platform
+        // ไปหน้าตั้งค่า OAuth โดยตรง
         const platform = account.platform?.toLowerCase();
-        onShowToast(`กำลังเปิดหน้าเชื่อมต่อ ${platformInfo.name}... (Coming Soon)`);
-        
-        // ตัวอย่าง: เปิด OAuth URL
-        // window.open(`/api/auth/${platform}?accountId=${account.id}`, '_blank');
+        onNavigateSetup(platform, account.id);
     };
 
     return (
@@ -214,6 +212,7 @@ const AccountCard = ({ account, userId, onRemove, onShowToast }) => {
 
 export default function Platforms() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('all');
     const [currentUser, setCurrentUser] = useState(null);
     const [accounts, setAccounts] = useState([]);
@@ -224,6 +223,11 @@ export default function Platforms() {
     const showToast = (message) => {
         setToast({ message, isVisible: true });
         setTimeout(() => setToast({ message: '', isVisible: false }), 3000);
+    };
+    
+    // Navigate to Setup page
+    const handleNavigateSetup = (platform, accountId) => {
+        navigate(`/platforms/setup/${platform}/${accountId}`);
     };
 
     useEffect(() => {
@@ -363,6 +367,7 @@ export default function Platforms() {
                             userId={currentUser?.uid}
                             onRemove={handleRemove}
                             onShowToast={showToast}
+                            onNavigateSetup={handleNavigateSetup}
                         />
                     ))
                 )}
