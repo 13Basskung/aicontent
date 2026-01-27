@@ -974,9 +974,41 @@ export default function Dashboard() {
                                             </div>
                                         </td>
                                         <td className="py-3 px-4 text-center">
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
-                                                <CheckCircle size={10} /> Connected
-                                            </span>
+                                            {/* สถานะตามเงื่อนไขจริง */}
+                                            {(() => {
+                                                // ตรวจสอบว่ามี Token/ID จริงหรือไม่
+                                                const hasRealConnection = account.accessToken || account.channelId || account.pageId || account.igUserId;
+                                                const isExpired = account.tokenExpiry && new Date(account.tokenExpiry.seconds ? account.tokenExpiry.seconds * 1000 : account.tokenExpiry) < new Date();
+                                                const hasError = account.connectionError;
+                                                
+                                                if (hasError) {
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 text-xs font-medium rounded-full">
+                                                            <AlertCircle size={10} /> Error
+                                                        </span>
+                                                    );
+                                                }
+                                                if (isExpired) {
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 text-xs font-medium rounded-full">
+                                                            <Clock size={10} /> Expired
+                                                        </span>
+                                                    );
+                                                }
+                                                if (hasRealConnection) {
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                                                            <CheckCircle size={10} /> Connected
+                                                        </span>
+                                                    );
+                                                }
+                                                // ไม่มี Token = ยังไม่ได้เชื่อมต่อจริง แค่สร้าง Label
+                                                return (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
+                                                        <AlertCircle size={10} /> Pending
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 ))
