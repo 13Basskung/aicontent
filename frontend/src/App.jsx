@@ -108,6 +108,7 @@ function SubNavItem({ to, icon: Icon, label }) {
 
 function AppContent() {
   const { t } = useTranslation();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -162,35 +163,42 @@ function AppContent() {
     }
   };
 
-  // Show loading spinner while checking auth
-if (loading) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-red-900 via-slate-900 to-slate-950 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-white text-lg">Loading...</p>
-      </div>
-    </div>
-  );
-}
-
-// Public routes (accessible without login)
-const location = window.location.pathname;
-if (!user && (location === '/privacy-policy' || location === '/terms-of-service')) {
-  return (
-    <Router>
+  // Public routes (accessible without login)
+  if (!user && (location.pathname === '/privacy-policy' || location.pathname === '/terms-of-service')) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-red-900 via-slate-900 to-slate-950 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white text-lg">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+    return (
       <Routes>
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
       </Routes>
-    </Router>
-  );
-}
+    );
+  }
 
-// Show landing page if not logged in
-if (!user) {
-  return <LandingPage />;
-}
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-900 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show landing page if not logged in
+  if (!user) {
+    return <LandingPage />;
+  }
 
 // Show main app if logged in
 return (
