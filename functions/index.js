@@ -779,23 +779,17 @@ async function expandScenesWithTopic(params) {
     ? characters.map(c => `- ${c.name}: ${c.visualDescription || c.description || 'N/A'}`).join('\n')
     : 'No specific characters defined';
 
-  // 🎬 DIALOGUE DENSITY MAPPING (1-5 ประโยคต่อฉาก)
+  // 🎬 DIALOGUE DENSITY MAPPING (1-5 ประโยค, สูงสุด 3.5x)
   const densityMapping = {
     1: { speed: '1.0x', style: 'หนัง/ดราม่า', introEffect: '3-4 วินาที', mood: 'Dramatic, Thoughtful', camera: 'Slow pan, Wide shots' },
     2: { speed: '1.0x', style: 'เล่าเรื่องสมจริง', introEffect: '2-3 วินาที', mood: 'Engaging, Storytelling', camera: 'Medium shots' },
     3: { speed: '2.0x', style: 'สมดุล', introEffect: '1-2 วินาที', mood: 'Balanced', camera: 'Mixed shots' },
-    4: { speed: '3.0x', style: 'ให้ความรู้', introEffect: '< 1 วินาที', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' },
-    5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', introEffect: 'ไม่มี (พูดทันที)', mood: 'Fast-paced, Information-dense', camera: 'Tight close-up, Minimal background' }
+    4: { speed: '3.0x', style: 'ให้ความรู้/สอน', introEffect: '< 1 วินาที', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' },
+    5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', introEffect: 'ไม่มี (พูดทันที)', mood: 'Fast-paced, Urgent', camera: 'Tight close-up' }
   };
 
-  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-5)
-  const sceneDialogueDensities = rawScenes.map(s => Math.min(5, Math.max(1, s.dialogueDensity || 3)));
-  const totalDialogueLines = sceneDialogueDensities.reduce((a, b) => a + b, 0);
-  const avgDialogueDensity = Math.round(totalDialogueLines / sceneDialogueDensities.length);
-  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
-  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
-
   // 🎬 SCENE BLUEPRINT: สร้างข้อมูลซีนจาก Mode สำหรับ AI
+  const lastScene = rawScenes[rawScenes.length - 1];
   const sceneBlueprint = rawScenes.map((scene, i) => {
     const isLastScene = (i === rawScenes.length - 1);
     const sceneRole = isLastScene ? '🔴 FINAL SCENE (MUST END STORY)' : `Scene ${i + 1}`;
@@ -812,6 +806,12 @@ async function expandScenesWithTopic(params) {
   - 😊 Mood: ${densityInfo.mood}
   - 📷 Camera: ${densityInfo.camera}`;
   }).join('\n\n');
+
+  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-5)
+  const sceneDialogueDensities = rawScenes.map(s => Math.min(5, Math.max(1, s.dialogueDensity || 3)));
+  const avgDialogueDensity = Math.round(sceneDialogueDensities.reduce((a, b) => a + b, 0) / sceneDialogueDensities.length);
+  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
+  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
 
   console.log(`   🎬 Scene Blueprint: ${totalScenes} scenes × ${sceneDuration}s = ${totalDuration}s total`);
   console.log(`   📊 Dialogue estimate: ${minDialoguePerScene}-${maxDialoguePerScene} lines per scene`);
@@ -1406,29 +1406,23 @@ Category ที่เลือกจะกำหนดรูปแบบบท�
       ? expanderList.map((exp, i) => `${i + 1}. "${exp.name}" - ${exp.blocks?.length || 0} กล่อง`).join('\n')
       : 'ไม่มี Expander ในระบบ';
 
-    // Build Scene Dialogue Density info from Mode data (1-4 ประโยคต่อฉาก)
+    // Build Scene Dialogue Density info from Mode data with Speed mapping
     const densityToStyle = {
-      1: { style: 'หนัง/ดราม่า' },
-      2: { style: 'เล่าเรื่อง' },
-      3: { style: 'สมดุล' },
-      4: { style: 'ให้ความรู้' }
+      1: { speed: '1.0x', style: 'หนัง/ดราม่า', intro: '3-4 วินาที' },
+      2: { speed: '1.0x', style: 'เล่าเรื่องสมจริง', intro: '2-3 วินาที' },
+      3: { speed: '2.0x', style: 'สมดุล', intro: '1-2 วินาที' },
+      4: { speed: '3.0x', style: 'ให้ความรู้/สอน', intro: '< 1 วินาที' },
+      5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', intro: 'ไม่มี (พูดทันที)' }
     };
     
     const sceneDialogueInfo = currentModeData?.blocks?.map((block, blockIdx) => {
       const scenes = (block.evolution || []).map((step, stepIdx) => {
-        const density = Math.min(4, Math.max(1, step.dialogueDensity || 3));
+        const density = Math.min(5, Math.max(1, step.dialogueDensity || 3));
         const styleInfo = densityToStyle[density] || densityToStyle[3];
-        return `  - Step ${stepIdx + 1}: ${density} ประโยค (สไตล์: ${styleInfo.style})`;
+        return `  - Step ${stepIdx + 1}: ${density} ประโยค (Speed ${styleInfo.speed}, สไตล์: ${styleInfo.style})`;
       }).join('\n');
       return `Block ${blockIdx + 1} (${block.title || 'Untitled'}):\n${scenes || '  - No steps'}`;
     }).join('\n') || 'ไม่มีข้อมูล Scene';
-    
-    // คำนวณ Total Dialogue Lines
-    const totalModeDialogueLines = currentModeData?.blocks?.reduce((sum, block) => {
-      return sum + (block.evolution || []).reduce((stepSum, step) => {
-        return stepSum + Math.min(4, Math.max(1, step.dialogueDensity || 3));
-      }, 0);
-    }, 0) || 0;
 
     // System prompt for Instruction Mode (สร้างคำสั่งฉาก)
     const instructionSystemPrompt = `You are "AI Scene Writer" - ผู้ช่วยเขียนคำสั่งฉากระดับมืออาชีพ 🎬
@@ -1536,12 +1530,16 @@ ${sceneDialogueInfo}
 - Expander บอก "ไม่มีบทพูด" → 0 dialogue placeholders
 - ไม่มี Expander → ใช้ Category rules
 
-[🎭 CATEGORY RULES (ใช้เมื่อไม่มี dialogueDensity)]
-- Cinematic / Movie: 1-2 dialogues per scene
-- Short Film / Story: 2-3 dialogues per scene
-- Vlog / Lifestyle: 2-3 dialogues
+[🎭 CATEGORY RULES (ใช้เมื่อไม่มี Expander)]
+- Cinematic / Movie: 2-5 dialogues per scene
+- Short Film / Story: 2-4 dialogues per scene
+- Product Showcase: 0-1 dialogues
+- Real Estate: 0 dialogues
+- Vlog / Lifestyle: 2-4 dialogues
+- Time-lapse: 0 dialogues
 - Documentary: 1-3 dialogues
-- Tutorial / Educational: 3-4 dialogues per scene
+- Tutorial: 3-5 dialogues
+- Relaxation / ASMR: 0 dialogues
 
 [⚡ IMPORTANT]
 - 🔴 แสดง Expander ที่มีให้ User เลือกก่อนเสมอ!
