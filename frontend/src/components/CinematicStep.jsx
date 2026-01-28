@@ -5,42 +5,31 @@ const CinematicStep = ({ stage, onUpdate, onRemove }) => {
     const [hoveredDensity, setHoveredDensity] = useState(null);
     const dialogueDensity = stage.dialogueDensity || 3; // Default 3 ประโยค
     
-    // ข้อมูลแต่ละระดับ Dialogue Density
+    // ข้อมูลแต่ละระดับ Dialogue Density (1-4 ประโยคต่อฉาก)
     const densityOptions = [
         { 
             value: 1, 
-            speed: '1.0x',
             color: 'green',
-            label: 'หนัง',
-            tooltip: '🎬 เหมาะกับวีดีโอแนวหนัง/ดราม่า\n• พูดช้า มีน้ำหนัก\n• เน้นอารมณ์และบรรยากาศ\n• มี Intro Effect 3-4 วินาที'
+            label: 'หนัง/ดราม่า',
+            tooltip: '🎬 เหมาะกับวีดีโอแนวหนัง/ดราม่า\n• 1 ประโยคต่อฉาก\n• เน้นอารมณ์และบรรยากาศ\n• AI จะแบ่งเนื้อหาให้จบในฉากนี้'
         },
         { 
             value: 2, 
-            speed: '1.0x',
             color: 'green',
-            label: 'เรื่องราว',
-            tooltip: '📖 เหมาะกับวีดีโอเล่าเรื่องสมจริง\n• พูดช้า ชัดเจน\n• เน้นความต่อเนื่องของเรื่อง\n• มี Intro Effect 2-3 วินาที'
+            label: 'เล่าเรื่อง',
+            tooltip: '📖 เหมาะกับวีดีโอเล่าเรื่อง\n• 2 ประโยคต่อฉาก\n• เนื้อหากระชับ ชัดเจน\n• AI จะแบ่งเนื้อหาให้ต่อเนื่องกับฉากถัดไป'
         },
         { 
             value: 3, 
-            speed: '2.0x',
             color: 'yellow',
             label: 'สมดุล',
-            tooltip: '⚖️ สมดุลระหว่างเรื่องราวและการสอน\n• ความเร็วปานกลาง\n• เหมาะกับทุกประเภทวีดีโอ\n• มี Intro Effect 1-2 วินาที'
+            tooltip: '⚖️ สมดุลระหว่างเรื่องราวและข้อมูล\n• 3 ประโยคต่อฉาก\n• เหมาะกับทุกประเภทวีดีโอ\n• AI จะคำนวณให้เนื้อหาครบในทุกฉาก'
         },
         { 
             value: 4, 
-            speed: '3.0x',
             color: 'orange',
-            label: 'สอน',
-            tooltip: '📚 เหมาะกับวีดีโอให้ความรู้/สอน\n• พูดเร็ว กระชับ\n• เน้นเนื้อหาสาระ\n• Intro Effect น้อย < 1 วินาที'
-        },
-        { 
-            value: 5, 
-            speed: '3.5x',
-            color: 'red',
-            label: 'ความรู้',
-            tooltip: '🚀 เหมาะกับวีดีโอให้ความรู้เข้มข้น\n• ความเร็วสูงสุด 3.5x\n• เน้นการพูดเป็นหลัก\n• เริ่มพูดทันที ไม่มี Intro'
+            label: 'ให้ความรู้',
+            tooltip: '📚 เหมาะกับวีดีโอให้ความรู้/สอน\n• 4 ประโยคต่อฉาก (สูงสุด)\n• เนื้อหาเข้มข้น ครบถ้วน\n• AI จะแบ่งข้อมูลให้จบครบในทุกฉาก'
         }
     ];
     
@@ -102,14 +91,13 @@ const CinematicStep = ({ stage, onUpdate, onRemove }) => {
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                         currentOption.color === 'green' ? 'text-green-400 bg-green-500/20' :
                         currentOption.color === 'yellow' ? 'text-yellow-400 bg-yellow-500/20' :
-                        currentOption.color === 'orange' ? 'text-orange-400 bg-orange-500/20' :
-                        'text-red-400 bg-red-500/20'
+                        'text-orange-400 bg-orange-500/20'
                     }`}>
-                        {dialogueDensity} ประโยค • {currentOption.speed} • {currentOption.label}
+                        {dialogueDensity} ประโยค • {currentOption.label}
                     </span>
                 </div>
                 
-                {/* 5 Buttons with Tooltips */}
+                {/* 4 Buttons with Tooltips */}
                 <div className="flex items-center gap-2 mb-2 relative">
                     {densityOptions.map((option) => (
                         <div key={option.value} className="relative">
@@ -128,9 +116,6 @@ const CinematicStep = ({ stage, onUpdate, onRemove }) => {
                                     <div className="text-xs text-white whitespace-pre-line leading-relaxed">
                                         {option.tooltip}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-white/10">
-                                        Speed: <span className="text-white font-medium">{option.speed}</span>
-                                    </div>
                                     {/* Arrow */}
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-slate-900"></div>
                                 </div>
@@ -140,7 +125,7 @@ const CinematicStep = ({ stage, onUpdate, onRemove }) => {
                 </div>
                 
                 <p className="text-[10px] text-slate-500">
-                    เลื่อนเม้าส์ไปที่ตัวเลขเพื่อดูรายละเอียด • 1-2 = หนัง • 3 = สมดุล • 4-5 = ให้ความรู้
+                    เลื่อนเม้าส์ไปที่ตัวเลขเพื่อดูรายละเอียด • 1-2 = หนัง/เล่าเรื่อง • 3 = สมดุล • 4 = ให้ความรู้
                 </p>
             </div>
 
