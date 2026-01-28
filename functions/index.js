@@ -787,8 +787,15 @@ async function expandScenesWithTopic(params) {
     4: { style: 'ให้ความรู้', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' }
   };
 
+  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-4)
+  // ⚠️ ต้องสร้างก่อน sceneBlueprint และ storySystemPrompt!
+  const sceneDialogueDensities = rawScenes.map(s => Math.min(4, Math.max(1, s.dialogueDensity || 3)));
+  const totalDialogueLines = sceneDialogueDensities.reduce((a, b) => a + b, 0);
+  const avgDialogueDensity = Math.round(totalDialogueLines / sceneDialogueDensities.length);
+  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
+  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
+
   // 🎬 SCENE BLUEPRINT: สร้างข้อมูลซีนจาก Mode สำหรับ AI
-  const totalDialogueLines = rawScenes.reduce((sum, s) => sum + Math.min(4, Math.max(1, s.dialogueDensity || 3)), 0);
   const sceneBlueprint = rawScenes.map((scene, i) => {
     const isLastScene = (i === rawScenes.length - 1);
     const isFirstScene = (i === 0);
@@ -807,12 +814,6 @@ async function expandScenesWithTopic(params) {
   - 😊 Mood: ${densityInfo.mood}
   - 📷 Camera: ${densityInfo.camera}`;
   }).join('\n\n');
-
-  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-4)
-  const sceneDialogueDensities = rawScenes.map(s => Math.min(4, Math.max(1, s.dialogueDensity || 3)));
-  const avgDialogueDensity = Math.round(sceneDialogueDensities.reduce((a, b) => a + b, 0) / sceneDialogueDensities.length);
-  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
-  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
 
   console.log(`   🎬 Scene Blueprint: ${totalScenes} scenes × ${sceneDuration}s = ${totalDuration}s total`);
   console.log(`   📊 Dialogue estimate: ${minDialoguePerScene}-${maxDialoguePerScene} lines per scene`);
