@@ -1512,25 +1512,29 @@ options: ["🎬 ทุกฉาก", "ฉาก 1", "ฉาก 2", ...]
 - AI Expander จะสร้างบทพูดจริงตาม Expander rules + Episode Topic
 
 [📊 DIALOGUE DENSITY จาก MODE (สำคัญที่สุด!)]
-⚠️ User ได้กำหนด Dialogue Density ไว้ในแต่ละ Scene แล้ว ต้องใช้ค่านี้! (สูงสุด 4 ประโยคต่อฉาก)
+⚠️ User ได้กำหนด Dialogue Density ไว้ในแต่ละ Scene แล้ว ต้องใช้ค่านี้!
 
 ${sceneDialogueInfo}
 
-📊 **Total Dialogue Lines: ${totalModeDialogueLines} ประโยค** ในทั้งหมด
+🔴🔴🔴 **กฎเหล็กสำคัญที่สุด - แต่ละฉากมี dialogueDensity ต่างกัน!** 🔴🔴🔴
+- ⚠️ ห้ามใช้ dialogueDensity จากฉากแรกสำหรับทุกฉาก!
+- ⚠️ ต้องตรวจสอบค่า dialogueDensity ของแต่ละ Block/Step แยกกัน!
+- ⚠️ ถ้า Block 1 มี 2 ประโยค และ Block 2 มี 4 ประโยค → ต้องสร้าง instruction ที่มี 2 และ 4 dialogue ตามลำดับ!
 
-🔴🔴🔴 **กฎเหล็กสำคัญที่สุด** 🔴🔴🔴
-1. แต่ละฉากมี dialogueDensity ต่างกัน - ห้ามใช้ค่าจากฉากแรกสำหรับทุกฉาก!
-2. เนื้อหาต้องจบครบถ้วนใน ${totalModeDialogueLines} ประโยค - ไม่มีค้างคา!
-3. แต่ละฉากต้องครอบคลุมส่วนของเนื้อหาและต่อเนื่องกับฉากถัดไป
-4. ฉากสุดท้ายต้องสรุปจบทุกอย่าง - NO LOOSE ENDS!
+📋 **ตัวอย่าง:**
+- Block 1 (dialogueDensity = 2): instruction มี [DIALOGUE: ...] 2 ตัว
+- Block 2 (dialogueDensity = 4): instruction มี [DIALOGUE: ...] 4 ตัว
+- Block 3 (dialogueDensity = 5): instruction มี [DIALOGUE: ...] 5 ตัว
 
-📋 **ตัวอย่าง (หัวข้อ: ทุเรียน, 2 ฉาก, รวม 8 ประโยค):**
-- ฉาก 1 (4 ประโยค): แนะนำทุเรียน, ประโยชน์, สารอาหาร, ข้อควรระวัง
-- ฉาก 2 (4 ประโยค): วิธีเลือกซื้อ, การเก็บรักษา, สรุปคุณค่า, จบเรื่อง
-→ รวม 8 ประโยค ครอบคลุมข้อมูลครบถ้วน ไม่มีค้างคา
+❌ **ผิด:** สร้างทุกฉากมี 2 dialogue เหมือนกัน
+✅ **ถูก:** ฉาก 1 มี 2, ฉาก 2 มี 4, ฉาก 3 มี 5 ตามที่กำหนด
 
-❌ **ผิด:** ฉาก 2 ยังพูดไม่จบ ข้อมูลขาดหาย
-✅ **ถูก:** ทุกฉากต่อเนื่องกัน และฉากสุดท้ายสรุปจบครบ
+[📊 DIALOGUE AMOUNT BY EXPANDER (ใช้เมื่อไม่มี dialogueDensity)]
+ปรับจำนวน [DIALOGUE: ...] ตาม Expander:
+- Expander บอก "พูดมาก/สนทนาเยอะ" → 3-5 dialogue placeholders ต่อฉาก
+- Expander บอก "พูดน้อย/minimal" → 1-2 dialogue placeholders ต่อฉาก
+- Expander บอก "ไม่มีบทพูด" → 0 dialogue placeholders
+- ไม่มี Expander → ใช้ Category rules
 
 [🎭 CATEGORY RULES (ใช้เมื่อไม่มี dialogueDensity)]
 - Cinematic / Movie: 1-2 dialogues per scene
