@@ -977,7 +977,7 @@ Each prompt must:
 2. Include MAIN SUBJECT (character with visualDescription)
 3. Include SHOT LIST (camera shots that prioritize showing character speaking)
 4. Include ALL DIALOGUE (every line from the story, in ${detectedLanguage})
-5. Include SPEECH SPEED (calculate based on dialogue length and duration)
+5. Include SPEECH SPEED (use value from Scene Blueprint - DO NOT calculate!)
 6. Follow ALL Expander rules
 
 === 🎯 SETTING RULE ===
@@ -993,19 +993,22 @@ If scene has 4+ dialogue lines:
 - Camera focused on speaking character
 - ALL dialogue MUST be included - NO CUTTING!
 
-=== 🔊 SPEECH SPEED CALCULATION ===
-Calculate words in dialogue, then: speechSpeed = totalWords / ${sceneDuration}
-- Normal speed = 2.5 words/sec
-- If speechSpeed > 2.5 → include "🔊 SPEECH SPEED: [X]x faster"
+=== 🔊 SPEECH SPEED (ใช้ค่าจาก Scene Blueprint เท่านั้น!) ===
+⚠️ ห้ามคำนวณเอง! ใช้ค่า Speech Speed จาก Scene Blueprint ที่กำหนดไว้ด้านบน
+- 1 ประโยค = 1.0x
+- 2 ประโยค = 1.0x
+- 3 ประโยค = 2.0x
+- 4 ประโยค = 3.0x
+- 5 ประโยค = 3.5x (สูงสุด)
 
 === OUTPUT FORMAT (JSON) ===
 {
   "scenes": [
     {
       "sceneNumber": 1,
-      "prompt": "VIDEO SPEC: Duration ${sceneDuration}s | Style ${modeCategory} | [Expander camera/lighting]\\nSETTING: [Topic-related setting]\\nMAIN SUBJECT: [character + visualDescription - speaking]\\nSHOT LIST: 1. [shot focused on speaker] 2. [shot] 3. [shot]\\nDIALOGUE: [character]: \\"[ALL lines in ${detectedLanguage}]\\"\\n🔊 SPEECH SPEED: [calculated]x\\nAVOID: No extra characters, no distortion, no wasted time on effects",
+      "prompt": "VIDEO SPEC: Duration ${sceneDuration}s | Style ${modeCategory} | [Expander camera/lighting]\\nSETTING: [Topic-related setting]\\nMAIN SUBJECT: [character + visualDescription - speaking]\\nSHOT LIST: 1. [shot focused on speaker] 2. [shot] 3. [shot]\\nDIALOGUE: [character]: \\"[ALL lines in ${detectedLanguage}]\\"\\n🔊 SPEECH SPEED: [from Scene Blueprint]x\\nAVOID: No extra characters, no distortion, no wasted time on effects, NO SUBTITLES, NO TEXT OVERLAY",
       "audioDescription": "Sound and music description",
-      "speechSpeed": 1.5,
+      "speechSpeed": 3.5,
       "totalWords": 30
     }
   ]
