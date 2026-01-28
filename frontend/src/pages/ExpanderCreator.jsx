@@ -187,6 +187,8 @@ const ExpanderCreator = () => {
     const [speakingBlock, setSpeakingBlock] = useState(false);
     const [thaiDescription, setThaiDescription] = useState('');
     const [loadingTranslation, setLoadingTranslation] = useState(false);
+    const [editedInstruction, setEditedInstruction] = useState('');
+    const [savingInstruction, setSavingInstruction] = useState(false);
     
     // Cancel Trial Modal State
     const [showCancelTrialModal, setShowCancelTrialModal] = useState(null); // expander to cancel
@@ -582,6 +584,7 @@ const ExpanderCreator = () => {
     // === BLOCK DETAIL & TTS ===
     const openBlockDetail = async (block) => {
         setSelectedBlockDetail(block);
+        setEditedInstruction(block.instruction || '');
         setThaiDescription('');
         setShowBlockDetail(true);
         setLoadingTranslation(true);
@@ -600,6 +603,47 @@ const ExpanderCreator = () => {
             setThaiDescription(`กล่อง "${block.name}" - ${block.instruction}`);
         } finally {
             setLoadingTranslation(false);
+        }
+    };
+    
+    // บันทึก Instruction ที่แก้ไข
+    const saveBlockInstruction = async () => {
+        if (!selectedBlockDetail || !editedInstruction.trim()) return;
+        
+        setSavingInstruction(true);
+        try {
+            // อัพเดท Block ใน selectedBlocks
+            const updatedBlocks = selectedBlocks.map(block => 
+                block.id === selectedBlockDetail.id 
+                    ? { ...block, instruction: editedInstruction.trim() }
+                    : block
+            );
+            setSelectedBlocks(updatedBlocks);
+            
+            // อัพเดท selectedBlockDetail
+            setSelectedBlockDetail({ ...selectedBlockDetail, instruction: editedInstruction.trim() });
+            
+            // ถ้ากำลัง edit expander อยู่ ให้อัพเดทใน Firestore ด้วย
+            if (editingExpander) {
+                const expanderRef = doc(db, `users/${user.uid}/expanders/${editingExpander}`);
+                const expanderDoc = await getDoc(expanderRef);
+                if (expanderDoc.exists()) {
+                    const expanderData = expanderDoc.data();
+                    const updatedExpanderBlocks = (expanderData.blocks || []).map(block =>
+                        block.id === selectedBlockDetail.id
+                            ? { ...block, instruction: editedInstruction.trim() }
+                            : block
+                    );
+                    await updateDoc(expanderRef, { blocks: updatedExpanderBlocks });
+                }
+            }
+            
+            alert('บันทึก Instruction สำเร็จ!');
+        } catch (error) {
+            console.error('Save instruction error:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึก');
+        } finally {
+            setSavingInstruction(false);
         }
     };
     
@@ -2402,13 +2446,30 @@ const ExpanderCreator = () => {
                             )}
                         </div>
                         
-                        {/* Original Instruction (collapsed) */}
-                        <details className="bg-black/20 border border-white/10 rounded-xl p-3 mb-6">
-                            <summary className="text-xs text-slate-500 cursor-pointer">ดู Instruction ต้นฉบับ (EN)</summary>
-                            <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-                                {selectedBlockDetail.instruction}
-                            </p>
-                        </details>
+                        {/* Editable Instruction */}
+                        <div className="bg-black/20 border border-white/10 rounded-xl p-3 mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-slate-500">✏️ Instruction (EN) - แก้ไขได้</span>
+                                <button
+                                    onClick={saveBlockInstruction}
+                                    disabled={savingInstruction || editedInstruction === selectedBlockDetail.instruction}
+                                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                                        savingInstruction || editedInstruction === selectedBlockDetail.instruction
+                                            ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                            : 'bg-green-500 text-white hover:bg-green-400'
+                                    }`}
+                                >
+                                    {savingInstruction ? '💾 กำลังบันทึก...' : '💾 บันทึก'}
+                                </button>
+                            </div>
+                            <textarea
+                                value={editedInstruction}
+                                onChange={(e) => setEditedInstruction(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded-lg p-3 text-slate-300 text-xs leading-relaxed resize-none focus:outline-none focus:border-blue-500"
+                                rows={4}
+                                placeholder="Instruction สำหรับ AI..."
+                            />
+                        </div>
                         
                         {/* TTS Button */}
                         <button
