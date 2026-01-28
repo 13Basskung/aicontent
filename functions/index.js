@@ -1348,6 +1348,15 @@ Category ที่เลือกจะกำหนดรูปแบบบท�
       ? expanderList.map((exp, i) => `${i + 1}. "${exp.name}" - ${exp.blocks?.length || 0} กล่อง`).join('\n')
       : 'ไม่มี Expander ในระบบ';
 
+    // Build Scene Dialogue Density info from Mode data
+    const sceneDialogueInfo = currentModeData?.blocks?.map((block, blockIdx) => {
+      const scenes = (block.evolution || []).map((step, stepIdx) => {
+        const density = step.dialogueDensity || 4;
+        return `  - Step ${stepIdx + 1}: ${density} ประโยค`;
+      }).join('\n');
+      return `Block ${blockIdx + 1} (${block.title || 'Untitled'}):\n${scenes || '  - No steps'}`;
+    }).join('\n') || 'ไม่มีข้อมูล Scene';
+
     // System prompt for Instruction Mode (สร้างคำสั่งฉาก)
     const instructionSystemPrompt = `You are "AI Scene Writer" - ผู้ช่วยเขียนคำสั่งฉากระดับมืออาชีพ 🎬
 
@@ -1429,7 +1438,17 @@ options: ["🎬 ทุกฉาก", "ฉาก 1", "ฉาก 2", ...]
 - ❌ ห้าม: [DIALOGUE: มาส - 'พร้อมหรือยัว?']
 - AI Expander จะสร้างบทพูดจริงตาม Expander rules + Episode Topic
 
-[📊 DIALOGUE AMOUNT BY EXPANDER]
+[📊 DIALOGUE DENSITY จาก MODE (สำคัญมาก!)]
+⚠️ User ได้กำหนด Dialogue Density ไว้ในแต่ละ Scene แล้ว ต้องใช้ค่านี้!
+
+${sceneDialogueInfo}
+
+🔴 **กฎเหล็ก:** จำนวน [DIALOGUE: ...] ใน sceneInstruction ต้องตรงกับ dialogueDensity ที่ User กำหนด!
+- ถ้า Scene มี dialogueDensity = 2 → ใส่ [DIALOGUE: ...] 2 ตัว
+- ถ้า Scene มี dialogueDensity = 8 → ใส่ [DIALOGUE: ...] 8 ตัว
+- ห้ามใส่น้อยกว่าหรือมากกว่าที่กำหนด!
+
+[📊 DIALOGUE AMOUNT BY EXPANDER (ใช้เมื่อไม่มี dialogueDensity)]
 ปรับจำนวน [DIALOGUE: ...] ตาม Expander:
 - Expander บอก "พูดมาก/สนทนาเยอะ" → 3-5 dialogue placeholders ต่อฉาก
 - Expander บอก "พูดน้อย/minimal" → 1-2 dialogue placeholders ต่อฉาก
