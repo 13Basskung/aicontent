@@ -779,17 +779,17 @@ async function expandScenesWithTopic(params) {
     ? characters.map(c => `- ${c.name}: ${c.visualDescription || c.description || 'N/A'}`).join('\n')
     : 'No specific characters defined';
 
-  // 🎬 DIALOGUE DENSITY MAPPING (1-4 ประโยคต่อฉาก)
+  // 🎬 DIALOGUE DENSITY MAPPING (1-5 ประโยคต่อฉาก)
   const densityMapping = {
-    1: { style: 'หนัง/ดราม่า', mood: 'Dramatic, Thoughtful', camera: 'Slow pan, Wide shots' },
-    2: { style: 'เล่าเรื่อง', mood: 'Engaging, Storytelling', camera: 'Medium shots' },
-    3: { style: 'สมดุล', mood: 'Balanced', camera: 'Mixed shots' },
-    4: { style: 'ให้ความรู้', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' }
+    1: { speed: '1.0x', style: 'หนัง/ดราม่า', introEffect: '3-4 วินาที', mood: 'Dramatic, Thoughtful', camera: 'Slow pan, Wide shots' },
+    2: { speed: '1.0x', style: 'เล่าเรื่องสมจริง', introEffect: '2-3 วินาที', mood: 'Engaging, Storytelling', camera: 'Medium shots' },
+    3: { speed: '2.0x', style: 'สมดุล', introEffect: '1-2 วินาที', mood: 'Balanced', camera: 'Mixed shots' },
+    4: { speed: '3.0x', style: 'ให้ความรู้', introEffect: '< 1 วินาที', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' },
+    5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', introEffect: 'ไม่มี (พูดทันที)', mood: 'Fast-paced, Information-dense', camera: 'Tight close-up, Minimal background' }
   };
 
-  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-4)
-  // ⚠️ ต้องสร้างก่อน sceneBlueprint และ storySystemPrompt!
-  const sceneDialogueDensities = rawScenes.map(s => Math.min(4, Math.max(1, s.dialogueDensity || 3)));
+  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-5)
+  const sceneDialogueDensities = rawScenes.map(s => Math.min(5, Math.max(1, s.dialogueDensity || 3)));
   const totalDialogueLines = sceneDialogueDensities.reduce((a, b) => a + b, 0);
   const avgDialogueDensity = Math.round(totalDialogueLines / sceneDialogueDensities.length);
   const minDialoguePerScene = Math.min(...sceneDialogueDensities);
@@ -798,19 +798,17 @@ async function expandScenesWithTopic(params) {
   // 🎬 SCENE BLUEPRINT: สร้างข้อมูลซีนจาก Mode สำหรับ AI
   const sceneBlueprint = rawScenes.map((scene, i) => {
     const isLastScene = (i === rawScenes.length - 1);
-    const isFirstScene = (i === 0);
-    const sceneDialogueDensity = Math.min(4, Math.max(1, scene.dialogueDensity || 3)); // จำกัด 1-4, default 3
+    const sceneRole = isLastScene ? '🔴 FINAL SCENE (MUST END STORY)' : `Scene ${i + 1}`;
+    const sceneDialogueDensity = Math.min(5, Math.max(1, scene.dialogueDensity || 3)); // จำกัด 1-5, default 3
     const densityInfo = densityMapping[sceneDialogueDensity] || densityMapping[3];
-    
-    let sceneRole = `Scene ${i + 1}/${totalScenes}`;
-    if (isFirstScene) sceneRole = `🟢 SCENE 1/${totalScenes} (OPENING)`;
-    else if (isLastScene) sceneRole = `🔴 FINAL SCENE ${i + 1}/${totalScenes} (MUST CONCLUDE STORY)`;
-    
     return `${sceneRole}:
   - Title: "${scene.blockTitle || 'Untitled'}"
   - Instruction: "${scene.sceneInstruction || 'Follow Expander'}"
-  - 💬 Dialogue Lines: EXACTLY ${sceneDialogueDensity} lines for THIS scene
+  - Visual: "${scene.visualPrompt || 'N/A'}"
+  - 💬 Dialogue Density: EXACTLY ${sceneDialogueDensity} dialogue lines
+  - 🔊 Speech Speed: ${densityInfo.speed}
   - 🎭 Style: ${densityInfo.style}
+  - ⏱️ Intro Effect: ${densityInfo.introEffect}
   - 😊 Mood: ${densityInfo.mood}
   - 📷 Camera: ${densityInfo.camera}`;
   }).join('\n\n');
