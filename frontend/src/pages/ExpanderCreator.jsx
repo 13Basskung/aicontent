@@ -625,7 +625,7 @@ const ExpanderCreator = () => {
             
             // ถ้ากำลัง edit expander อยู่ ให้อัพเดทใน Firestore ด้วย
             if (editingExpander) {
-                const expanderRef = doc(db, `users/${user.uid}/expanders/${editingExpander}`);
+                const expanderRef = doc(db, `users/${user.uid}/expanders/${editingExpander.id}`);
                 const expanderDoc = await getDoc(expanderRef);
                 if (expanderDoc.exists()) {
                     const expanderData = expanderDoc.data();
@@ -636,9 +636,11 @@ const ExpanderCreator = () => {
                     );
                     await updateDoc(expanderRef, { blocks: updatedExpanderBlocks });
                 }
+                alert('✅ บันทึก Instruction สำเร็จ!');
+            } else {
+                // ถ้าเป็น Expander ใหม่ แจ้งเตือนว่าต้อง Save Expander ก่อน
+                alert('⚠️ Instruction อัพเดทในหน้านี้แล้ว\n\n📌 กรุณากด "Save Expander" เพื่อบันทึกถาวรลง Firebase');
             }
-            
-            alert('บันทึก Instruction สำเร็จ!');
         } catch (error) {
             console.error('Save instruction error:', error);
             alert('เกิดข้อผิดพลาดในการบันทึก');
