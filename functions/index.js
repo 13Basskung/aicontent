@@ -850,6 +850,25 @@ Description: ${episodeDesc || 'N/A'}
 Category: ${modeCategory || 'Cinematic'}
 Language for ALL dialogues: ${detectedLanguage}
 
+=== 🎯 SETTING RULES (CRITICAL!) ===
+1. SETTING must DIRECTLY relate to the Topic/Episode - NO EXCEPTIONS!
+   - Topic: "ลำไส้" → SETTING: ภายในร่างกาย, ระบบย่อยอาหาร, ลำไส้แบบ cartoon style
+   - Topic: "ปลา" → SETTING: ใต้น้ำ, มหาสมุทร, ตู้ปลา
+   - Topic: "หัวใจ" → SETTING: ภายในหัวใจ, ระบบไหลเวียนเลือด
+   - NEVER use generic unrelated settings like "ทุ่งกว้าง", "ป่า", "ชายหาด" if Topic is specific organ/object!
+2. If Expander says "ฉากหลังเหมาะกับหัวข้อ" → SETTING MUST be Topic-related environment
+3. Background should support the Topic, not distract from it
+
+=== 🎬 DIALOGUE-HEAVY SCENES (dialogueDensity >= 4) ===
+When scene has many dialogue lines:
+1. Main Subject = Character who speaks (center frame, prominent)
+2. Camera = Medium shot or Close-up on speaking character
+3. START SPEAKING within first 0.5 seconds - NO DELAY!
+4. NO slow intro pans, NO atmospheric establishing shots
+5. NO wasting time on effects - CHARACTER TALKS IMMEDIATELY
+6. Background = Simple, clean, Topic-related
+7. All dialogue MUST be spoken - prioritize speech over visual effects
+
 === 🔗 SEAMLESS SCENE TRANSITIONS ===
 - Scene 1 → Scene 2: Must have visual/emotional bridge
 - Each scene MUST end with a natural bridge to the next
@@ -939,19 +958,40 @@ Language: ${detectedLanguage}
 === YOUR TASK ===
 Convert each scene from the story into a video prompt.
 Each prompt must:
-1. Include SETTING (from story)
+1. Include SETTING (from story - MUST relate to Topic "${episodeTopic}")
 2. Include MAIN SUBJECT (character with visualDescription)
-3. Include SHOT LIST (3-4 camera shots for ${sceneDuration}s)
-4. Include DIALOGUE (exactly from the story, in ${detectedLanguage})
-5. Follow ALL Expander rules
+3. Include SHOT LIST (camera shots that prioritize showing character speaking)
+4. Include ALL DIALOGUE (every line from the story, in ${detectedLanguage})
+5. Include SPEECH SPEED (calculate based on dialogue length and duration)
+6. Follow ALL Expander rules
+
+=== 🎯 SETTING RULE ===
+SETTING must DIRECTLY relate to Topic "${episodeTopic}"
+- NEVER use generic unrelated settings!
+- If Topic is body part → SETTING inside body
+- If Topic is animal → SETTING in animal's habitat
+
+=== 🎬 DIALOGUE-HEAVY RULE ===
+If scene has 4+ dialogue lines:
+- Character speaks IMMEDIATELY (within 0.5s)
+- NO slow intro shots, NO establishing shots
+- Camera focused on speaking character
+- ALL dialogue MUST be included - NO CUTTING!
+
+=== 🔊 SPEECH SPEED CALCULATION ===
+Calculate words in dialogue, then: speechSpeed = totalWords / ${sceneDuration}
+- Normal speed = 2.5 words/sec
+- If speechSpeed > 2.5 → include "🔊 SPEECH SPEED: [X]x faster"
 
 === OUTPUT FORMAT (JSON) ===
 {
   "scenes": [
     {
       "sceneNumber": 1,
-      "prompt": "VIDEO SPEC: Duration ${sceneDuration}s | Style ${modeCategory} | [Expander camera/lighting]\\nSETTING: [from story]\\nMAIN SUBJECT: [character + visualDescription]\\nSHOT LIST: 1. [shot] 2. [shot] 3. [shot]\\nDIALOGUE: [character]: \\"[line in ${detectedLanguage}]\\"\\nAVOID: No extra characters, no distortion",
-      "audioDescription": "Sound and music description"
+      "prompt": "VIDEO SPEC: Duration ${sceneDuration}s | Style ${modeCategory} | [Expander camera/lighting]\\nSETTING: [Topic-related setting]\\nMAIN SUBJECT: [character + visualDescription - speaking]\\nSHOT LIST: 1. [shot focused on speaker] 2. [shot] 3. [shot]\\nDIALOGUE: [character]: \\"[ALL lines in ${detectedLanguage}]\\"\\n🔊 SPEECH SPEED: [calculated]x\\nAVOID: No extra characters, no distortion, no wasted time on effects",
+      "audioDescription": "Sound and music description",
+      "speechSpeed": 1.5,
+      "totalWords": 30
     }
   ]
 }`;
