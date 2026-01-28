@@ -784,15 +784,19 @@ async function expandScenesWithTopic(params) {
   const sceneBlueprint = rawScenes.map((scene, i) => {
     const isLastScene = (i === rawScenes.length - 1);
     const sceneRole = isLastScene ? '🔴 FINAL SCENE (MUST END STORY)' : `Scene ${i + 1}`;
+    const sceneDialogueDensity = scene.dialogueDensity || 4; // ใช้ค่าจาก Mode หรือ default 4
     return `${sceneRole}:
   - Title: "${scene.blockTitle || 'Untitled'}"
   - Instruction: "${scene.sceneInstruction || 'Follow Expander'}"
-  - Visual: "${scene.visualPrompt || 'N/A'}"`;
+  - Visual: "${scene.visualPrompt || 'N/A'}"
+  - 💬 Dialogue Density: EXACTLY ${sceneDialogueDensity} dialogue lines for this scene`;
   }).join('\n\n');
 
-  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน
-  const minDialoguePerScene = Math.max(1, Math.floor(sceneDuration / 4));
-  const maxDialoguePerScene = Math.floor(sceneDuration / 2);
+  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี
+  const sceneDialogueDensities = rawScenes.map(s => s.dialogueDensity || 4);
+  const avgDialogueDensity = Math.round(sceneDialogueDensities.reduce((a, b) => a + b, 0) / sceneDialogueDensities.length);
+  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
+  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
 
   console.log(`   🎬 Scene Blueprint: ${totalScenes} scenes × ${sceneDuration}s = ${totalDuration}s total`);
   console.log(`   📊 Dialogue estimate: ${minDialoguePerScene}-${maxDialoguePerScene} lines per scene`);
@@ -1161,7 +1165,8 @@ function extractRawScenesFromMode(modeData) {
           cameraAngle: step.cameraAngle || 'wide',
           timeOfDay: step.timeOfDay || 'day',
           locationName: location?.name || '',
-          dialogues: dialogues
+          dialogues: dialogues,
+          dialogueDensity: step.dialogueDensity || 4 // ใช้ค่าจาก Mode Scene หรือ default 4
         });
       });
     } else {
@@ -1174,7 +1179,8 @@ function extractRawScenesFromMode(modeData) {
         audioAmbience: '',
         cameraAngle: 'wide',
         timeOfDay: 'day',
-        dialogues: []
+        dialogues: [],
+        dialogueDensity: 4 // Default 4 ประโยค
       });
     }
   });
@@ -1591,7 +1597,8 @@ exports.compilePrompts = functions
             timeOfDay: step.timeOfDay || 'day',
             bgmMood: step.bgmMood || 'epic',
             backgroundVoices: step.backgroundVoices || '',
-            dialogues: dialogues
+            dialogues: dialogues,
+            dialogueDensity: step.dialogueDensity || 4 // ใช้ค่าจาก Mode Scene
           });
         });
       });
@@ -1941,7 +1948,7 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
 
                   if (scenes.length > 0 || prompts.length > 0) {
                     try {
-                      // ✅ FIX #2: Build raw scenes with sceneInstruction
+                      // ✅ FIX #2: Build raw scenes with sceneInstruction and dialogueDensity
                       const rawScenes = scenes.length > 0
                         ? scenes.map((s, i) => ({
                             sceneNumber: i + 1,
@@ -1950,7 +1957,8 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                             rawPrompt: s.englishPrompt || prompts[i] || '',
                             sceneInstruction: s.sceneInstruction || s.dialogueScript || '',
                             audioAmbience: s.audioDescription || '',
-                            cameraAngle: s.cameraMovement || 'wide'
+                            cameraAngle: s.cameraMovement || 'wide',
+                            dialogueDensity: s.dialogueDensity || 4 // ใช้ค่าจาก Mode Scene
                           }))
                         : prompts.map((p, i) => ({
                             sceneNumber: i + 1,
@@ -1959,7 +1967,8 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                             rawPrompt: p,
                             sceneInstruction: '',
                             audioAmbience: '',
-                            cameraAngle: 'wide'
+                            cameraAngle: 'wide',
+                            dialogueDensity: 4 // Default 4
                           }));
 
                       console.log(`      🔧 Using SHARED expandScenesWithTopic() for ${rawScenes.length} scenes...`);
