@@ -2,6 +2,14 @@
   "projects": {
     "default": "content-auto-post"
   },
-  "targets": {},
+  "targets": {
+    "content-auto-post": {
+      "hosting": {
+        "aicreators-vip": [
+          "aicreators-vip"
+        ]
+      }
+    }
+  },
   "etags": {}
 }
