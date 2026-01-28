@@ -831,19 +831,15 @@ async function expandScenesWithTopic(params) {
 - Total Scenes: ${totalScenes} scene(s)
 - Duration per Scene: ${sceneDuration} seconds
 - Total Video Length: ${totalDuration} seconds (${(totalDuration/60).toFixed(1)} minutes)
-- Total Dialogue Lines: ${totalDialogueLines} lines across ALL scenes
 
-🔴🔴🔴 CRITICAL: COMPLETE STORY DISTRIBUTION 🔴🔴🔴
-You have EXACTLY ${totalDialogueLines} dialogue lines to tell the COMPLETE story about "${episodeTopic}".
-- Scene distribution: ${sceneDialogueDensities.map((d, i) => `Scene ${i+1}: ${d} lines`).join(', ')}
-- ALL information about the topic MUST be covered within these ${totalDialogueLines} lines
-- Story MUST be COMPLETE when all scenes are done - NO CLIFFHANGERS, NO INCOMPLETE INFO
+⚠️ CRITICAL TIMING RULE:
+You have EXACTLY ${totalScenes} scene(s) × ${sceneDuration} seconds each = ${totalDuration} seconds total.
+- If 1 scene × 8s → Complete story in ONE 8-second scene
+- If 3 scenes × 8s → Spread story across THREE 8-second scenes  
+- If 5 scenes × 10s → Epic arc across FIVE 10-second scenes
 
-📋 CONTENT DISTRIBUTION RULE:
-- Divide your content into ${totalScenes} parts
-- Each scene covers its portion of the topic COMPLETELY
-- Scene transitions should flow naturally
-- Last scene MUST conclude everything - NO loose ends
+Each scene's content (dialogue + action) MUST be achievable within ${sceneDuration} seconds.
+Approximate dialogue: ${minDialoguePerScene} to ${maxDialoguePerScene} lines per scene.
 
 === 🎬 SCENE BLUEPRINT (FROM MODE) ===
 ${sceneBlueprint}
