@@ -1505,15 +1505,23 @@ options: ["🎬 ทุกฉาก", "ฉาก 1", "ฉาก 2", ...]
 - ❌ ห้าม: [DIALOGUE: มาส - 'พร้อมหรือยัว?']
 - AI Expander จะสร้างบทพูดจริงตาม Expander rules + Episode Topic
 
-[📊 DIALOGUE DENSITY จาก MODE (สำคัญมาก!)]
+[📊 DIALOGUE DENSITY จาก MODE (สำคัญที่สุด!)]
 ⚠️ User ได้กำหนด Dialogue Density ไว้ในแต่ละ Scene แล้ว ต้องใช้ค่านี้!
 
 ${sceneDialogueInfo}
 
-🔴 **กฎเหล็ก:** จำนวน [DIALOGUE: ...] ใน sceneInstruction ต้องตรงกับ dialogueDensity ที่ User กำหนด!
-- ถ้า Scene มี dialogueDensity = 2 → ใส่ [DIALOGUE: ...] 2 ตัว
-- ถ้า Scene มี dialogueDensity = 8 → ใส่ [DIALOGUE: ...] 8 ตัว
-- ห้ามใส่น้อยกว่าหรือมากกว่าที่กำหนด!
+🔴🔴🔴 **กฎเหล็กสำคัญที่สุด - แต่ละฉากมี dialogueDensity ต่างกัน!** 🔴🔴🔴
+- ⚠️ ห้ามใช้ dialogueDensity จากฉากแรกสำหรับทุกฉาก!
+- ⚠️ ต้องตรวจสอบค่า dialogueDensity ของแต่ละ Block/Step แยกกัน!
+- ⚠️ ถ้า Block 1 มี 2 ประโยค และ Block 2 มี 4 ประโยค → ต้องสร้าง instruction ที่มี 2 และ 4 dialogue ตามลำดับ!
+
+📋 **ตัวอย่าง:**
+- Block 1 (dialogueDensity = 2): instruction มี [DIALOGUE: ...] 2 ตัว
+- Block 2 (dialogueDensity = 4): instruction มี [DIALOGUE: ...] 4 ตัว
+- Block 3 (dialogueDensity = 5): instruction มี [DIALOGUE: ...] 5 ตัว
+
+❌ **ผิด:** สร้างทุกฉากมี 2 dialogue เหมือนกัน
+✅ **ถูก:** ฉาก 1 มี 2, ฉาก 2 มี 4, ฉาก 3 มี 5 ตามที่กำหนด
 
 [📊 DIALOGUE AMOUNT BY EXPANDER (ใช้เมื่อไม่มี dialogueDensity)]
 ปรับจำนวน [DIALOGUE: ...] ตาม Expander:
