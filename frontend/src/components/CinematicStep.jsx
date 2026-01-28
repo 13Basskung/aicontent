@@ -2,18 +2,59 @@ import React, { useState } from 'react';
 import { Type, Trash2, FileText, MessageCircle } from 'lucide-react';
 
 const CinematicStep = ({ stage, onUpdate, onRemove }) => {
-    const [showCustomInput, setShowCustomInput] = useState(false);
-    const dialogueDensity = stage.dialogueDensity || 4; // Default 4 ประโยค
+    const [hoveredDensity, setHoveredDensity] = useState(null);
+    const dialogueDensity = stage.dialogueDensity || 3; // Default 3 ประโยค
     
-    // คำนวณสีตาม density
-    const getDensityColor = (value) => {
-        if (value <= 2) return { bg: 'bg-green-500', text: 'text-green-400', label: 'น้อย' };
-        if (value <= 4) return { bg: 'bg-yellow-500', text: 'text-yellow-400', label: 'ปานกลาง' };
-        if (value <= 6) return { bg: 'bg-orange-500', text: 'text-orange-400', label: 'มาก' };
-        return { bg: 'bg-red-500', text: 'text-red-400', label: 'เข้มข้น' };
+    // ข้อมูลแต่ละระดับ Dialogue Density
+    const densityOptions = [
+        { 
+            value: 1, 
+            speed: '1.0x',
+            color: 'green',
+            label: 'หนัง',
+            tooltip: '🎬 เหมาะกับวีดีโอแนวหนัง/ดราม่า\n• พูดช้า มีน้ำหนัก\n• เน้นอารมณ์และบรรยากาศ\n• มี Intro Effect 3-4 วินาที'
+        },
+        { 
+            value: 2, 
+            speed: '1.0x',
+            color: 'green',
+            label: 'เรื่องราว',
+            tooltip: '📖 เหมาะกับวีดีโอเล่าเรื่องสมจริง\n• พูดช้า ชัดเจน\n• เน้นความต่อเนื่องของเรื่อง\n• มี Intro Effect 2-3 วินาที'
+        },
+        { 
+            value: 3, 
+            speed: '2.0x',
+            color: 'yellow',
+            label: 'สมดุล',
+            tooltip: '⚖️ สมดุลระหว่างเรื่องราวและการสอน\n• ความเร็วปานกลาง\n• เหมาะกับทุกประเภทวีดีโอ\n• มี Intro Effect 1-2 วินาที'
+        },
+        { 
+            value: 4, 
+            speed: '3.0x',
+            color: 'orange',
+            label: 'สอน',
+            tooltip: '📚 เหมาะกับวีดีโอให้ความรู้/สอน\n• พูดเร็ว กระชับ\n• เน้นเนื้อหาสาระ\n• Intro Effect น้อย < 1 วินาที'
+        },
+        { 
+            value: 5, 
+            speed: '3.5x',
+            color: 'red',
+            label: 'ความรู้',
+            tooltip: '🚀 เหมาะกับวีดีโอให้ความรู้เข้มข้น\n• ความเร็วสูงสุด 3.5x\n• เน้นการพูดเป็นหลัก\n• เริ่มพูดทันที ไม่มี Intro'
+        }
+    ];
+    
+    const currentOption = densityOptions.find(opt => opt.value === dialogueDensity) || densityOptions[2];
+    
+    const getColorClasses = (color, isActive) => {
+        const colors = {
+            green: isActive ? 'bg-green-500/30 text-green-300 border-green-500/50' : 'bg-white/5 text-slate-400 border-white/10 hover:bg-green-500/10 hover:border-green-500/30',
+            yellow: isActive ? 'bg-yellow-500/30 text-yellow-300 border-yellow-500/50' : 'bg-white/5 text-slate-400 border-white/10 hover:bg-yellow-500/10 hover:border-yellow-500/30',
+            orange: isActive ? 'bg-orange-500/30 text-orange-300 border-orange-500/50' : 'bg-white/5 text-slate-400 border-white/10 hover:bg-orange-500/10 hover:border-orange-500/30',
+            red: isActive ? 'bg-red-500/30 text-red-300 border-red-500/50' : 'bg-white/5 text-slate-400 border-white/10 hover:bg-red-500/10 hover:border-red-500/30'
+        };
+        return colors[color] || colors.yellow;
     };
-    
-    const densityInfo = getDensityColor(dialogueDensity);
     
     return (
         <div className="bg-slate-800 rounded-lg p-3 border border-white/5 shadow-lg relative group">
@@ -53,94 +94,53 @@ const CinematicStep = ({ stage, onUpdate, onRemove }) => {
                 </div>
             </div>
 
-            {/* Dialogue Density Slider */}
+            {/* Dialogue Density Buttons */}
             <div className="mt-3 pt-3 border-t border-white/5">
                 <div className="flex items-center gap-2 mb-2">
                     <MessageCircle size={12} className="text-purple-400" />
                     <span className="text-xs font-medium text-purple-300">Dialogue Density (ความหนาแน่นบทพูด)</span>
-                    <span className={`text-[10px] ${densityInfo.text} ${densityInfo.bg}/20 px-1.5 py-0.5 rounded font-medium`}>
-                        {dialogueDensity} ประโยค • {densityInfo.label}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        currentOption.color === 'green' ? 'text-green-400 bg-green-500/20' :
+                        currentOption.color === 'yellow' ? 'text-yellow-400 bg-yellow-500/20' :
+                        currentOption.color === 'orange' ? 'text-orange-400 bg-orange-500/20' :
+                        'text-red-400 bg-red-500/20'
+                    }`}>
+                        {dialogueDensity} ประโยค • {currentOption.speed} • {currentOption.label}
                     </span>
                 </div>
                 
-                {/* Preset Buttons */}
-                <div className="flex items-center gap-2 mb-2">
-                    <button
-                        onClick={() => { onUpdate('dialogueDensity', 2); setShowCustomInput(false); }}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                            dialogueDensity === 2 
-                                ? 'bg-green-500/30 text-green-300 border border-green-500/50' 
-                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                        }`}
-                    >
-                        🟢 2
-                    </button>
-                    <button
-                        onClick={() => { onUpdate('dialogueDensity', 4); setShowCustomInput(false); }}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                            dialogueDensity === 4 
-                                ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50' 
-                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                        }`}
-                    >
-                        🟡 4
-                    </button>
-                    <button
-                        onClick={() => { onUpdate('dialogueDensity', 8); setShowCustomInput(false); }}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                            dialogueDensity === 8 
-                                ? 'bg-red-500/30 text-red-300 border border-red-500/50' 
-                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                        }`}
-                    >
-                        🔴 8
-                    </button>
-                    <button
-                        onClick={() => setShowCustomInput(!showCustomInput)}
-                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                            showCustomInput || ![2, 4, 8].includes(dialogueDensity)
-                                ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50' 
-                                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-                        }`}
-                    >
-                        ✏️ กำหนดเอง
-                    </button>
+                {/* 5 Buttons with Tooltips */}
+                <div className="flex items-center gap-2 mb-2 relative">
+                    {densityOptions.map((option) => (
+                        <div key={option.value} className="relative">
+                            <button
+                                onClick={() => onUpdate('dialogueDensity', option.value)}
+                                onMouseEnter={() => setHoveredDensity(option.value)}
+                                onMouseLeave={() => setHoveredDensity(null)}
+                                className={`w-10 h-10 rounded-lg text-sm font-bold transition-all border ${getColorClasses(option.color, dialogueDensity === option.value)}`}
+                            >
+                                {option.value}
+                            </button>
+                            
+                            {/* Tooltip */}
+                            {hoveredDensity === option.value && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50">
+                                    <div className="text-xs text-white whitespace-pre-line leading-relaxed">
+                                        {option.tooltip}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-white/10">
+                                        Speed: <span className="text-white font-medium">{option.speed}</span>
+                                    </div>
+                                    {/* Arrow */}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-slate-900"></div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
                 
-                {/* Custom Input or Slider */}
-                {(showCustomInput || ![2, 4, 8].includes(dialogueDensity)) && (
-                    <div className="flex items-center gap-3 mb-2">
-                        <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={dialogueDensity}
-                            onChange={(e) => onUpdate('dialogueDensity', parseInt(e.target.value))}
-                            className="flex-1 h-2 rounded-lg appearance-none cursor-pointer"
-                            style={{
-                                background: `linear-gradient(to right, 
-                                    #22c55e 0%, 
-                                    #eab308 30%, 
-                                    #f97316 60%, 
-                                    #ef4444 100%)`
-                            }}
-                        />
-                        <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={dialogueDensity}
-                            onChange={(e) => {
-                                const val = Math.min(10, Math.max(1, parseInt(e.target.value) || 1));
-                                onUpdate('dialogueDensity', val);
-                            }}
-                            className="w-12 bg-black/30 text-white text-sm text-center border border-purple-500/30 rounded py-1 focus:border-purple-500 outline-none"
-                        />
-                    </div>
-                )}
-                
                 <p className="text-[10px] text-slate-500">
-                    กำหนดจำนวนประโยคบทพูดที่ AI จะสร้างสำหรับฉากนี้ (1-10)
+                    เลื่อนเม้าส์ไปที่ตัวเลขเพื่อดูรายละเอียด • 1-2 = หนัง • 3 = สมดุล • 4-5 = ให้ความรู้
                 </p>
             </div>
 
