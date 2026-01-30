@@ -189,9 +189,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
     }
 
-    // 3. Handle STEP Recorded
+    // 3. Handle STEP Recorded - Relay to popup
     if (request.action === "RECORD_STEP") {
         console.log("💾 Step Captured:", request.payload);
+        // 🔥 FIX: Relay to popup so recordedSteps gets updated
+        chrome.runtime.sendMessage({ action: "RECORD_STEP", payload: request.payload }).catch(() => {
+            // Popup may be closed, ignore error
+        });
+    }
+
+    // 3.1 Handle PENDING_CLICK - Relay to popup for modifier selection
+    if (request.action === "PENDING_CLICK") {
+        console.log("🎛️ PENDING_CLICK - Relaying to popup:", request.payload);
+        // Store pending click and notify popup
+        chrome.storage.local.set({ pendingClick: request.payload });
     }
 
     // 3.5 Handle STOP_TEST - Stop current test
@@ -313,45 +324,92 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.warn(`⚠️ Missing projectId (${projectId}) or userId (${userId}) - prompts will be empty!`);
                 }
 
-                // Smart Tab: Check existing tabs first, then use startUrl if needed
+                // 🔥 Smart Tab: Navigate แทนเปิดใหม่
                 let tabId = request.tabId;
                 const targetUrl = block.startUrl?.trim();
 
                 console.log("🔍 Block startUrl check:", { startUrl: targetUrl, hasUrl: !!targetUrl });
 
                 if (targetUrl && targetUrl !== 'null') {
-                    // Check if any existing tab matches the startUrl
-                    const allTabs = await chrome.tabs.query({});
-                    const targetOrigin = new URL(targetUrl).origin;
-                    const existingTab = allTabs.find(tab => {
+                    const targetUrlObj = new URL(targetUrl);
+                    
+                    // 1. ลองหา Active Tab ก่อน
+                    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                    let activeOriginMatch = false;
+                    if (activeTab?.url) {
                         try {
-                            return tab.url && new URL(tab.url).origin === targetOrigin;
-                        } catch { return false; }
-                    });
-
-                    if (existingTab) {
-                        console.log("✅ Found existing tab with same origin:", existingTab.url);
-                        tabId = existingTab.id;
-                        await chrome.tabs.update(tabId, { active: true });
-                        await chrome.windows.update(existingTab.windowId, { focused: true });
+                            const activeUrlObj = new URL(activeTab.url);
+                            activeOriginMatch = activeUrlObj.origin === targetUrlObj.origin;
+                        } catch {}
+                    }
+                    
+                    if (activeOriginMatch) {
+                        // Active tab origin ตรง → Navigate ไป startUrl (ไม่เปิดใหม่)
+                        console.log("✅ Active tab origin matches, navigating...", activeTab.url);
+                        tabId = activeTab.id;
+                        if (activeTab.url !== targetUrl) {
+                            await chrome.tabs.update(tabId, { url: targetUrl });
+                            // Wait for navigation
+                            await new Promise(resolve => {
+                                const listener = (updatedTabId, info) => {
+                                    if (updatedTabId === tabId && info.status === 'complete') {
+                                        chrome.tabs.onUpdated.removeListener(listener);
+                                        resolve();
+                                    }
+                                };
+                                chrome.tabs.onUpdated.addListener(listener);
+                                setTimeout(resolve, 10000);
+                            });
+                        }
                         await new Promise(r => setTimeout(r, 1000));
                     } else {
-                        console.log("🌐 No existing tab found, opening new tab:", targetUrl);
-                        const newTab = await chrome.tabs.create({ url: targetUrl, active: true });
-                        tabId = newTab.id;
-
-                        // Wait for tab to fully load
-                        await new Promise(resolve => {
-                            const listener = (updatedTabId, info) => {
-                                if (updatedTabId === tabId && info.status === 'complete') {
-                                    chrome.tabs.onUpdated.removeListener(listener);
-                                    resolve();
-                                }
-                            };
-                            chrome.tabs.onUpdated.addListener(listener);
-                            setTimeout(resolve, 10000);
+                        // 2. หา Tab อื่นที่ origin ตรง
+                        const allTabs = await chrome.tabs.query({});
+                        const existingTab = allTabs.find(tab => {
+                            try {
+                                if (!tab.url) return false;
+                                const tabUrlObj = new URL(tab.url);
+                                return tabUrlObj.origin === targetUrlObj.origin;
+                            } catch { return false; }
                         });
-                        await new Promise(r => setTimeout(r, 2000));
+
+                        if (existingTab) {
+                            // พบ tab ที่ origin ตรง → Switch + Navigate
+                            console.log("✅ Found tab with same origin, switching & navigating...", existingTab.url);
+                            tabId = existingTab.id;
+                            await chrome.tabs.update(tabId, { active: true, url: targetUrl });
+                            await chrome.windows.update(existingTab.windowId, { focused: true });
+                            // Wait for navigation
+                            await new Promise(resolve => {
+                                const listener = (updatedTabId, info) => {
+                                    if (updatedTabId === tabId && info.status === 'complete') {
+                                        chrome.tabs.onUpdated.removeListener(listener);
+                                        resolve();
+                                    }
+                                };
+                                chrome.tabs.onUpdated.addListener(listener);
+                                setTimeout(resolve, 10000);
+                            });
+                            await new Promise(r => setTimeout(r, 1000));
+                        } else {
+                            // 3. ไม่มี tab ไหนเลย → เปิดใหม่ครั้งเดียว
+                            console.log("🌐 No matching tab, opening new tab:", targetUrl);
+                            const newTab = await chrome.tabs.create({ url: targetUrl, active: true });
+                            tabId = newTab.id;
+
+                            // Wait for tab to fully load
+                            await new Promise(resolve => {
+                                const listener = (updatedTabId, info) => {
+                                    if (updatedTabId === tabId && info.status === 'complete') {
+                                        chrome.tabs.onUpdated.removeListener(listener);
+                                        resolve();
+                                    }
+                                };
+                                chrome.tabs.onUpdated.addListener(listener);
+                                setTimeout(resolve, 10000);
+                            });
+                            await new Promise(r => setTimeout(r, 2000));
+                        }
                     }
                     console.log("✅ Tab ready:", tabId);
                 }

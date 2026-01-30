@@ -9,6 +9,7 @@ if (window.recorderInjected) {
 
     let isArmed = false;
     let lastStepTimestamp = null;
+    let pendingClickTarget = null; // เก็บ target element ไว้คลิกจริงหลังบันทึก
 
     // --- LISTENER: Commands from Background/Popup ---
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -23,6 +24,19 @@ if (window.recorderInjected) {
             isArmed = false;
             showOverlay("⚪ Recording Stopped", 2000);
             sendResponse({ status: "DISARMED" });
+        }
+
+        // 🔥 CONFIRM_CLICK - คลิกจริงหลังจาก popup บันทึกเสร็จ
+        if (request.action === "CONFIRM_CLICK") {
+            console.log("🔥 CONFIRM_CLICK received");
+            if (pendingClickTarget) {
+                setTimeout(() => {
+                    pendingClickTarget.click();
+                    pendingClickTarget = null;
+                    showOverlay("✅ บันทึกแล้ว", 1500);
+                }, 100);
+            }
+            sendResponse({ status: "CLICKED" });
         }
 
         // 🧱 INJECT VARIABLE MARKER
@@ -96,8 +110,10 @@ if (window.recorderInjected) {
             ...elementContext
         };
 
-        console.log("⚡ CAPTURED:", payload);
-        chrome.runtime.sendMessage({ action: "RECORD_STEP", payload: payload });
+        // 🎛️ ส่ง PENDING_CLICK ไป popup เพื่อแสดง Modal ใน Extension UI
+        pendingClickTarget = target;
+        chrome.runtime.sendMessage({ action: "PENDING_CLICK", payload: payload });
+        showOverlay("🎛️ เลือกออฟชั่นใน Extension...", 2000);
 
     }, true); // Use Capture Phase
 

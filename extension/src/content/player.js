@@ -257,6 +257,131 @@ if (window.playerInjected) {
         return count;
     };
 
+    // --- 🎛️ EXECUTE STEP WITH MODIFIERS ---
+    const executeStepWithModifiers = async (step, variables = {}) => {
+        const modifiers = step.modifiers || {};
+        const preActions = modifiers.preActions || [];
+        const postActions = modifiers.postActions || [];
+        let retryCount = 0;
+        let maxRetries = 1;
+        let shouldRetry = false;
+
+        // Check if retry is enabled
+        const retryAction = postActions.find(a => a.type === 'retry_on_fail');
+        if (retryAction) {
+            maxRetries = retryAction.maxRetries || 3;
+        }
+
+        do {
+            shouldRetry = false;
+            retryCount++;
+            console.log(`🎛️ Executing step with modifiers (attempt ${retryCount}/${maxRetries})`);
+
+            // === PRE-ACTIONS ===
+            for (const action of preActions.sort((a, b) => a.order - b.order)) {
+                console.log(`   ▶️ PRE: ${action.type}`);
+                
+                if (action.type === 'count_scenes') {
+                    window.__sceneCountBefore = countElements(action.selector || '[role="listitem"]');
+                    console.log(`   🔢 Scene count before: ${window.__sceneCountBefore}`);
+                }
+                else if (action.type === 'inject_prompt') {
+                    const prompt = variables?.prompt || variables?.currentPrompt || '';
+                    if (prompt) {
+                        window.__pendingPrompt = prompt;
+                        console.log(`   📝 Prompt loaded: "${prompt.substring(0, 50)}..."`);
+                    }
+                }
+            }
+
+            // === MAIN ACTION (click) ===
+            try {
+                const el = await findElement(step.selector);
+                if (step.action === 'click') {
+                    el.click();
+                    console.log(`   ✅ Clicked: ${step.selector}`);
+                }
+            } catch (e) {
+                console.error(`   ❌ Main action failed:`, e);
+                return false;
+            }
+
+            // === POST-ACTIONS ===
+            for (const action of postActions.sort((a, b) => a.order - b.order)) {
+                console.log(`   ▶️ POST: ${action.type}`);
+                
+                if (action.type === 'wait_progress') {
+                    const progressSelector = action.selector || '.sc-dd6abb21-1';
+                    const timeout = 600000; // 10 minutes
+                    const startTime = Date.now();
+                    let lastProgress = '';
+                    
+                    console.log(`   ⏳ Waiting for progress: ${progressSelector}`);
+                    
+                    while (Date.now() - startTime < timeout) {
+                        const progressEl = document.querySelector(progressSelector);
+                        
+                        if (!progressEl) {
+                            console.log(`   ✅ Progress completed (element disappeared)`);
+                            break;
+                        }
+                        
+                        const currentProgress = progressEl.textContent?.trim() || '';
+                        if (currentProgress !== lastProgress) {
+                            console.log(`   📊 Progress: ${currentProgress}`);
+                            lastProgress = currentProgress;
+                        }
+                        
+                        if (currentProgress.includes('100')) {
+                            console.log(`   ✅ Progress reached 100%`);
+                            await sleep(2000);
+                            break;
+                        }
+                        
+                        await sleep(2000);
+                    }
+                }
+                else if (action.type === 'validate_scene') {
+                    await sleep(2000); // Wait for DOM to update
+                    const sceneCountAfter = countElements(action.selector || '[role="listitem"]');
+                    const sceneCountBefore = window.__sceneCountBefore || 0;
+                    
+                    if (sceneCountAfter > sceneCountBefore) {
+                        console.log(`   ✅ Validation passed: ${sceneCountBefore} → ${sceneCountAfter} scenes`);
+                        window.__validationPassed = true;
+                    } else {
+                        console.log(`   ❌ Validation failed: ${sceneCountBefore} → ${sceneCountAfter} scenes (no increase)`);
+                        window.__validationPassed = false;
+                        
+                        // Check if retry is enabled
+                        if (retryAction && retryCount < maxRetries) {
+                            console.log(`   🔄 Will retry (${retryCount}/${maxRetries})`);
+                            shouldRetry = true;
+                            await sleep(3000); // Wait before retry
+                        }
+                    }
+                }
+                else if (action.type === 'type_prompt') {
+                    // Will be handled by next type action automatically via window.__pendingPrompt
+                    console.log(`   ⌨️ Prompt ready for next type action`);
+                }
+                else if (action.type === 'wait_after') {
+                    const duration = action.duration || 5000;
+                    console.log(`   ⏱️ Waiting ${duration}ms after action...`);
+                    await sleep(duration);
+                }
+            }
+
+        } while (shouldRetry && retryCount < maxRetries);
+
+        // Return result based on validation
+        if (postActions.some(a => a.type === 'validate_scene')) {
+            return window.__validationPassed !== false;
+        }
+
+        return true;
+    };
+
     // --- EXECUTION ENGINE ---
     const executeStep = async (step, variables = {}) => {
         console.log(`🚀 Executing: ${step.action} on ${step.selector || 'N/A'}`);
@@ -376,6 +501,11 @@ if (window.playerInjected) {
                 
                 console.warn(`⏱️ Timeout waiting for element: ${step.selector}`);
                 return false;
+            }
+
+            // --- 🎛️ EXECUTE STEP WITH MODIFIERS ---
+            if (step.modifiers) {
+                return await executeStepWithModifiers(step, variables);
             }
 
             // --- STANDARD ACTIONS (need element) ---

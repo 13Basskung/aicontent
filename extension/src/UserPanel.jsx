@@ -429,6 +429,38 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
     const [recipeType, setRecipeType] = useState('ONCE');
     const [logs, setLogs] = useState([]);
     const [recordedSteps, setRecordedSteps] = useState([]);
+    
+    // 🎛️ Modifier Modal States
+    const [pendingClick, setPendingClick] = useState(null);
+    const [selectedModifiers, setSelectedModifiers] = useState([]);
+    const [waitAfterValue, setWaitAfterValue] = useState(5);
+    
+    // 🎛️ MODIFIER OPTIONS CONFIG
+    const MODIFIER_OPTIONS = [
+        { id: 'wait_progress', icon: '⏳', label: 'รอ%', tooltip: 'รอ Progress เสร็จ', type: 'post', selector: '.sc-dd6abb21-1' },
+        { id: 'count_scenes', icon: '🔢', label: 'นับฉาก', tooltip: 'นับจำนวนฉากก่อนทำ', type: 'pre', selector: '[role="listitem"]' },
+        { id: 'validate_scene', icon: '✅', label: 'ยืนยัน', tooltip: 'ตรวจสอบฉากเพิ่ม', type: 'post', selector: '[role="listitem"]' },
+        { id: 'retry_on_fail', icon: '🔄', label: 'ซ้ำ', tooltip: 'ทำซ้ำถ้า Error (3 ครั้ง)', type: 'post', maxRetries: 3 },
+        { id: 'inject_prompt', icon: '📝', label: 'Prompt', tooltip: 'ดึง Prompt จาก Firestore', type: 'pre' },
+        { id: 'type_prompt', icon: '⌨️', label: 'พิมพ์', tooltip: 'พิมพ์ Prompt ลง Input', type: 'post' },
+        { id: 'wait_after', icon: '⏱️', label: 'รอหลัง', tooltip: 'รอ X วินาทีหลังทำ', type: 'post', hasInput: true },
+        { id: 'loop_start', icon: '🔁', label: 'เริ่มวน', tooltip: 'เริ่มต้น Loop', type: 'standalone' },
+        { id: 'loop_end', icon: '🏁', label: 'จบวน', tooltip: 'สิ้นสุด Loop', type: 'standalone' }
+    ];
+    
+    // 🎯 VARIABLE OPTIONS CONFIG
+    const VARIABLE_OPTIONS = [
+        { id: 'prompt', label: '{{prompt}}', color: 'green' },
+        { id: 'sceneIndex', label: '{{sceneIndex}}', color: 'pink' },
+        { id: 'title_youtube', label: 'YT Title', color: 'red' },
+        { id: 'title_tiktok', label: 'TT Title', color: 'cyan' },
+        { id: 'title_facebook', label: 'FB Title', color: 'blue' },
+        { id: 'title_instagram', label: 'IG Title', color: 'pink' },
+        { id: 'tags_youtube', label: 'YT Tags', color: 'red' },
+        { id: 'tags_tiktok', label: 'TT Tags', color: 'cyan' },
+        { id: 'tags_facebook', label: 'FB Tags', color: 'blue' },
+        { id: 'tags_instagram', label: 'IG Tags', color: 'pink' }
+    ];
 
     // Block Library States
     const [savedBlocks, setSavedBlocks] = useState([]);
@@ -668,6 +700,43 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
         }
     };
 
+    // 🎛️ Listen for pending clicks from content script
+    useEffect(() => {
+        if (!isRecording) return;
+        
+        const checkPendingClick = () => {
+            chrome.storage.local.get(['pendingClick'], (result) => {
+                if (result.pendingClick) {
+                    console.log("🎛️ Found pendingClick:", result.pendingClick);
+                    setPendingClick(result.pendingClick);
+                    setSelectedModifiers([]);
+                    chrome.storage.local.remove(['pendingClick']);
+                }
+            });
+        };
+        
+        // Check on storage change (with areaName)
+        const handleStorageChange = (changes, areaName) => {
+            if (areaName === 'local' && changes.pendingClick?.newValue) {
+                console.log("🎛️ Storage changed - pendingClick:", changes.pendingClick.newValue);
+                setPendingClick(changes.pendingClick.newValue);
+                setSelectedModifiers([]);
+                chrome.storage.local.remove(['pendingClick']);
+            }
+        };
+        
+        chrome.storage.onChanged.addListener(handleStorageChange);
+        checkPendingClick(); // Initial check
+        
+        // Poll every 300ms as backup (faster response)
+        const pollInterval = setInterval(checkPendingClick, 300);
+        
+        return () => {
+            chrome.storage.onChanged.removeListener(handleStorageChange);
+            clearInterval(pollInterval);
+        };
+    }, [isRecording]);
+
     // Listen for recorded steps and test status updates
     useEffect(() => {
         const handleMessage = (request) => {
@@ -741,10 +810,90 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
         });
     };
 
+    // 🎛️ Handle Save Click with Modifiers
+    const handleSaveClick = async () => {
+        if (!pendingClick) return;
+        
+        const finalPayload = { ...pendingClick };
+        
+        if (selectedModifiers.length > 0) {
+            const preActions = selectedModifiers
+                .filter(m => m.type === 'pre')
+                .map((m, i) => ({ type: m.id, selector: m.selector, order: i + 1 }));
+                
+            const postActions = selectedModifiers
+                .filter(m => m.type === 'post')
+                .map((m, i) => ({ 
+                    type: m.id, 
+                    selector: m.selector, 
+                    order: i + 1,
+                    maxRetries: m.maxRetries,
+                    duration: m.id === 'wait_after' ? waitAfterValue * 1000 : undefined
+                }));
+
+            const standaloneActions = selectedModifiers.filter(m => m.type === 'standalone');
+
+            if (preActions.length > 0 || postActions.length > 0) {
+                finalPayload.modifiers = { preActions, postActions };
+            }
+
+            // Handle standalone actions (loop_start, loop_end)
+            standaloneActions.forEach(m => {
+                chrome.runtime.sendMessage({ 
+                    action: "RECORD_STEP", 
+                    payload: { action: m.id, description: m.tooltip }
+                });
+            });
+        }
+
+        // Send the main click step
+        chrome.runtime.sendMessage({ action: "RECORD_STEP", payload: finalPayload });
+        
+        // Tell content script to perform the actual click
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+            chrome.tabs.sendMessage(tab.id, { action: "CONFIRM_CLICK" });
+        }
+        
+        setLogs(prev => [`🎛️ บันทึก: ${finalPayload.selector?.substring(0, 25)}... (+${selectedModifiers.length} modifiers)`, ...prev]);
+        setPendingClick(null);
+        setSelectedModifiers([]);
+    };
+
+    // 🎛️ Handle Skip Click (save without modifiers)
+    const handleSkipClick = async () => {
+        if (!pendingClick) return;
+        
+        chrome.runtime.sendMessage({ action: "RECORD_STEP", payload: pendingClick });
+        
+        // Tell content script to perform the actual click
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+            chrome.tabs.sendMessage(tab.id, { action: "CONFIRM_CLICK" });
+        }
+        
+        setLogs(prev => [`⚡ บันทึก: ${pendingClick.selector?.substring(0, 25)}...`, ...prev]);
+        setPendingClick(null);
+        setSelectedModifiers([]);
+    };
+
+    // 🎛️ Toggle Modifier Selection
+    const toggleModifier = (mod) => {
+        setSelectedModifiers(prev => {
+            const exists = prev.find(m => m.id === mod.id);
+            if (exists) {
+                return prev.filter(m => m.id !== mod.id);
+            } else {
+                return [...prev, mod];
+            }
+        });
+    };
+
     // Stop Recording
     const stopRecording = async () => {
         await chrome.storage.local.set({ isRecording: false });
         setIsRecording(false);
+        setPendingClick(null); // Clear any pending click
         chrome.runtime.sendMessage({ action: "STOP_RECORDING" });
         setLogs(prev => [`[SYSTEM] Recording stopped. ${recordedSteps.length} steps captured.`, ...prev]);
         
@@ -1595,201 +1744,145 @@ export default function UserPanel({ keyData, onLogout, onEnterAdminMode }) {
                                     {isRecording ? '⏹ STOP RECORDING' : '🔴 START RECORDING'}
                                 </button>
 
-                                {/* Variable Markers - Thai UI */}
-                                <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-purple-300 font-bold mb-2">🎯 ตัวแปรพื้นฐาน</p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => injectVariable('prompt')}
-                                            className="flex flex-col items-center p-2 bg-green-500/10 border border-green-500/30 rounded-lg hover:bg-green-500/20 transition-all">
-                                            <span className="text-green-400 text-xs font-mono">{'{{prompt}}'}</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">Prompt</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('sceneIndex')}
-                                            className="flex flex-col items-center p-2 bg-pink-500/10 border border-pink-500/30 rounded-lg hover:bg-pink-500/20 transition-all">
-                                            <span className="text-pink-400 text-xs font-mono">{'{{sceneIndex}}'}</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">ลำดับ Scene</span>
-                                        </button>
+                                {/* 🎛️ Modifier Modal - แสดงเมื่อมี pendingClick */}
+                                {pendingClick && (
+                                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-red-500/50 rounded-lg p-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-white font-bold text-sm">🎛️ ออฟชั่นเสริม</span>
+                                            <span className="text-gray-400 text-[10px] truncate max-w-[150px]">{pendingClick.selector}</span>
+                                        </div>
+                                        
+                                        {/* Modifier Buttons Grid */}
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {MODIFIER_OPTIONS.map(mod => (
+                                                <button
+                                                    key={mod.id}
+                                                    onClick={() => toggleModifier(mod)}
+                                                    title={mod.tooltip}
+                                                    className={`flex flex-col items-center p-2 rounded border transition-all ${
+                                                        selectedModifiers.find(m => m.id === mod.id)
+                                                            ? 'bg-red-500/30 border-red-500'
+                                                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                                    }`}
+                                                >
+                                                    <span className="text-lg">{mod.icon}</span>
+                                                    <span className="text-[9px] text-gray-300">{mod.label}</span>
+                                                    {selectedModifiers.find(m => m.id === mod.id) && (
+                                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center">
+                                                            {selectedModifiers.findIndex(m => m.id === mod.id) + 1}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        
+                                        {/* Wait After Input */}
+                                        {selectedModifiers.find(m => m.id === 'wait_after') && (
+                                            <div className="flex items-center gap-2 bg-black/30 p-2 rounded">
+                                                <span className="text-gray-400 text-xs">⏱️ รอ:</span>
+                                                <input
+                                                    type="number"
+                                                    value={waitAfterValue}
+                                                    onChange={(e) => setWaitAfterValue(parseInt(e.target.value) || 5)}
+                                                    className="w-16 bg-black/50 border border-white/20 rounded px-2 py-1 text-white text-sm"
+                                                />
+                                                <span className="text-gray-400 text-xs">วินาที</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Variables Section */}
+                                        <div className="border-t border-white/10 pt-2">
+                                            <span className="text-purple-400 text-[10px] font-bold">🎯 ตัวแปร (คลิก input ก่อน)</span>
+                                            <div className="grid grid-cols-5 gap-1 mt-1">
+                                                {VARIABLE_OPTIONS.map(v => (
+                                                    <button
+                                                        key={v.id}
+                                                        onClick={() => injectVariable(v.id)}
+                                                        className={`text-[8px] py-1 px-1 rounded border border-${v.color}-500/30 text-${v.color}-400 hover:bg-${v.color}-500/20`}
+                                                    >
+                                                        {v.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Save/Skip Buttons */}
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleSaveClick}
+                                                className="flex-1 py-2 bg-gradient-to-r from-red-600 to-red-500 rounded font-bold text-white text-sm hover:from-red-500 hover:to-red-400"
+                                            >
+                                                ✓ บันทึก {selectedModifiers.length > 0 && `(+${selectedModifiers.length})`}
+                                            </button>
+                                            <button
+                                                onClick={handleSkipClick}
+                                                className="flex-1 py-2 bg-white/10 border border-white/20 rounded text-gray-300 text-sm hover:bg-white/20"
+                                            >
+                                                ✗ ข้าม
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Platform-specific Title/Tags */}
-                                <div className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border border-blue-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-blue-300 font-bold mb-2">📺 Title ตาม Platform</p>
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <button onClick={() => injectVariable('title_youtube')}
-                                            className="flex items-center justify-center p-1.5 bg-red-500/10 border border-red-500/30 rounded hover:bg-red-500/20 transition-all">
-                                            <span className="text-red-400 text-[10px] font-mono">YouTube</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('title_tiktok')}
-                                            className="flex items-center justify-center p-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition-all">
-                                            <span className="text-cyan-400 text-[10px] font-mono">TikTok</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('title_facebook')}
-                                            className="flex items-center justify-center p-1.5 bg-blue-500/10 border border-blue-500/30 rounded hover:bg-blue-500/20 transition-all">
-                                            <span className="text-blue-400 text-[10px] font-mono">Facebook</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('title_instagram')}
-                                            className="flex items-center justify-center p-1.5 bg-pink-500/10 border border-pink-500/30 rounded hover:bg-pink-500/20 transition-all">
-                                            <span className="text-pink-400 text-[10px] font-mono">Instagram</span>
-                                        </button>
+                                {/* 📋 Log Record - ขยายใหญ่ขึ้น */}
+                                <div className="bg-black/90 border border-red-500/30 rounded-lg p-3 flex-1">
+                                    <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                                        <span className="text-red-400 font-bold text-sm">📋 Log Record</span>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => setLogs([])}
+                                                className="text-[10px] text-gray-400 hover:text-white px-2 py-0.5 bg-white/5 rounded"
+                                            >
+                                                🗑️ ล้าง
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(logs.join('\n'));
+                                                    alert('Copied!');
+                                                }}
+                                                className="text-[10px] text-gray-400 hover:text-white px-2 py-0.5 bg-white/5 rounded"
+                                            >
+                                                📋 Copy
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border border-yellow-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-yellow-300 font-bold mb-2"># Tags ตาม Platform</p>
-                                    <div className="grid grid-cols-2 gap-1">
-                                        <button onClick={() => injectVariable('tags_youtube')}
-                                            className="flex items-center justify-center p-1.5 bg-red-500/10 border border-red-500/30 rounded hover:bg-red-500/20 transition-all">
-                                            <span className="text-red-400 text-[10px] font-mono">YouTube (10)</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('tags_tiktok')}
-                                            className="flex items-center justify-center p-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition-all">
-                                            <span className="text-cyan-400 text-[10px] font-mono">TikTok (5)</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('tags_facebook')}
-                                            className="flex items-center justify-center p-1.5 bg-blue-500/10 border border-blue-500/30 rounded hover:bg-blue-500/20 transition-all">
-                                            <span className="text-blue-400 text-[10px] font-mono">Facebook (3)</span>
-                                        </button>
-                                        <button onClick={() => injectVariable('tags_instagram')}
-                                            className="flex items-center justify-center p-1.5 bg-pink-500/10 border border-pink-500/30 rounded hover:bg-pink-500/20 transition-all">
-                                            <span className="text-pink-400 text-[10px] font-mono">Instagram (30)</span>
-                                        </button>
+                                    <div className="max-h-64 overflow-auto font-mono text-xs space-y-1">
+                                        {logs.length === 0 ? (
+                                            <div className="text-gray-600 text-center py-8">
+                                                <div className="text-2xl mb-2">🎛️</div>
+                                                <div>เริ่ม Recording แล้วคลิกที่หน้าเว็บ</div>
+                                                <div className="text-[10px] mt-1">Modal ออฟชั่นจะเด้งขึ้นให้เลือก</div>
+                                            </div>
+                                        ) : (
+                                            logs.slice(0, 50).map((log, i) => {
+                                                // Color coding
+                                                let colorClass = 'text-green-400';
+                                                if (log.includes('❌') || log.includes('ERROR') || log.includes('FAIL')) {
+                                                    colorClass = 'text-red-400';
+                                                } else if (log.includes('⚠️') || log.includes('WARN')) {
+                                                    colorClass = 'text-yellow-400';
+                                                } else if (log.includes('🔄') || log.includes('RETRY')) {
+                                                    colorClass = 'text-orange-400';
+                                                } else if (log.includes('📝') || log.includes('PROMPT')) {
+                                                    colorClass = 'text-emerald-400';
+                                                } else if (log.includes('🎛️') || log.includes('MODIFIER')) {
+                                                    colorClass = 'text-purple-400';
+                                                }
+                                                
+                                                // Indentation for sub-items
+                                                const isSubItem = log.startsWith('   ') || log.includes('├─') || log.includes('└─');
+                                                
+                                                return (
+                                                    <div 
+                                                        key={i} 
+                                                        className={`${colorClass} ${isSubItem ? 'pl-4 text-[10px] opacity-80' : ''}`}
+                                                    >
+                                                        {log}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
                                     </div>
-                                    <p className="text-[9px] text-gray-500 mt-2 text-center">💡 คลิกที่ช่อง input ในหน้าเว็บก่อน แล้วกดปุ่มด้านบน</p>
-                                </div>
-
-                                {/* 🎬 Scene Actions - สำหรับเลือกฉากตามตำแหน่ง */}
-                                <div className="bg-gradient-to-br from-violet-900/30 to-purple-900/30 border border-violet-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-violet-300 font-bold mb-2">🎬 Scene Actions <span className="text-gray-500 font-normal">(เลือกฉากตามตำแหน่ง)</span></p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => {
-                                            // ใช้ Smart Selector กดฉากสุดท้าย
-                                            setRecordedSteps(prev => [...prev, {
-                                                action: 'click',
-                                                selector: '$scene:last',
-                                                description: 'คลิกฉากสุดท้าย'
-                                            }]);
-                                            setLogs(prev => [`[ADDED] click: $scene:last (ฉากสุดท้าย)`, ...prev]);
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-violet-500/10 border border-violet-500/30 rounded-lg hover:bg-violet-500/20 transition-all">
-                                            <span className="text-violet-400 text-xs font-bold">🎬 กดฉากสุดท้าย</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">$scene:last</span>
-                                        </button>
-                                        <button onClick={() => {
-                                            const n = prompt('ต้องการกดฉากที่เท่าไหร่?', '3');
-                                            if (n && !isNaN(n)) {
-                                                // ใช้ Smart Selector กดฉากที่ N
-                                                setRecordedSteps(prev => [...prev, {
-                                                    action: 'click',
-                                                    selector: `$[role="listitem"]:nth(${n})`,
-                                                    description: `คลิกฉากที่ ${n}`
-                                                }]);
-                                                setLogs(prev => [`[ADDED] click: ฉากที่ ${n}`, ...prev]);
-                                            }
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-lg hover:bg-fuchsia-500/20 transition-all">
-                                            <span className="text-fuchsia-400 text-xs font-bold">🔢 กดฉากที่ N</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">เลือกเลขฉาก</span>
-                                        </button>
-                                    </div>
-                                    <p className="text-[9px] text-gray-500 mt-2 text-center">💡 ใช้สำหรับ Google Vids - ไม่ต้องพึ่ง class name ที่สุ่ม</p>
-                                </div>
-
-                                {/* 🔄 Loop & Prompt Actions */}
-                                <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-blue-300 font-bold mb-2">🔄 Loop & Prompt <span className="text-gray-500 font-normal">(วนซ้ำและดึงข้อมูล)</span></p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => {
-                                            setRecordedSteps(prev => [...prev, {
-                                                action: 'loop_start',
-                                                description: 'เริ่มต้น loop'
-                                            }]);
-                                            setLogs(prev => [`[ADDED] loop_start`, ...prev]);
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-all">
-                                            <span className="text-blue-400 text-xs font-bold">🔄 วนซ้ำ</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">loop_start</span>
-                                        </button>
-                                        <button onClick={() => {
-                                            setRecordedSteps(prev => [...prev, {
-                                                action: 'loop_end',
-                                                description: 'สิ้นสุด loop'
-                                            }]);
-                                            setLogs(prev => [`[ADDED] loop_end`, ...prev]);
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/20 transition-all">
-                                            <span className="text-indigo-400 text-xs font-bold">🏁 จบการวน</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">loop_end</span>
-                                        </button>
-                                        <button onClick={() => {
-                                            setRecordedSteps(prev => [...prev, {
-                                                action: 'inject_prompt',
-                                                description: 'ดึง prompt จาก Firestore'
-                                            }]);
-                                            setLogs(prev => [`[ADDED] inject_prompt (from Firestore)`, ...prev]);
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-all">
-                                            <span className="text-emerald-400 text-xs font-bold">📝 ใส่ Prompt</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">inject_prompt</span>
-                                        </button>
-                                        <button onClick={() => {
-                                            const seconds = prompt('รอกี่วินาที?', '5');
-                                            if (seconds && !isNaN(seconds)) {
-                                                setRecordedSteps(prev => [...prev, {
-                                                    action: 'wait',
-                                                    duration: parseInt(seconds) * 1000,
-                                                    description: `รอ ${seconds} วินาที`
-                                                }]);
-                                                setLogs(prev => [`[ADDED] wait: ${seconds} วินาที`, ...prev]);
-                                            }
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all">
-                                            <span className="text-amber-400 text-xs font-bold">⏳ รอ X วินาที</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">wait</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* ⏳ Wait Actions - สำหรับรอ Progress และ Download */}
-                                <div className="bg-gradient-to-br from-orange-900/30 to-red-900/30 border border-orange-500/30 rounded-lg p-3">
-                                    <p className="text-xs text-orange-300 font-bold mb-2">⏳ Wait Actions <span className="text-gray-500 font-normal">(รอการทำงาน)</span></p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => {
-                                            const selector = '.sc-dd6abb21-1';
-                                            setRecordedSteps(prev => [...prev, {
-                                                action: 'wait_for_progress_complete',
-                                                selector: selector,
-                                                timeout: 600000
-                                            }]);
-                                            setLogs(prev => [`[ADDED] wait_for_progress_complete`, ...prev]);
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg hover:bg-orange-500/20 transition-all">
-                                            <span className="text-orange-400 text-xs font-bold">📊 รอสร้างเสร็จ</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">รอ % ขึ้น 100%</span>
-                                        </button>
-                                        <button onClick={() => {
-                                            const selector = prompt('ใส่ selector ของ Download button:', 'a[download]');
-                                            if (selector) {
-                                                setRecordedSteps(prev => [...prev, {
-                                                    action: 'wait_for_element_and_click',
-                                                    selector: selector,
-                                                    timeout: 600000
-                                                }]);
-                                                setLogs(prev => [`[ADDED] wait_for_element_and_click`, ...prev]);
-                                            }
-                                        }}
-                                            className="flex flex-col items-center p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-all">
-                                            <span className="text-cyan-400 text-xs font-bold">⬇️ รอแล้วดาวน์โหลด</span>
-                                            <span className="text-gray-400 text-[9px] mt-0.5">รอปุ่มโผล่แล้วกด</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Log Console */}
-                                <div className="bg-black/80 border border-white/10 rounded-lg p-2 max-h-28 overflow-auto font-mono text-xs">
-                                    <div className="text-gray-600 border-b border-white/10 pb-1 mb-1">TERMINAL</div>
-                                    {logs.length === 0 ? <span className="text-gray-700">Waiting...</span> : 
-                                        logs.slice(0, 10).map((log, i) => <div key={i} className="text-green-400">{log}</div>)}
                                 </div>
                             </div>
                         )}
