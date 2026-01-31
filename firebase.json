@@ -16,7 +16,7 @@
     }
   ],
   "hosting": {
-    "site": "content-auto-post",
+    "site": "aicreators-vip",
     "public": "build",
     "ignore": [
       "firebase.json",
