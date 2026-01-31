@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onUpdate: (callback) => {
       ipcRenderer.on('scheduler:update', (event, data) => callback(data));
+    },
+    onStatus: (callback) => {
+      ipcRenderer.on('scheduler:status', (event, data) => callback(data));
     }
   },
 

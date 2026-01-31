@@ -873,7 +873,7 @@ function Dashboard({ keyData }) {
                         className="flex items-center gap-1 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition"
                       >
                         <Play className="w-4 h-4" />
-                        RUN
+                        TEST RUN
                       </button>
                     </div>
                   </div>

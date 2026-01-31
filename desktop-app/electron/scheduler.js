@@ -12,13 +12,17 @@ let activeSchedules = [];
 let schedulerInterval = null;
 let mainWindow = null;
 let runBlockCallback = null;
+let instanceManager = null;
+let playwrightBridge = null;
 
 /**
  * Initialize scheduler
  */
-function initScheduler(win, runBlockFn) {
+function initScheduler(win, runBlockFn, instMgr, pwBridge) {
   mainWindow = win;
   runBlockCallback = runBlockFn;
+  instanceManager = instMgr;
+  playwrightBridge = pwBridge;
   console.log('✅ Scheduler initialized');
 }
 
@@ -153,18 +157,18 @@ function startScheduler(userId, instances) {
           // Find instance for this project
           const instance = instances.find(i => i.projectId === slot.projectId);
           
-          if (instance && runBlockCallback) {
-            // Notify UI
-            if (mainWindow) {
-              mainWindow.webContents.send('scheduler:trigger', {
-                projectName: slot.projectName,
-                slotId: slot.slotId,
-                time: slot.start
-              });
-            }
-          } else {
-            console.log(`⚠️ No instance found for project: ${slot.projectName}`);
+          // Notify UI first
+          if (mainWindow) {
+            mainWindow.webContents.send('scheduler:trigger', {
+              projectName: slot.projectName,
+              slotId: slot.slotId,
+              time: slot.start,
+              status: 'starting'
+            });
           }
+          
+          // Auto-run: Launch Chrome and execute block
+          await executeScheduledRun(slot, instances);
         }
       }
     } catch (error) {
@@ -213,11 +217,120 @@ async function getTodaySchedule(userId) {
     .sort((a, b) => a.start.localeCompare(b.start));
 }
 
+/**
+ * Execute scheduled automation run
+ */
+async function executeScheduledRun(slot, instances) {
+  try {
+    // Find or create instance for this project
+    let instance = instances.find(i => i.projectId === slot.projectId);
+    
+    if (!instance && instanceManager) {
+      // Create new instance for this project
+      console.log(`🚀 Creating new instance for project: ${slot.projectName}`);
+      const result = await instanceManager.launchInstance(slot.projectId);
+      if (result.success) {
+        instance = { id: result.instanceId, projectId: slot.projectId };
+        // Wait for Chrome to be ready
+        await new Promise(r => setTimeout(r, 3000));
+      } else {
+        console.error(`❌ Failed to create instance: ${result.error}`);
+        notifyUI('error', slot, result.error);
+        return;
+      }
+    }
+    
+    if (!instance) {
+      console.log(`⚠️ No instance available for project: ${slot.projectName}`);
+      notifyUI('error', slot, 'No instance available');
+      return;
+    }
+    
+    // Find automation block for this project
+    // For now, we'll use a default block or the first available
+    const block = await getAutomationBlock(slot.projectId);
+    
+    if (!block) {
+      console.log(`⚠️ No automation block found for project: ${slot.projectName}`);
+      notifyUI('error', slot, 'No automation block configured');
+      return;
+    }
+    
+    // Prepare variables
+    const variables = {
+      projectId: slot.projectId,
+      projectName: slot.projectName,
+      platforms: slot.platforms,
+      scenes: slot.scenes,
+      sceneDuration: slot.sceneDuration,
+      sceneIndex: 0
+    };
+    
+    console.log(`▶️ Running block "${block.name}" for ${slot.projectName}`);
+    
+    // Execute the block
+    if (playwrightBridge) {
+      const result = await playwrightBridge.runBlock(instance.id, block, variables);
+      
+      if (result.success) {
+        console.log(`✅ Completed: ${slot.projectName}`);
+        notifyUI('success', slot);
+      } else {
+        console.error(`❌ Failed: ${result.error}`);
+        notifyUI('error', slot, result.error);
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Execute error: ${error.message}`);
+    notifyUI('error', slot, error.message);
+  }
+}
+
+/**
+ * Get automation block for project
+ */
+async function getAutomationBlock(projectId) {
+  // Try to get blocks from store or default
+  try {
+    const Store = require('electron-store');
+    const store = new Store();
+    const blocks = store.get('blocks', []);
+    
+    // Find block assigned to this project or use default
+    const projectBlock = blocks.find(b => b.projectId === projectId);
+    if (projectBlock) return projectBlock;
+    
+    // Use first available block as fallback
+    if (blocks.length > 0) return blocks[0];
+    
+    return null;
+  } catch (error) {
+    console.error('Get block error:', error);
+    return null;
+  }
+}
+
+/**
+ * Notify UI about scheduler status
+ */
+function notifyUI(status, slot, error = null) {
+  if (mainWindow) {
+    mainWindow.webContents.send('scheduler:status', {
+      status,
+      projectName: slot.projectName,
+      slotId: slot.slotId,
+      time: slot.start,
+      error
+    });
+  }
+}
+
 module.exports = {
   initScheduler,
   startScheduler,
   stopScheduler,
   fetchUserSchedule,
   getTodaySchedule,
-  checkScheduleNow
+  checkScheduleNow,
+  executeScheduledRun
 };

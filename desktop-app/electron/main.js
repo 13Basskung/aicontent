@@ -2,8 +2,10 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
-const { initPlaywrightBridge, closeAllInstances, getInstances } = require('./playwright-bridge');
-const { initInstanceManager } = require('./instance-manager');
+const playwrightBridge = require('./playwright-bridge');
+const { initPlaywrightBridge, closeAllInstances, getInstances } = playwrightBridge;
+const instanceManager = require('./instance-manager');
+const { initInstanceManager } = instanceManager;
 const { initScheduler, startScheduler, stopScheduler, getTodaySchedule, fetchUserSchedule } = require('./scheduler');
 const { initRecorder, startRecording, stopRecording, getRecordedSteps, clearSteps, addCustomStep } = require('./recorder');
 
@@ -63,8 +65,8 @@ function createWindow() {
       initInstanceManager(mainWindow, getInstances());
     }, 1000);
     
-    // Initialize Scheduler (Phase 8)
-    initScheduler(mainWindow);
+    // Initialize Scheduler (Phase 8) - pass instanceManager and playwrightBridge for auto-run
+    initScheduler(mainWindow, null, instanceManager, playwrightBridge);
     
     // Initialize Recorder (Phase 6)
     initRecorder(mainWindow);

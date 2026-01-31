@@ -22,18 +22,36 @@ function SchedulerPanel({ keyData, instances }) {
   const [loading, setLoading] = useState(true);
   const [lastTrigger, setLastTrigger] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [lastDay, setLastDay] = useState(new Date().getDay());
+  const [executionStatus, setExecutionStatus] = useState(null);
 
-  // Update current time every second
+  // Update current time every second + check day change
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      const now = new Date();
+      setCurrentTime(now);
+      
+      // Auto-refresh when day changes
+      if (now.getDay() !== lastDay) {
+        console.log('📅 Day changed - refreshing schedule');
+        setLastDay(now.getDay());
+        loadSchedules();
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [lastDay]);
 
-  // Load schedules on mount
+  // Load schedules on mount + auto-refresh every 30 seconds for real-time sync
   useEffect(() => {
     loadSchedules();
+    
+    // Real-time sync: poll Firestore every 30 seconds
+    const syncInterval = setInterval(() => {
+      console.log('🔄 Auto-syncing schedules from Firestore...');
+      loadSchedules();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(syncInterval);
   }, [keyData]);
 
   // Listen for scheduler events
@@ -47,6 +65,14 @@ function SchedulerPanel({ keyData, instances }) {
       window.electronAPI.scheduler.onUpdate((data) => {
         console.log('📅 Schedules updated:', data);
         setSchedules(data);
+      });
+      
+      // Listen for execution status
+      window.electronAPI.scheduler.onStatus?.((data) => {
+        console.log('📊 Execution status:', data);
+        setExecutionStatus(data);
+        // Clear status after 10 seconds
+        setTimeout(() => setExecutionStatus(null), 10000);
       });
     }
   }, []);
@@ -166,7 +192,31 @@ function SchedulerPanel({ keyData, instances }) {
           <div className="mt-3 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
             <div className="flex items-center gap-2 text-yellow-400 text-sm">
               <AlertCircle className="w-4 h-4" />
-              <span>ล่าสุด: {lastTrigger.projectName} @ {lastTrigger.time}</span>
+              <span>กำลังรัน: {lastTrigger.projectName} @ {lastTrigger.time}</span>
+            </div>
+          </div>
+        )}
+        
+        {executionStatus && (
+          <div className={`mt-3 p-2 rounded-lg border ${
+            executionStatus.status === 'success' 
+              ? 'bg-green-500/10 border-green-500/20' 
+              : 'bg-red-500/10 border-red-500/20'
+          }`}>
+            <div className={`flex items-center gap-2 text-sm ${
+              executionStatus.status === 'success' ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {executionStatus.status === 'success' ? (
+                <CheckCircle className="w-4 h-4" />
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              <span>
+                {executionStatus.status === 'success' 
+                  ? `✅ ${executionStatus.projectName} รันสำเร็จ!`
+                  : `❌ ${executionStatus.projectName}: ${executionStatus.error}`
+                }
+              </span>
             </div>
           </div>
         )}

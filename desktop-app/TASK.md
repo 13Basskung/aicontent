@@ -18,7 +18,7 @@
 | Phase 7: Multi-Instance | ✅ เสร็จ | 2026-01-31 |
 | Phase 8: Scheduler | ✅ เสร็จ | 2026-01-31 |
 | Phase 9: Auto-Update | ✅ Config เสร็จ | 2026-01-31 |
-| Phase 10: Build & Release | ⏳ รอดำเนินการ | - |
+| Phase 10: Build & Release | ✅ เสร็จ | 2026-01-31 |
 
 ---
 
