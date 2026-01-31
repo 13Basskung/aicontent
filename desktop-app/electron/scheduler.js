@@ -220,6 +220,13 @@ async function fetchUserSchedule(userId) {
     for (const doc of projectsData.documents || []) {
       const projectId = doc.name.split('/').pop();
       const projectName = parseFirestoreValue(doc.fields?.name);
+      const projectTimezone = parseFirestoreValue(doc.fields?.timezone);
+      
+      // Update global timezone if project has one
+      if (projectTimezone) {
+        userTimezone = projectTimezone;
+        console.log('🌍 Found project timezone:', projectTimezone);
+      }
       
       // Get slots for this project
       const slotsUrl = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}/projects/${projectId}/slots?key=${API_KEY}`;
@@ -238,7 +245,8 @@ async function fetchUserSchedule(userId) {
           end: parseFirestoreValue(fields.end),
           scenes: parseFirestoreValue(fields.scenes),
           sceneDuration: parseFirestoreValue(fields.sceneDuration),
-          platforms: parseFirestoreValue(fields.platforms) || []
+          platforms: parseFirestoreValue(fields.platforms) || [],
+          timezone: projectTimezone || 'Asia/Bangkok'
         });
       }
     }

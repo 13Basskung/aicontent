@@ -599,8 +599,15 @@ export default function TimeSlotPicker({ projectId, modeScenes = null, userTimez
                                     ].map(tz => (
                                         <button
                                             key={tz.value}
-                                            onClick={() => {
+                                            onClick={async () => {
+                                                // Save timezone to BOTH user doc AND project doc
                                                 onTimezoneChange({ target: { value: tz.value } });
+                                                // Also save to project document for Desktop Agent
+                                                if (currentUser && projectId) {
+                                                    await setDoc(doc(db, 'users', currentUser.uid, 'projects', projectId), 
+                                                        { timezone: tz.value }, { merge: true });
+                                                    console.log('📅 Timezone saved to project:', tz.value);
+                                                }
                                                 setIsTimezoneDropdownOpen(false);
                                             }}
                                             className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
