@@ -119,7 +119,7 @@ export default function Projects() {
         };
     }, [isTimezoneDropdownOpen]);
 
-    // Fetch User Timezone on Load
+    // Fetch User Timezone on Load + Ensure email is saved for Desktop App
     useEffect(() => {
         if (!currentUser) return;
         console.log("👤 Fetching Timezone for user:", currentUser.uid);
@@ -133,8 +133,20 @@ export default function Projects() {
                         setUserTimezone(data.timezone);
                         console.log("✅ Set User Timezone from DB:", data.timezone);
                     }
+                    // Always ensure email is saved (for Desktop App to query by email)
+                    if (!data.email && currentUser.email) {
+                        console.log("📧 Saving email to user document...");
+                        await setDoc(doc(db, 'users', currentUser.uid), { 
+                            email: currentUser.email 
+                        }, { merge: true });
+                    }
                 } else {
-                    console.log("⚠️ User Document not found, creating placeholder...");
+                    // Create user document with email
+                    console.log("⚠️ User Document not found, creating with email...");
+                    await setDoc(doc(db, 'users', currentUser.uid), { 
+                        email: currentUser.email || '',
+                        timezone: 'Asia/Bangkok'
+                    }, { merge: true });
                 }
             } catch (e) {
                 console.error("Error fetching user timezone:", e);
