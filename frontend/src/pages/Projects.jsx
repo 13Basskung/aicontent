@@ -1627,7 +1627,13 @@ export default function Projects() {
                                         const modeScenes = selectedModeData 
                                             ? (selectedModeData.blocks || []).reduce((acc, block) => acc + (block.evolution?.length || 0), 0)
                                             : null;
-                                        return <TimeSlotPicker projectId={selectedProject.id} modeScenes={modeScenes} key={`${selectedProject.id}-${modeScenes}`} />;
+                                        return <TimeSlotPicker 
+                                            projectId={selectedProject.id} 
+                                            modeScenes={modeScenes} 
+                                            key={`${selectedProject.id}-${modeScenes}`}
+                                            userTimezone={userTimezone}
+                                            onTimezoneChange={handleTimezoneChange}
+                                        />;
                                     })()}
 
                                     {/* ========================================== */}

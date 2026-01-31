@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Clock, AlertTriangle, Loader2, Check, ChevronDown, MonitorPlay, Pencil, X, Save } from 'lucide-react';
+import { Plus, Trash2, Clock, AlertTriangle, Loader2, Check, ChevronDown, MonitorPlay, Pencil, X, Save, Globe } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { db, auth } from '../../firebase';
 import { collection, doc, setDoc, onSnapshot, collectionGroup, query, getDocs } from 'firebase/firestore';
@@ -145,10 +146,14 @@ const TimelineVisualizer = ({ slots }) => {
     );
 };
 
-export default function TimeSlotPicker({ projectId, modeScenes = null }) {
+export default function TimeSlotPicker({ projectId, modeScenes = null, userTimezone = 'Asia/Bangkok', onTimezoneChange = null }) {
     const { t } = useTranslation();
     const dropdownRef = useRef(null);
+    const timezoneButtonRef = useRef(null);
+    const timezoneDropdownRef = useRef(null);
     const [selectedDay, setSelectedDay] = useState('mon');
+    const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
+    const [timezoneDropdownPos, setTimezoneDropdownPos] = useState({ top: 0, left: 0, width: 0 });
     const [schedule, setSchedule] = useState({
         mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: []
     });
@@ -535,7 +540,81 @@ export default function TimeSlotPicker({ projectId, modeScenes = null }) {
                     <Clock size={28} className="text-red-400" />
                     <h2 className="text-2xl font-bold tracking-wide">{t('timeslot.title')}</h2>
                 </div>
-                {isSaving && <div className="text-sm text-white/70 flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> {t('timeslot.saving')}</div>}
+                
+                {/* Timezone Selector + Saving Status */}
+                <div className="flex items-center gap-4">
+                    {isSaving && <div className="text-sm text-white/70 flex items-center gap-2"><Loader2 className="animate-spin" size={16} /> {t('timeslot.saving')}</div>}
+                    
+                    {/* Timezone Selector */}
+                    {onTimezoneChange && (
+                        <div className="relative">
+                            <button
+                                ref={timezoneButtonRef}
+                                onClick={() => {
+                                    const buttonEl = timezoneButtonRef.current;
+                                    if (buttonEl) {
+                                        const rect = buttonEl.getBoundingClientRect();
+                                        setTimezoneDropdownPos({
+                                            top: rect.bottom + 8,
+                                            left: rect.left,
+                                            width: rect.width
+                                        });
+                                    }
+                                    setIsTimezoneDropdownOpen((open) => !open);
+                                }}
+                                className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
+                            >
+                                <img 
+                                    src={`https://flagcdn.com/24x18/${userTimezone === 'Asia/Bangkok' ? 'th' : userTimezone === 'Europe/London' ? 'gb' : userTimezone === 'Asia/Shanghai' ? 'cn' : userTimezone === 'Asia/Seoul' ? 'kr' : 'tw'}.png`}
+                                    alt="flag"
+                                    className="w-6 h-4 object-cover rounded-sm"
+                                />
+                                <span className="flex-1 text-left">
+                                    {userTimezone === 'Asia/Bangkok' && 'Thailand (GMT+7)'}
+                                    {userTimezone === 'Europe/London' && 'UK (GMT+0)'}
+                                    {userTimezone === 'Asia/Shanghai' && 'China (GMT+8)'}
+                                    {userTimezone === 'Asia/Seoul' && 'Korea (GMT+9)'}
+                                    {userTimezone === 'Asia/Taipei' && 'Taiwan (GMT+8)'}
+                                </span>
+                                <ChevronDown size={14} className={`text-yellow-500 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {/* Dropdown Options */}
+                            {isTimezoneDropdownOpen && createPortal(
+                                <div
+                                    ref={timezoneDropdownRef}
+                                    className="fixed bg-slate-900/80 backdrop-blur-[28px] border border-white/15 rounded-2xl shadow-[0_32px_100px_rgba(0,0,0,0.95)] ring-1 ring-white/10 z-[999999] overflow-hidden"
+                                    style={{
+                                        top: timezoneDropdownPos.top,
+                                        left: timezoneDropdownPos.left,
+                                        width: Math.max(256, timezoneDropdownPos.width)
+                                    }}
+                                >
+                                    {[
+                                        { value: 'Asia/Bangkok', code: 'th', label: 'Thailand (GMT+7)' },
+                                        { value: 'Europe/London', code: 'gb', label: 'United Kingdom (GMT+0)' },
+                                        { value: 'Asia/Shanghai', code: 'cn', label: 'China (GMT+8)' },
+                                        { value: 'Asia/Seoul', code: 'kr', label: 'South Korea (GMT+9)' },
+                                        { value: 'Asia/Taipei', code: 'tw', label: 'Taiwan (GMT+8)' },
+                                    ].map(tz => (
+                                        <button
+                                            key={tz.value}
+                                            onClick={() => {
+                                                onTimezoneChange({ target: { value: tz.value } });
+                                                setIsTimezoneDropdownOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
+                                        >
+                                            <img src={`https://flagcdn.com/24x18/${tz.code}.png`} alt="flag" className="w-6 h-4 object-cover rounded-sm shadow-sm" />
+                                            <span className="text-sm font-medium">{tz.label}</span>
+                                        </button>
+                                    ))}
+                                </div>,
+                                document.body
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Error Message */}
