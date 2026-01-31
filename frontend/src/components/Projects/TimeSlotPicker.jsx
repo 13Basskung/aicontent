@@ -614,6 +614,22 @@ export default function TimeSlotPicker({ projectId, modeScenes = null, userTimez
                             )}
                         </div>
                     )}
+                    
+                    {/* Current Time Display */}
+                    {onTimezoneChange && (
+                        <div className="flex items-center gap-2 bg-green-500/10 rounded-lg px-3 py-2 border border-green-500/20">
+                            <Clock size={16} className="text-green-400" />
+                            <span suppressHydrationWarning className="font-mono font-bold text-lg text-white">
+                                {new Date().toLocaleTimeString('en-US', {
+                                    timeZone: userTimezone,
+                                    hour12: false,
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                })}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
