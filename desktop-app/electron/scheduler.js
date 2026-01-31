@@ -14,6 +14,8 @@ let mainWindow = null;
 let runBlockCallback = null;
 let instanceManager = null;
 let playwrightBridge = null;
+let cachedScheduleHash = null;
+let userTimezone = 'Asia/Bangkok';
 
 /**
  * Initialize scheduler
@@ -72,6 +74,65 @@ function parseFirestoreValue(value) {
 function getDayCode(date) {
   const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   return days[date.getDay()];
+}
+
+/**
+ * Fetch user timezone from Firestore
+ */
+async function fetchUserTimezone(userId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}?key=${API_KEY}`;
+    const data = await fetchJSON(url);
+    if (data.fields?.timezone?.stringValue) {
+      userTimezone = data.fields.timezone.stringValue;
+      console.log('🌍 User timezone:', userTimezone);
+    }
+    return userTimezone;
+  } catch (error) {
+    console.error('❌ Failed to fetch timezone:', error.message);
+    return 'Asia/Bangkok';
+  }
+}
+
+/**
+ * Get current timezone
+ */
+function getUserTimezone() {
+  return userTimezone;
+}
+
+/**
+ * Create hash from schedules for change detection
+ */
+function createScheduleHash(schedules) {
+  const str = JSON.stringify(schedules.map(s => ({
+    projectId: s.projectId,
+    slotId: s.slotId,
+    day: s.day,
+    start: s.start
+  })).sort((a, b) => a.slotId.localeCompare(b.slotId)));
+  // Simple hash
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
+/**
+ * Check if schedules have changed
+ */
+function hasScheduleChanged(newHash) {
+  if (cachedScheduleHash === null) {
+    cachedScheduleHash = newHash;
+    return true;
+  }
+  if (cachedScheduleHash !== newHash) {
+    cachedScheduleHash = newHash;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -332,5 +393,9 @@ module.exports = {
   fetchUserSchedule,
   getTodaySchedule,
   checkScheduleNow,
-  executeScheduledRun
+  executeScheduledRun,
+  fetchUserTimezone,
+  getUserTimezone,
+  createScheduleHash,
+  hasScheduleChanged
 };

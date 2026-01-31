@@ -24,6 +24,7 @@ function SchedulerPanel({ keyData, instances }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastDay, setLastDay] = useState(new Date().getDay());
   const [executionStatus, setExecutionStatus] = useState(null);
+  const [userTimezone, setUserTimezone] = useState('Asia/Bangkok');
 
   // Update current time every second + check day change
   useEffect(() => {
@@ -41,15 +42,28 @@ function SchedulerPanel({ keyData, instances }) {
     return () => clearInterval(timer);
   }, [lastDay]);
 
-  // Load schedules on mount + auto-refresh every 30 seconds for real-time sync
+  // Load schedules on mount + fetch timezone
   useEffect(() => {
     loadSchedules();
-    
-    // Real-time sync: poll Firestore every 30 seconds
-    const syncInterval = setInterval(() => {
-      console.log('🔄 Auto-syncing schedules from Firestore...');
-      loadSchedules();
-    }, 30000); // 30 seconds
+    loadTimezone();
+  }, [keyData]);
+
+  // Smart-refresh: check for changes every 30 seconds (only update if changed)
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      if (window.electronAPI?.scheduler && keyData?.userId) {
+        const result = await window.electronAPI.scheduler.checkChanges(keyData.userId);
+        if (result.changed) {
+          console.log('🔄 Schedules changed - updating...');
+          setSchedules(result.schedules);
+          setUserTimezone(result.timezone);
+          // Filter today's schedules
+          const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+          const todayCode = days[new Date().getDay()];
+          setTodaySchedules(result.schedules.filter(s => s.day === todayCode));
+        }
+      }
+    }, 30000);
     
     return () => clearInterval(syncInterval);
   }, [keyData]);
@@ -76,6 +90,18 @@ function SchedulerPanel({ keyData, instances }) {
       });
     }
   }, []);
+
+  async function loadTimezone() {
+    try {
+      if (window.electronAPI?.scheduler && keyData?.userId) {
+        const tz = await window.electronAPI.scheduler.getTimezone(keyData.userId);
+        setUserTimezone(tz);
+        console.log('🌍 User timezone:', tz);
+      }
+    } catch (error) {
+      console.error('Load timezone error:', error);
+    }
+  }
 
   async function loadSchedules() {
     setLoading(true);
@@ -104,13 +130,46 @@ function SchedulerPanel({ keyData, instances }) {
     }
   }
 
+  // Get current time in user's timezone
+  function getTimeInTimezone() {
+    return new Date(currentTime.toLocaleString('en-US', { timeZone: userTimezone }));
+  }
+
   function getCurrentDayCode() {
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    return days[currentTime.getDay()];
+    const tzTime = getTimeInTimezone();
+    return days[tzTime.getDay()];
   }
 
   function formatTime(date) {
-    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    // Format time in user's timezone
+    return date.toLocaleTimeString('th-TH', { 
+      timeZone: userTimezone,
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+  }
+
+  function formatTimeWithSeconds(date) {
+    return date.toLocaleTimeString('th-TH', { 
+      timeZone: userTimezone,
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false 
+    });
+  }
+
+  function getTimezoneLabel() {
+    const labels = {
+      'Asia/Bangkok': 'Thailand (GMT+7)',
+      'Europe/London': 'UK (GMT+0)',
+      'Asia/Shanghai': 'China (GMT+8)',
+      'Asia/Seoul': 'Korea (GMT+9)',
+      'Asia/Taipei': 'Taiwan (GMT+8)'
+    };
+    return labels[userTimezone] || userTimezone;
   }
 
   function isUpcoming(slot) {
@@ -140,9 +199,14 @@ function SchedulerPanel({ keyData, instances }) {
               <Clock className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Scheduler</h2>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                Scheduler
+                <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+                  {getTimezoneLabel()}
+                </span>
+              </h2>
               <p className="text-white/50 text-sm">
-                {DAY_NAMES[getCurrentDayCode()]} {formatTime(currentTime)}:{String(currentTime.getSeconds()).padStart(2, '0')}
+                {DAY_NAMES[getCurrentDayCode()]} {formatTimeWithSeconds(currentTime)}
               </p>
             </div>
           </div>
