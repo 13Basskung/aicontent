@@ -8,7 +8,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/13Basskung/aicontents-desktop-agen.git"
+    "url": "https://github.com/13Basskung/aicontent.git"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev:react\" \"wait-on http://localhost:3000 && npm run dev:electron\"",
@@ -54,7 +54,7 @@
     "publish": {
       "provider": "github",
       "owner": "13Basskung",
-      "repo": "aicontents-desktop-agen",
+      "repo": "aicontent",
       "releaseType": "release"
     }
   },
