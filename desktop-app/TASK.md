@@ -1,825 +1,893 @@
-# 📋 Task: Desktop App Implementation
+# 📋 Task: Desktop App Implementation (Node.js Version)
 
-> แผนงานละเอียดสำหรับสร้าง Desktop App แทน Chrome Extension
-> แต่ละขั้นตอนมีการอ้างอิงโค้ดจริงจากโปรเจคปัจจุบัน
+> **แผนงานใหม่**: ใช้ Node.js + Playwright JS (ไม่ต้องติดตั้ง Python)
+> ลูกค้าติดตั้ง .exe เพียงไฟล์เดียว → ใช้งานได้เลย + Auto-Update
 
 ---
 
-## 📌 สารบัญ
+## � Implementation Status
 
-1. [Phase 1: Project Setup](#phase-1-project-setup)
-2. [Phase 2: Firebase Integration](#phase-2-firebase-integration)
+| Phase | สถานะ | วันที่เสร็จ |
+|-------|--------|------------|
+| Phase 1: Project Setup | ✅ เสร็จ | 2026-01-31 |
+| Phase 2: Firebase Integration | ✅ เสร็จ (รวมใน Phase 1) | 2026-01-31 |
+| Phase 3: Key-based Auth | ✅ เสร็จ (รวมใน Phase 1) | 2026-01-31 |
+| Phase 4: Project UI | ✅ เสร็จ (รวมใน Phase 1) | 2026-01-31 |
+| Phase 5: Playwright Player | ✅ เสร็จ | 2026-01-31 |
+| Phase 6: Playwright Recorder | ✅ เสร็จ | 2026-01-31 |
+| Phase 7: Multi-Instance | ✅ เสร็จ | 2026-01-31 |
+| Phase 8: Scheduler | ✅ เสร็จ | 2026-01-31 |
+| Phase 9: Auto-Update | ✅ Config เสร็จ | 2026-01-31 |
+| Phase 10: Build & Release | ⏳ รอดำเนินการ | - |
+
+---
+
+## �� สารบัญ
+
+1. [Phase 1: Project Setup (Electron + React + Playwright JS)](#phase-1-project-setup)
+2. [Phase 2: Firebase Integration (JavaScript)](#phase-2-firebase-integration)
 3. [Phase 3: Key-based Authentication](#phase-3-key-based-authentication)
 4. [Phase 4: Project Management UI](#phase-4-project-management-ui)
-5. [Phase 5: Playwright Player](#phase-5-playwright-player)
+5. [Phase 5: Playwright Player (JavaScript)](#phase-5-playwright-player)
 6. [Phase 6: Playwright Recorder (Admin)](#phase-6-playwright-recorder-admin)
 7. [Phase 7: Multi-Instance Manager](#phase-7-multi-instance-manager)
 8. [Phase 8: Scheduler & Auto-Run](#phase-8-scheduler--auto-run)
-9. [Phase 9: Testing & Polish](#phase-9-testing--polish)
+9. [Phase 9: Auto-Update System](#phase-9-auto-update-system)
+10. [Phase 10: Build & Release](#phase-10-build--release)
+
+---
+
+## 🎯 ผลลัพธ์ที่ลูกค้าจะได้
+
+```
+✅ ไฟล์ติดตั้ง: ContentAutoPost-Setup-1.0.0.exe (~150MB)
+✅ ติดตั้งแล้วได้: Desktop Shortcut + Start Menu
+✅ ไม่ต้องติดตั้ง Python หรือรันคำสั่งใดๆ
+✅ Auto-Update: กดปุ่มเดียวอัพเดทเป็นเวอร์ชันใหม่
+```
 
 ---
 
 ## Phase 1: Project Setup
 
-### 1.1 สร้างโครงสร้างโฟลเดอร์
+### 1.1 โครงสร้างโฟลเดอร์ใหม่
 
 ```
 desktop-app/
-├── electron/              # Electron main process
-│   ├── main.js           # Main entry point
-│   ├── preload.js        # Preload script
-│   └── ipc-handlers.js   # IPC handlers
+├── electron/                  # Electron main process
+│   ├── main.js               # Main entry point
+│   ├── preload.js            # Preload script (bridge)
+│   ├── updater.js            # Auto-update handler
+│   └── playwright-bridge.js  # Playwright IPC handlers
 │
-├── src/                   # React UI (renderer)
-│   ├── components/       # React components
-│   ├── pages/            # Page components
-│   ├── hooks/            # Custom hooks
-│   ├── utils/            # Utilities
-│   ├── App.jsx           # Main app
-│   └── main.jsx          # React entry
+├── src/                       # React UI (renderer)
+│   ├── components/           # React components
+│   │   ├── ProjectList.jsx
+│   │   ├── ProjectCard.jsx
+│   │   ├── InstanceManager.jsx
+│   │   ├── BlockRunner.jsx
+│   │   └── UpdateNotification.jsx
+│   ├── pages/
+│   │   ├── Login.jsx
+│   │   └── Dashboard.jsx
+│   ├── hooks/
+│   │   └── useFirebase.js
+│   ├── utils/
+│   │   ├── firebase.js       # Firebase REST API
+│   │   └── auth.js           # Key decoder
+│   ├── App.jsx
+│   └── main.jsx
 │
-├── playwright/            # Playwright automation
-│   ├── player.py         # Step execution
-│   ├── recorder.py       # Step recording
-│   ├── instance_manager.py # Multi-instance
-│   └── firebase_client.py # Firebase REST API
+├── automation/                # Playwright (JavaScript)
+│   ├── player.js             # Step execution engine
+│   ├── recorder.js           # Step recording
+│   └── instance-manager.js   # Multi-instance control
 │
-├── profiles/              # Chrome profiles (persistent login)
-│   ├── instance_1/
-│   ├── instance_2/
-│   └── ...
+├── profiles/                  # Chrome profiles (auto-created)
 │
-├── data/                  # Local data
-│   ├── config.json       # App config
-│   └── instances.json    # Instance states
-│
-├── package.json          # Node dependencies
-├── requirements.txt      # Python dependencies
-├── WALKTHROUGH.md        # Documentation
-└── TASK.md              # This file
+├── package.json              # All dependencies
+├── electron-builder.yml      # Build config + Auto-update
+├── vite.config.js            # Vite config
+├── WALKTHROUGH.md
+└── TASK.md
 ```
 
-### 1.2 Task Checklist
+### 1.2 package.json
 
-- [ ] **1.2.1** สร้างโฟลเดอร์ตาม structure ด้านบน
-- [ ] **1.2.2** สร้าง `package.json` สำหรับ Electron + React
-  ```json
-  {
-    "name": "content-auto-post-desktop",
-    "version": "1.0.0",
-    "main": "electron/main.js",
-    "scripts": {
-      "dev": "vite",
-      "electron": "electron .",
-      "start": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron\"",
-      "build": "vite build && electron-builder"
+```json
+{
+  "name": "content-auto-post",
+  "version": "1.0.0",
+  "description": "Desktop Agent for Content Auto Post",
+  "main": "electron/main.js",
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "electron:build": "npm run build && electron-builder",
+    "electron:publish": "npm run build && electron-builder --publish always"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "playwright": "^1.40.0",
+    "electron-updater": "^6.1.7",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.10",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.contentautopost.desktop",
+    "productName": "Content Auto Post",
+    "directories": {
+      "output": "release"
     },
-    "dependencies": {
-      "react": "^18.2.0",
-      "react-dom": "^18.2.0",
-      "electron": "^28.0.0"
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "automation/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_USERNAME",
+      "repo": "content-auto-post-desktop"
     }
   }
-  ```
-- [ ] **1.2.3** สร้าง `requirements.txt` สำหรับ Python
-  ```
-  playwright==1.40.0
-  requests==2.31.0
-  python-dotenv==1.0.0
-  ```
-- [ ] **1.2.4** สร้าง `electron/main.js` (Electron entry point)
-- [ ] **1.2.5** สร้าง `electron/preload.js` (Bridge to renderer)
-- [ ] **1.2.6** ตั้งค่า Vite สำหรับ React
+}
+```
 
-### 1.3 อ้างอิงโค้ดเดิม
+### 1.3 Task Checklist
 
-| ไฟล์ใหม่ | อ้างอิงจาก |
-|----------|------------|
-| `src/App.jsx` | `extension/src/App.jsx` (structure) |
-| `src/components/` | `extension/src/UserPanel.jsx` (UI) |
+- [ ] **1.3.1** สร้างโฟลเดอร์ตาม structure
+- [ ] **1.3.2** สร้าง `package.json`
+- [ ] **1.3.3** สร้าง `electron/main.js`
+- [ ] **1.3.4** สร้าง `electron/preload.js`
+- [ ] **1.3.5** สร้าง `vite.config.js`
+- [ ] **1.3.6** รัน `npm install`
+- [ ] **1.3.7** ทดสอบ `npm run electron:dev`
 
 ---
 
-## Phase 2: Firebase Integration
+## Phase 2: Firebase Integration (JavaScript)
 
 ### 2.1 Firebase REST API Client
 
 📁 **อ้างอิง:** `extension/src/background/index.js` บรรทัด 9-10, 46-81
 
-```python
-# playwright/firebase_client.py
+```javascript
+// src/utils/firebase.js
 
-import requests
-from typing import Optional, Dict, List, Any
+const FIREBASE_PROJECT_ID = 'content-auto-post';
+const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE';
 
-FIREBASE_PROJECT_ID = "content-auto-post"
-API_KEY = "AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE"
+const BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
-class FirebaseClient:
-    def __init__(self):
-        self.base_url = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents"
-    
-    def _parse_value(self, val: Dict) -> Any:
-        """Convert Firestore value to Python value"""
-        # อ้างอิง: background/index.js บรรทัด 46-62
-        if val is None:
-            return None
-        if 'mapValue' in val:
-            return {k: self._parse_value(v) for k, v in val['mapValue'].get('fields', {}).items()}
-        if 'arrayValue' in val:
-            return [self._parse_value(v) for v in val['arrayValue'].get('values', [])]
-        if 'stringValue' in val:
-            return val['stringValue']
-        if 'integerValue' in val:
-            return int(val['integerValue'])
-        if 'doubleValue' in val:
-            return float(val['doubleValue'])
-        if 'booleanValue' in val:
-            return val['booleanValue']
-        if 'timestampValue' in val:
-            return val['timestampValue']
-        if 'nullValue' in val:
-            return None
-        return val
-    
-    def fetch_projects(self, user_id: str) -> List[Dict]:
-        """Fetch projects for a user"""
-        # อ้างอิง: UserPanel.jsx บรรทัด 203-234
-        url = f"{self.base_url}/users/{user_id}/projects?key={API_KEY}"
-        res = requests.get(url)
-        data = res.json()
-        
-        if 'documents' not in data:
-            return []
-        
-        projects = []
-        for doc in data['documents']:
-            project_id = doc['name'].split('/')[-1]
-            fields = doc.get('fields', {})
-            projects.append({
-                'id': project_id,
-                'name': self._parse_value(fields.get('name', {})) or project_id,
-                'status': self._parse_value(fields.get('status', {})) or 'idle'
-            })
-        return projects
-    
-    def fetch_block(self, block_name: str) -> Optional[Dict]:
-        """Fetch block by name"""
-        # อ้างอิง: background/index.js บรรทัด 84-134
-        url = f"{self.base_url}:runQuery?key={API_KEY}"
-        body = {
-            "structuredQuery": {
-                "from": [{"collectionId": "global_recipe_blocks"}],
-                "where": {
-                    "fieldFilter": {
-                        "field": {"fieldPath": "name"},
-                        "op": "EQUAL",
-                        "value": {"stringValue": block_name}
-                    }
-                },
-                "limit": 1
-            }
+/**
+ * Convert Firestore value to JavaScript value
+ * อ้างอิง: background/index.js บรรทัด 46-62
+ */
+function parseValue(val) {
+  if (!val) return null;
+  if ('mapValue' in val) {
+    const fields = val.mapValue.fields || {};
+    return Object.fromEntries(
+      Object.entries(fields).map(([k, v]) => [k, parseValue(v)])
+    );
+  }
+  if ('arrayValue' in val) {
+    return (val.arrayValue.values || []).map(parseValue);
+  }
+  if ('stringValue' in val) return val.stringValue;
+  if ('integerValue' in val) return parseInt(val.integerValue);
+  if ('doubleValue' in val) return parseFloat(val.doubleValue);
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('nullValue' in val) return null;
+  return val;
+}
+
+/**
+ * Fetch projects for a user
+ * อ้างอิง: UserPanel.jsx บรรทัด 203-234
+ */
+export async function fetchProjects(userId) {
+  const url = `${BASE_URL}/users/${userId}/projects?key=${API_KEY}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  
+  if (!data.documents) return [];
+  
+  return data.documents.map(doc => {
+    const projectId = doc.name.split('/').pop();
+    const fields = doc.fields || {};
+    return {
+      id: projectId,
+      name: parseValue(fields.name) || projectId,
+      status: parseValue(fields.status) || 'idle'
+    };
+  });
+}
+
+/**
+ * Fetch block by name
+ * อ้างอิง: background/index.js บรรทัด 84-134
+ */
+export async function fetchBlock(blockName) {
+  const url = `${BASE_URL}:runQuery?key=${API_KEY}`;
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: 'global_recipe_blocks' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'name' },
+          op: 'EQUAL',
+          value: { stringValue: blockName }
         }
-        res = requests.post(url, json=body)
-        data = res.json()
-        
-        if not data or not data[0].get('document'):
-            return None
-        
-        doc = data[0]['document']
-        fields = doc.get('fields', {})
-        
-        return {
-            'id': doc['name'].split('/')[-1],
-            'name': self._parse_value(fields.get('name', {})),
-            'type': self._parse_value(fields.get('type', {})) or 'ONCE',
-            'startUrl': self._parse_value(fields.get('startUrl', {})) or '',
-            'variables': self._parse_value(fields.get('variables', {})) or [],
-            'steps': self._parse_value(fields.get('steps', {})) or []
-        }
-    
-    def fetch_prompts(self, user_id: str, project_id: str) -> List[str]:
-        """Fetch prompts from jobs or readyPrompts"""
-        # อ้างอิง: background/index.js บรรทัด 275-325
-        prompts = []
-        
-        # Try jobs collection first
-        jobs_url = f"{self.base_url}/users/{user_id}/projects/{project_id}/jobs?key={API_KEY}"
-        jobs_res = requests.get(jobs_url)
-        jobs_data = jobs_res.json()
-        
-        if 'documents' in jobs_data:
-            for doc in jobs_data['documents']:
-                job_prompts = self._parse_value(doc.get('fields', {}).get('prompts', {}))
-                if job_prompts and isinstance(job_prompts, list):
-                    prompts = [p for p in job_prompts if p and str(p).strip()]
-                    if prompts:
-                        return prompts
-        
-        # Fallback to readyPrompts
-        ready_url = f"{self.base_url}/users/{user_id}/projects/{project_id}/readyPrompts?key={API_KEY}"
-        ready_res = requests.get(ready_url)
-        ready_data = ready_res.json()
-        
-        if 'documents' in ready_data:
-            for doc in ready_data['documents']:
-                ready_prompts = self._parse_value(doc.get('fields', {}).get('prompts', {}))
-                if ready_prompts and isinstance(ready_prompts, list):
-                    # Extract englishPrompt if object
-                    prompts = [
-                        p.get('englishPrompt', p) if isinstance(p, dict) else p
-                        for p in ready_prompts
-                        if p
-                    ]
-                    if prompts:
-                        return prompts
-        
-        return prompts
+      },
+      limit: 1
+    }
+  };
+  
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  
+  if (!data[0]?.document) return null;
+  
+  const doc = data[0].document;
+  const fields = doc.fields || {};
+  
+  return {
+    id: doc.name.split('/').pop(),
+    name: parseValue(fields.name),
+    type: parseValue(fields.type) || 'ONCE',
+    startUrl: parseValue(fields.startUrl) || '',
+    variables: parseValue(fields.variables) || [],
+    steps: parseValue(fields.steps) || []
+  };
+}
+
+/**
+ * Fetch prompts from jobs or readyPrompts
+ * อ้างอิง: background/index.js บรรทัด 275-325
+ */
+export async function fetchPrompts(userId, projectId) {
+  // Try jobs collection first
+  const jobsUrl = `${BASE_URL}/users/${userId}/projects/${projectId}/jobs?key=${API_KEY}`;
+  const jobsRes = await fetch(jobsUrl);
+  const jobsData = await jobsRes.json();
+  
+  if (jobsData.documents) {
+    for (const doc of jobsData.documents) {
+      const prompts = parseValue(doc.fields?.prompts);
+      if (Array.isArray(prompts) && prompts.length > 0) {
+        return prompts.filter(p => p && String(p).trim());
+      }
+    }
+  }
+  
+  // Fallback to readyPrompts
+  const readyUrl = `${BASE_URL}/users/${userId}/projects/${projectId}/readyPrompts?key=${API_KEY}`;
+  const readyRes = await fetch(readyUrl);
+  const readyData = await readyRes.json();
+  
+  if (readyData.documents) {
+    for (const doc of readyData.documents) {
+      const prompts = parseValue(doc.fields?.prompts);
+      if (Array.isArray(prompts) && prompts.length > 0) {
+        return prompts.map(p => 
+          typeof p === 'object' ? p.englishPrompt : p
+        ).filter(Boolean);
+      }
+    }
+  }
+  
+  return [];
+}
+
+/**
+ * Save block to Firestore (Admin)
+ */
+export async function saveBlock(block) {
+  const url = `${BASE_URL}/global_recipe_blocks?key=${API_KEY}`;
+  // ... implementation
+}
 ```
 
 ### 2.2 Task Checklist
 
-- [ ] **2.2.1** สร้าง `playwright/firebase_client.py`
-- [ ] **2.2.2** Implement `_parse_value()` (จาก `fromFirestoreValue`)
-- [ ] **2.2.3** Implement `fetch_projects()` (จาก UserPanel.jsx)
-- [ ] **2.2.4** Implement `fetch_block()` (จาก background/index.js)
-- [ ] **2.2.5** Implement `fetch_prompts()` (จาก background/index.js)
-- [ ] **2.2.6** Implement `fetch_jobs()` สำหรับ Job queue
-- [ ] **2.2.7** Implement `save_block()` สำหรับ Admin record
-- [ ] **2.2.8** ทดสอบ API calls ทั้งหมด
+- [ ] **2.2.1** สร้าง `src/utils/firebase.js`
+- [ ] **2.2.2** Implement `parseValue()` (จาก `fromFirestoreValue`)
+- [ ] **2.2.3** Implement `fetchProjects()`
+- [ ] **2.2.4** Implement `fetchBlock()`
+- [ ] **2.2.5** Implement `fetchPrompts()`
+- [ ] **2.2.6** Implement `fetchJobs()`
+- [ ] **2.2.7** Implement `saveBlock()` (Admin)
+- [ ] **2.2.8** ทดสอบ API calls
 
 ---
 
 ## Phase 3: Key-based Authentication
 
-### 3.1 Key Decoder
+### 3.1 Key Decoder (JavaScript)
 
 📁 **อ้างอิง:** `extension/src/App.jsx` บรรทัด 38-52
 
-```python
-# playwright/auth.py
+```javascript
+// src/utils/auth.js
 
-import base64
-from dataclasses import dataclass
-from typing import Optional
+/**
+ * Decode base64 key to user data
+ * Format: userId:ADMIN|USER:timestamp:random
+ * อ้างอิง: App.jsx บรรทัด 38-52
+ */
+export function decodeKey(key) {
+  try {
+    const decoded = atob(key);
+    const parts = decoded.split(':');
+    if (parts.length >= 2) {
+      return {
+        userId: parts[0],
+        isAdmin: parts[1] === 'ADMIN',
+        timestamp: parts[2] || null,
+        random: parts[3] || null
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
-@dataclass
-class KeyData:
-    user_id: str
-    is_admin: bool
-    timestamp: Optional[str] = None
-    random: Optional[str] = None
+/**
+ * Save key to local storage (electron-store)
+ */
+export async function saveKey(key) {
+  return window.electronAPI.saveConfig('licenseKey', key);
+}
 
-def decode_key(key: str) -> Optional[KeyData]:
-    """
-    Decode base64 key to KeyData
-    Format: userId:ADMIN|USER:timestamp:random
-    """
-    try:
-        decoded = base64.b64decode(key).decode('utf-8')
-        parts = decoded.split(':')
-        if len(parts) >= 2:
-            return KeyData(
-                user_id=parts[0],
-                is_admin=parts[1] == 'ADMIN',
-                timestamp=parts[2] if len(parts) > 2 else None,
-                random=parts[3] if len(parts) > 3 else None
-            )
-        return None
-    except Exception:
-        return None
+/**
+ * Load saved key
+ */
+export async function loadKey() {
+  return window.electronAPI.loadConfig('licenseKey');
+}
 ```
 
-### 3.2 Task Checklist
-
-- [ ] **3.2.1** สร้าง `playwright/auth.py`
-- [ ] **3.2.2** Implement `decode_key()` (จาก App.jsx)
-- [ ] **3.2.3** สร้าง Login UI ใน React (`src/pages/Login.jsx`)
-- [ ] **3.2.4** เก็บ Key ใน `data/config.json`
-- [ ] **3.2.5** Auto-login ถ้ามี stored key
-- [ ] **3.2.6** ทดสอบ Login flow
-
-### 3.3 Login UI
-
-📁 **อ้างอิง:** `extension/src/App.jsx` บรรทัด 531-584
+### 3.2 Login Page
 
 ```jsx
 // src/pages/Login.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { decodeKey, saveKey, loadKey } from '../utils/auth';
 
 export default function Login({ onLogin }) {
   const [keyInput, setKeyInput] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Auto-login if key exists
+  useEffect(() => {
+    loadKey().then(savedKey => {
+      if (savedKey) {
+        const decoded = decodeKey(savedKey);
+        if (decoded) {
+          onLogin(decoded);
+          return;
+        }
+      }
+      setLoading(false);
+    });
+  }, []);
 
   const handleLogin = async () => {
-    // Call Python to decode key
-    const result = await window.electronAPI.decodeKey(keyInput);
-    if (result.success) {
-      onLogin(result.data);
-    } else {
+    const decoded = decodeKey(keyInput.trim());
+    if (!decoded) {
       setError('Invalid key format');
+      return;
     }
+    
+    await saveKey(keyInput.trim());
+    onLogin(decoded);
   };
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
     <div className="login-container">
-      <h1>Content Auto Post</h1>
-      <input
-        type="text"
-        value={keyInput}
-        onChange={(e) => setKeyInput(e.target.value)}
-        placeholder="Paste User Key Here..."
-      />
-      <button onClick={handleLogin} disabled={!keyInput.trim()}>
-        Connect Agent
-      </button>
-      {error && <p className="error">{error}</p>}
+      <div className="login-card">
+        <h1>🚀 Content Auto Post</h1>
+        <p>Desktop Agent</p>
+        
+        <input
+          type="text"
+          value={keyInput}
+          onChange={(e) => setKeyInput(e.target.value)}
+          placeholder="Paste your License Key here..."
+          className="key-input"
+        />
+        
+        {error && <p className="error">{error}</p>}
+        
+        <button 
+          onClick={handleLogin} 
+          disabled={!keyInput.trim()}
+          className="login-btn"
+        >
+          Connect Agent
+        </button>
+      </div>
     </div>
   );
 }
 ```
 
+### 3.3 Task Checklist
+
+- [ ] **3.3.1** สร้าง `src/utils/auth.js`
+- [ ] **3.3.2** สร้าง `src/pages/Login.jsx`
+- [ ] **3.3.3** Implement `electron-store` สำหรับเก็บ Key
+- [ ] **3.3.4** Implement Auto-login
+- [ ] **3.3.5** ทดสอบ Login flow
+
 ---
 
 ## Phase 4: Project Management UI
 
-### 4.1 Projects List
+### 4.1 Dashboard
 
-📁 **อ้างอิง:** `extension/src/UserPanel.jsx` บรรทัด 190-280
+```jsx
+// src/pages/Dashboard.jsx
+import { useState, useEffect } from 'react';
+import { fetchProjects } from '../utils/firebase';
+import ProjectList from '../components/ProjectList';
+import InstanceManager from '../components/InstanceManager';
+
+export default function Dashboard({ user, onLogout }) {
+  const [projects, setProjects] = useState([]);
+  const [instances, setInstances] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProjects(user.userId).then(data => {
+      setProjects(data);
+      setLoading(false);
+    });
+  }, [user.userId]);
+
+  const handleCreateInstance = async (project) => {
+    const instanceId = `instance_${Date.now()}`;
+    const result = await window.electronAPI.createInstance(instanceId, project);
+    if (result.success) {
+      setInstances(prev => [...prev, { id: instanceId, ...project, status: 'running' }]);
+    }
+  };
+
+  const handleRunBlock = async (instanceId, blockName) => {
+    await window.electronAPI.runBlock(instanceId, blockName);
+  };
+
+  return (
+    <div className="dashboard">
+      <header>
+        <h1>Content Auto Post</h1>
+        <div className="user-info">
+          <span>{user.isAdmin ? '👑 Admin' : '👤 User'}</span>
+          <button onClick={onLogout}>Logout</button>
+        </div>
+      </header>
+
+      <main>
+        <section className="projects-section">
+          <h2>📁 Your Projects</h2>
+          <ProjectList 
+            projects={projects} 
+            loading={loading}
+            onCreateInstance={handleCreateInstance}
+          />
+        </section>
+
+        <section className="instances-section">
+          <h2>🖥️ Chrome Instances</h2>
+          <InstanceManager 
+            instances={instances}
+            onRunBlock={handleRunBlock}
+          />
+        </section>
+      </main>
+    </div>
+  );
+}
+```
 
 ### 4.2 Task Checklist
 
 - [ ] **4.2.1** สร้าง `src/pages/Dashboard.jsx`
 - [ ] **4.2.2** สร้าง `src/components/ProjectList.jsx`
 - [ ] **4.2.3** สร้าง `src/components/ProjectCard.jsx`
-- [ ] **4.2.4** Implement project selection
-- [ ] **4.2.5** สร้าง `src/components/JobList.jsx` (แสดง Jobs)
-- [ ] **4.2.6** สร้าง `src/components/BlockList.jsx` (แสดง Blocks)
-- [ ] **4.2.7** Implement Lock Project ↔ Instance UI
-
-### 4.3 UI Components
-
-```jsx
-// src/components/ProjectCard.jsx
-// อ้างอิง: UserPanel.jsx บรรทัด 1048-1150
-
-export default function ProjectCard({ project, isLocked, onSelect, onLock, onUnlock }) {
-  return (
-    <div className={`project-card ${isLocked ? 'locked' : ''}`}>
-      <div className="project-info">
-        <h3>{project.name}</h3>
-        <span className={`status ${project.status}`}>{project.status}</span>
-      </div>
-      <div className="actions">
-        {isLocked ? (
-          <button onClick={onUnlock}>🔓 Unlock</button>
-        ) : (
-          <button onClick={onLock}>🔒 Lock to Instance</button>
-        )}
-        <button onClick={onSelect}>Select</button>
-      </div>
-    </div>
-  );
-}
-```
+- [ ] **4.2.4** สร้าง `src/components/InstanceManager.jsx`
+- [ ] **4.2.5** สร้าง `src/components/BlockRunner.jsx`
+- [ ] **4.2.6** ทดสอบ UI flow
 
 ---
 
-## Phase 5: Playwright Player
+## Phase 5: Playwright Player (JavaScript)
 
 ### 5.1 Step Execution Engine
 
 📁 **อ้างอิง:** `extension/src/content/player.js` บรรทัด 260-565
 
-```python
-# playwright/player.py
+```javascript
+// automation/player.js
 
-import asyncio
-from playwright.async_api import async_playwright, Page
-from typing import Dict, List, Any, Optional
-import re
+const { chromium } = require('playwright');
+const path = require('path');
 
-class PlaywrightPlayer:
-    def __init__(self, profile_path: str, headless: bool = False):
-        self.profile_path = profile_path
-        self.headless = headless
-        self.browser = None
-        self.page = None
-        self._pending_prompt = None
-        self._scene_count_before = 0
-    
-    async def start(self):
-        """Start browser with persistent context"""
-        playwright = await async_playwright().start()
-        self.browser = await playwright.chromium.launch_persistent_context(
-            user_data_dir=self.profile_path,
-            headless=self.headless,
-            viewport={'width': 1280, 'height': 720}
-        )
-        self.page = self.browser.pages[0] if self.browser.pages else await self.browser.new_page()
-    
-    async def stop(self):
-        """Stop browser"""
-        if self.browser:
-            await self.browser.close()
-    
-    async def find_element(self, selector: str, timeout: int = 15000):
-        """
-        Find element with custom selector support
-        อ้างอิง: player.js บรรทัด 13-161
-        """
-        # Custom $scene:last selector
-        if selector.startswith('$'):
-            selector_without_dollar = selector[1:]
-            
-            if selector_without_dollar == 'scene:last':
-                # Google Vids scene container
-                locator = self.page.locator('[role="listitem"]').last
-                await locator.wait_for(timeout=timeout)
-                return locator
-            
-            elif ':last-child' in selector_without_dollar:
-                parent_selector = selector_without_dollar.replace(':last-child', '').strip()
-                locator = self.page.locator(f"{parent_selector} > *:last-child")
-                await locator.wait_for(timeout=timeout)
-                return locator
-            
-            elif ':last' in selector_without_dollar:
-                base_selector = selector_without_dollar.replace(':last', '').strip()
-                locator = self.page.locator(base_selector).last
-                await locator.wait_for(timeout=timeout)
-                return locator
+class PlaywrightPlayer {
+  constructor(profilePath, headless = false) {
+    this.profilePath = profilePath;
+    this.headless = headless;
+    this.browser = null;
+    this.page = null;
+    this._pendingPrompt = null;
+    this._sceneCountBefore = 0;
+  }
+
+  async start() {
+    this.browser = await chromium.launchPersistentContext(this.profilePath, {
+      headless: this.headless,
+      viewport: { width: 1280, height: 720 },
+      args: ['--disable-blink-features=AutomationControlled']
+    });
+    this.page = this.browser.pages()[0] || await this.browser.newPage();
+  }
+
+  async stop() {
+    if (this.browser) {
+      await this.browser.close();
+    }
+  }
+
+  /**
+   * Find element with custom selector support
+   * อ้างอิง: player.js บรรทัด 13-161
+   */
+  async findElement(selector, timeout = 15000) {
+    // Custom $scene:last selector
+    if (selector.startsWith('$')) {
+      const selectorWithoutDollar = selector.slice(1);
+      
+      if (selectorWithoutDollar === 'scene:last') {
+        const locator = this.page.locator('[role="listitem"]').last();
+        await locator.waitFor({ timeout });
+        return locator;
+      }
+      
+      if (selectorWithoutDollar.includes(':last')) {
+        const baseSelector = selectorWithoutDollar.replace(':last', '').trim();
+        const locator = this.page.locator(baseSelector).last();
+        await locator.waitFor({ timeout });
+        return locator;
+      }
+    }
+
+    // Text-based selector
+    if (selector.includes('::text=')) {
+      const [tag, textPart] = selector.split('::text=');
+      const text = textPart.replace(/['"]/g, '');
+      const locator = this.page.locator(`${tag || '*'}:has-text("${text}")`);
+      await locator.waitFor({ timeout });
+      return locator;
+    }
+
+    // Standard CSS selector
+    const locator = this.page.locator(selector);
+    await locator.waitFor({ timeout });
+    return locator;
+  }
+
+  /**
+   * Execute a single step
+   * อ้างอิง: player.js บรรทัด 386-565
+   */
+  async executeStep(step, variables = {}) {
+    const { action, selector } = step;
+    console.log(`🚀 Executing: ${action} on ${selector || 'N/A'}`);
+
+    try {
+      await this.sleep(500); // Human-like delay
+
+      // === Special Actions (no element needed) ===
+      
+      if (action === 'wait_for_element') {
+        const timeout = step.timeout || 300000;
+        await this.page.waitForSelector(selector, { timeout });
+        return true;
+      }
+
+      if (action === 'wait_for_disappear') {
+        const timeout = step.timeout || 300000;
+        await this.page.waitForSelector(selector, { state: 'hidden', timeout });
+        return true;
+      }
+
+      if (action === 'count_elements') {
+        const count = await this.page.locator(selector).count();
+        this._sceneCountBefore = count;
+        console.log(`🔢 Count: ${count}`);
+        return true;
+      }
+
+      if (action === 'wait') {
+        const duration = step.duration || step.value || 1000;
+        await this.sleep(duration);
+        return true;
+      }
+
+      if (action === 'loop_start') {
+        console.log('🔄 LOOP_START marker');
+        return true;
+      }
+
+      if (action === 'loop_end') {
+        console.log('🏁 LOOP_END marker');
+        return { loopEnd: true };
+      }
+
+      if (action === 'inject_prompt') {
+        const prompt = variables.prompt || variables.currentPrompt || '';
+        if (prompt) {
+          this._pendingPrompt = prompt;
+          console.log(`📝 Prompt loaded: ${prompt.slice(0, 50)}...`);
+        }
+        return true;
+      }
+
+      if (action === 'wait_for_progress_complete') {
+        const timeout = step.timeout || 600000;
+        const startTime = Date.now();
         
-        # Text-based selector
-        if '::text=' in selector:
-            parts = selector.split('::text=')
-            tag = parts[0] or '*'
-            text = parts[1].strip('"\'')
-            locator = self.page.locator(f"{tag}:has-text('{text}')")
-            await locator.wait_for(timeout=timeout)
-            return locator
+        while (Date.now() - startTime < timeout) {
+          const el = await this.page.$(selector);
+          if (!el) {
+            console.log('✅ Progress completed');
+            return true;
+          }
+          
+          const text = await el.textContent().catch(() => '');
+          if (text && text.includes('100')) {
+            console.log('✅ Progress reached 100%');
+            await this.sleep(2000);
+            return true;
+          }
+          
+          await this.sleep(2000);
+        }
+        return false;
+      }
+
+      // === Check for modifiers ===
+      if (step.modifiers) {
+        return await this.executeStepWithModifiers(step, variables);
+      }
+
+      // === Standard Actions (need element) ===
+      const el = await this.findElement(selector);
+
+      if (action === 'click') {
+        await el.click();
+        return true;
+      }
+
+      if (action === 'type' || action === 'input') {
+        let value = step.value || '';
         
-        # Standard CSS selector
-        locator = self.page.locator(selector)
-        await locator.wait_for(timeout=timeout)
-        return locator
-    
-    async def execute_step(self, step: Dict, variables: Dict = None) -> bool:
-        """
-        Execute a single step
-        อ้างอิง: player.js บรรทัด 386-565
-        """
-        variables = variables or {}
-        action = step.get('action', '')
-        selector = step.get('selector', '')
+        // Use pending prompt
+        if (value === '{{prompt}}' && this._pendingPrompt) {
+          value = this._pendingPrompt;
+          this._pendingPrompt = null;
+        }
         
-        print(f"🚀 Executing: {action} on {selector or 'N/A'}")
+        // Variable injection
+        if (value.includes('{{')) {
+          for (const [key, val] of Object.entries(variables)) {
+            const replacement = Array.isArray(val) ? val.join(', ') : String(val || '');
+            value = value.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), replacement);
+          }
+        }
         
-        try:
-            await asyncio.sleep(0.5)  # Human-like delay
-            
-            # --- Special Actions (no element needed) ---
-            if action == 'wait_for_element':
-                timeout = step.get('timeout', 300000)
-                await self.page.wait_for_selector(selector, timeout=timeout)
-                return True
-            
-            if action == 'wait_for_disappear':
-                timeout = step.get('timeout', 300000)
-                await self.page.wait_for_selector(selector, state='hidden', timeout=timeout)
-                return True
-            
-            if action == 'count_elements':
-                count = await self.page.locator(selector).count()
-                self._scene_count_before = count
-                print(f"🔢 Count: {count}")
-                return True
-            
-            if action == 'wait':
-                duration = step.get('duration', step.get('value', 1000))
-                await asyncio.sleep(duration / 1000)
-                return True
-            
-            if action == 'loop_start':
-                print("🔄 LOOP_START marker")
-                return True
-            
-            if action == 'loop_end':
-                print("🏁 LOOP_END marker")
-                return {'loop_end': True}
-            
-            if action == 'inject_prompt':
-                prompt = variables.get('prompt', variables.get('currentPrompt', ''))
-                if prompt:
-                    self._pending_prompt = prompt
-                    print(f"📝 Prompt loaded: {prompt[:50]}...")
-                return True
-            
-            if action == 'wait_for_progress_complete':
-                timeout = step.get('timeout', 600000)
-                start_time = asyncio.get_event_loop().time()
-                
-                while (asyncio.get_event_loop().time() - start_time) < (timeout / 1000):
-                    try:
-                        el = await self.page.query_selector(selector)
-                        if not el:
-                            print("✅ Progress completed")
-                            return True
-                        
-                        text = await el.text_content()
-                        if text and '100' in text:
-                            print("✅ Progress reached 100%")
-                            await asyncio.sleep(2)
-                            return True
-                    except:
-                        pass
-                    
-                    await asyncio.sleep(2)
-                
-                return False
-            
-            # --- Check for modifiers ---
-            if step.get('modifiers'):
-                return await self.execute_step_with_modifiers(step, variables)
-            
-            # --- Standard Actions (need element) ---
-            el = await self.find_element(selector)
-            
-            if action == 'click':
-                await el.click()
-                return True
-            
-            if action in ['type', 'input']:
-                value = step.get('value', '')
-                
-                # Use pending prompt if {{prompt}}
-                if value == '{{prompt}}' and self._pending_prompt:
-                    value = self._pending_prompt
-                    self._pending_prompt = None
-                
-                # Variable injection
-                if '{{' in value:
-                    for key, val in variables.items():
-                        if isinstance(val, list):
-                            val = ', '.join(str(v) for v in val)
-                        elif val is None:
-                            val = ''
-                        value = value.replace(f'{{{{{key}}}}}', str(val))
-                
-                await el.fill(value)
-                return True
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Step Failed: {e}")
-            return False
-    
-    async def execute_step_with_modifiers(self, step: Dict, variables: Dict) -> bool:
-        """
-        Execute step with pre/post modifiers
-        อ้างอิง: player.js บรรทัด 261-383
-        """
-        modifiers = step.get('modifiers', {})
-        pre_actions = modifiers.get('preActions', [])
-        post_actions = modifiers.get('postActions', [])
+        await el.fill(value);
+        return true;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.error(`❌ Step Failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Execute step with pre/post modifiers
+   * อ้างอิง: player.js บรรทัด 261-383
+   */
+  async executeStepWithModifiers(step, variables) {
+    const { preActions = [], postActions = [] } = step.modifiers || {};
+
+    // === PRE-ACTIONS ===
+    for (const action of preActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
+      console.log(`   ▶️ PRE: ${action.type}`);
+      
+      if (action.type === 'count_scenes') {
+        const sel = action.selector || '[role="listitem"]';
+        this._sceneCountBefore = await this.page.locator(sel).count();
+      }
+      
+      if (action.type === 'inject_prompt') {
+        const prompt = variables.prompt || variables.currentPrompt || '';
+        if (prompt) this._pendingPrompt = prompt;
+      }
+    }
+
+    // === MAIN ACTION ===
+    try {
+      const el = await this.findElement(step.selector);
+      if (step.action === 'click') await el.click();
+    } catch (error) {
+      console.error(`   ❌ Main action failed: ${error.message}`);
+      return false;
+    }
+
+    // === POST-ACTIONS ===
+    for (const action of postActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
+      console.log(`   ▶️ POST: ${action.type}`);
+      
+      if (action.type === 'wait_progress') {
+        const sel = action.selector || '.sc-dd6abb21-1';
+        const timeout = 600000;
+        const startTime = Date.now();
         
-        # === PRE-ACTIONS ===
-        for action in sorted(pre_actions, key=lambda x: x.get('order', 0)):
-            action_type = action.get('type', '')
-            print(f"   ▶️ PRE: {action_type}")
-            
-            if action_type == 'count_scenes':
-                selector = action.get('selector', '[role="listitem"]')
-                self._scene_count_before = await self.page.locator(selector).count()
-            
-            elif action_type == 'inject_prompt':
-                prompt = variables.get('prompt', variables.get('currentPrompt', ''))
-                if prompt:
-                    self._pending_prompt = prompt
-        
-        # === MAIN ACTION ===
-        try:
-            el = await self.find_element(step['selector'])
-            if step['action'] == 'click':
-                await el.click()
-        except Exception as e:
-            print(f"   ❌ Main action failed: {e}")
-            return False
-        
-        # === POST-ACTIONS ===
-        for action in sorted(post_actions, key=lambda x: x.get('order', 0)):
-            action_type = action.get('type', '')
-            print(f"   ▶️ POST: {action_type}")
-            
-            if action_type == 'wait_progress':
-                selector = action.get('selector', '.sc-dd6abb21-1')
-                timeout = 600000
-                start_time = asyncio.get_event_loop().time()
-                
-                while (asyncio.get_event_loop().time() - start_time) < (timeout / 1000):
-                    el = await self.page.query_selector(selector)
-                    if not el:
-                        print("   ✅ Progress completed")
-                        break
-                    await asyncio.sleep(2)
-            
-            elif action_type == 'validate_scene':
-                await asyncio.sleep(2)
-                selector = action.get('selector', '[role="listitem"]')
-                count_after = await self.page.locator(selector).count()
-                if count_after > self._scene_count_before:
-                    print(f"   ✅ Validation passed: {self._scene_count_before} → {count_after}")
-                else:
-                    print(f"   ❌ Validation failed")
-                    return False
-            
-            elif action_type == 'wait_after':
-                duration = action.get('duration', 5000)
-                await asyncio.sleep(duration / 1000)
-        
-        return True
-    
-    async def execute_block(self, block: Dict, prompts: List[str]) -> bool:
-        """
-        Execute entire block with loop support
-        อ้างอิง: player.js บรรทัด 700-783
-        """
-        steps = block.get('steps', [])
-        has_loop = any(s.get('action') in ['loop_start', 'loop_end'] for s in steps)
-        
-        if has_loop and prompts:
-            print(f"🔄 Executing block with {len(prompts)} prompts")
-            
-            loop_start_index = -1
-            
-            for prompt_index, prompt in enumerate(prompts):
-                variables = {
-                    'prompt': prompt,
-                    'sceneIndex': prompt_index + 1,
-                    'prompts': prompts
-                }
-                
-                i = 0
-                while i < len(steps):
-                    step = steps[i]
-                    
-                    if step.get('action') == 'loop_start':
-                        loop_start_index = i
-                        i += 1
-                        continue
-                    
-                    if step.get('action') == 'loop_end':
-                        # Next prompt iteration will start from loop_start
-                        break
-                    
-                    result = await self.execute_step(step, variables)
-                    if not result:
-                        print(f"❌ Step {i + 1} failed")
-                        return False
-                    
-                    i += 1
-                
-                print(f"✅ Completed prompt {prompt_index + 1}/{len(prompts)}")
-        
-        else:
-            # No loop - execute all steps once
-            variables = {'prompt': prompts[0] if prompts else '', 'prompts': prompts}
-            for i, step in enumerate(steps):
-                result = await self.execute_step(step, variables)
-                if not result:
-                    print(f"❌ Step {i + 1} failed")
-                    return False
-        
-        return True
+        while (Date.now() - startTime < timeout) {
+          const el = await this.page.$(sel);
+          if (!el) {
+            console.log('   ✅ Progress completed');
+            break;
+          }
+          await this.sleep(2000);
+        }
+      }
+      
+      if (action.type === 'validate_scene') {
+        await this.sleep(2000);
+        const sel = action.selector || '[role="listitem"]';
+        const countAfter = await this.page.locator(sel).count();
+        if (countAfter > this._sceneCountBefore) {
+          console.log(`   ✅ Validation: ${this._sceneCountBefore} → ${countAfter}`);
+        } else {
+          console.log(`   ❌ Validation failed`);
+          return false;
+        }
+      }
+      
+      if (action.type === 'wait_after') {
+        const duration = action.duration || 5000;
+        await this.sleep(duration);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Execute entire block with loop support
+   * อ้างอิง: player.js บรรทัด 700-783
+   */
+  async executeBlock(block, prompts = []) {
+    const { steps = [] } = block;
+    const hasLoop = steps.some(s => ['loop_start', 'loop_end'].includes(s.action));
+
+    if (hasLoop && prompts.length > 0) {
+      console.log(`🔄 Executing block with ${prompts.length} prompts`);
+
+      for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+        const variables = {
+          prompt: prompts[promptIndex],
+          sceneIndex: promptIndex + 1,
+          prompts
+        };
+
+        let i = 0;
+        while (i < steps.length) {
+          const step = steps[i];
+
+          if (step.action === 'loop_start') {
+            i++;
+            continue;
+          }
+
+          if (step.action === 'loop_end') {
+            break; // Next prompt iteration
+          }
+
+          const result = await this.executeStep(step, variables);
+          if (!result) {
+            console.error(`❌ Step ${i + 1} failed`);
+            return false;
+          }
+
+          i++;
+        }
+
+        console.log(`✅ Completed prompt ${promptIndex + 1}/${prompts.length}`);
+      }
+    } else {
+      // No loop - execute all steps once
+      const variables = { prompt: prompts[0] || '', prompts };
+      for (let i = 0; i < steps.length; i++) {
+        const result = await this.executeStep(steps[i], variables);
+        if (!result) {
+          console.error(`❌ Step ${i + 1} failed`);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+module.exports = { PlaywrightPlayer };
 ```
 
 ### 5.2 Task Checklist
 
-- [ ] **5.2.1** สร้าง `playwright/player.py`
-- [ ] **5.2.2** Implement `find_element()` (จาก player.js)
-  - [ ] Custom `$scene:last` selector
-  - [ ] `::text=` selector
-  - [ ] Standard CSS selector
-- [ ] **5.2.3** Implement `execute_step()` (จาก player.js)
-  - [ ] wait_for_element
-  - [ ] wait_for_disappear
-  - [ ] count_elements
-  - [ ] wait
-  - [ ] loop_start / loop_end
-  - [ ] inject_prompt
-  - [ ] wait_for_progress_complete
-  - [ ] click
-  - [ ] type / input
-- [ ] **5.2.4** Implement `execute_step_with_modifiers()` (จาก player.js)
-  - [ ] Pre-actions (count_scenes, inject_prompt)
-  - [ ] Post-actions (wait_progress, validate_scene, wait_after)
-- [ ] **5.2.5** Implement `execute_block()` with loop support
-- [ ] **5.2.6** Variable injection (`{{prompt}}`, `{{sceneIndex}}`, etc.)
-- [ ] **5.2.7** ทดสอบกับ Block จริง
+- [ ] **5.2.1** สร้าง `automation/player.js`
+- [ ] **5.2.2** Implement `findElement()` with custom selectors
+- [ ] **5.2.3** Implement `executeStep()` with all actions
+- [ ] **5.2.4** Implement `executeStepWithModifiers()`
+- [ ] **5.2.5** Implement `executeBlock()` with loop support
+- [ ] **5.2.6** ทดสอบกับ Block จริง
 
 ---
 
 ## Phase 6: Playwright Recorder (Admin)
 
-### 6.1 Playwright Codegen Integration
+### 6.1 Task Checklist
 
-```python
-# playwright/recorder.py
-
-import subprocess
-import json
-from typing import List, Dict
-
-class PlaywrightRecorder:
-    def __init__(self):
-        self.recorded_steps = []
-    
-    def start_codegen(self, url: str, output_file: str = "recorded_steps.json"):
-        """
-        Start Playwright codegen for recording
-        User will record manually, then we parse the output
-        """
-        # Run codegen and save to file
-        cmd = f"npx playwright codegen {url} --save-storage=auth.json"
-        subprocess.run(cmd, shell=True)
-    
-    def parse_codegen_output(self, code: str) -> List[Dict]:
-        """
-        Parse Playwright codegen output to steps format
-        """
-        steps = []
-        lines = code.strip().split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            
-            # Parse click
-            if '.click(' in line:
-                match = re.search(r"\.click\(['\"](.+?)['\"]\)", line)
-                if match:
-                    steps.append({
-                        'action': 'click',
-                        'selector': match.group(1)
-                    })
-            
-            # Parse fill
-            elif '.fill(' in line:
-                match = re.search(r"\.fill\(['\"](.+?)['\"],\s*['\"](.+?)['\"]\)", line)
-                if match:
-                    steps.append({
-                        'action': 'type',
-                        'selector': match.group(1),
-                        'value': match.group(2)
-                    })
-            
-            # Parse goto
-            elif '.goto(' in line:
-                match = re.search(r"\.goto\(['\"](.+?)['\"]\)", line)
-                if match:
-                    steps.append({
-                        'action': 'navigate',
-                        'url': match.group(1)
-                    })
-        
-        return steps
-    
-    def add_modifier(self, step_index: int, modifier: Dict):
-        """Add modifier to a step"""
-        if step_index < len(self.recorded_steps):
-            if 'modifiers' not in self.recorded_steps[step_index]:
-                self.recorded_steps[step_index]['modifiers'] = {
-                    'preActions': [],
-                    'postActions': []
-                }
-            
-            if modifier.get('type') == 'pre':
-                self.recorded_steps[step_index]['modifiers']['preActions'].append(modifier)
-            else:
-                self.recorded_steps[step_index]['modifiers']['postActions'].append(modifier)
-    
-    def save_block(self, block_name: str, start_url: str) -> Dict:
-        """Save recorded steps as a block"""
-        return {
-            'name': block_name,
-            'type': 'ONCE',
-            'startUrl': start_url,
-            'variables': [],
-            'steps': self.recorded_steps
-        }
-```
-
-### 6.2 Task Checklist
-
-- [ ] **6.2.1** สร้าง `playwright/recorder.py`
-- [ ] **6.2.2** Implement Codegen launcher
-- [ ] **6.2.3** Implement code parser → steps
-- [ ] **6.2.4** สร้าง UI สำหรับ Add Modifiers (`src/components/ModifierEditor.jsx`)
-  - [ ] อ้างอิง: `UserPanel.jsx` MODIFIER_OPTIONS (บรรทัด 439-449)
-- [ ] **6.2.5** สร้าง UI สำหรับ Add Variables (`src/components/VariableEditor.jsx`)
-  - [ ] อ้างอิง: `UserPanel.jsx` VARIABLE_OPTIONS (บรรทัด 452-463)
-- [ ] **6.2.6** Implement save block to Firestore
-- [ ] **6.2.7** ทดสอบ Record → Save → Run flow
+- [ ] **6.1.1** สร้าง `automation/recorder.js`
+- [ ] **6.1.2** Implement Codegen integration
+- [ ] **6.1.3** สร้าง UI สำหรับ Add Modifiers
+- [ ] **6.1.4** สร้าง UI สำหรับ Add Variables
+- [ ] **6.1.5** ทดสอบ Record → Save → Run
 
 ---
 
@@ -827,224 +895,355 @@ class PlaywrightRecorder:
 
 ### 7.1 Instance Manager
 
-```python
-# playwright/instance_manager.py
+```javascript
+// automation/instance-manager.js
 
-import asyncio
-import json
-from typing import Dict, List
-from pathlib import Path
-from player import PlaywrightPlayer
-from firebase_client import FirebaseClient
+const { PlaywrightPlayer } = require('./player');
+const path = require('path');
+const fs = require('fs');
 
-class InstanceManager:
-    def __init__(self, data_dir: str = "./data"):
-        self.data_dir = Path(data_dir)
-        self.instances: Dict[str, PlaywrightPlayer] = {}
-        self.instance_states: Dict[str, Dict] = {}
-        self.firebase = FirebaseClient()
-        self._load_states()
+class InstanceManager {
+  constructor(dataDir = './data') {
+    this.dataDir = dataDir;
+    this.instances = new Map(); // instanceId -> PlaywrightPlayer
+    this.states = new Map();    // instanceId -> state
+    this._loadStates();
+  }
+
+  _loadStates() {
+    const stateFile = path.join(this.dataDir, 'instances.json');
+    if (fs.existsSync(stateFile)) {
+      const data = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      Object.entries(data).forEach(([id, state]) => this.states.set(id, state));
+    }
+  }
+
+  _saveStates() {
+    const stateFile = path.join(this.dataDir, 'instances.json');
+    const data = Object.fromEntries(this.states.entries());
+    fs.mkdirSync(this.dataDir, { recursive: true });
+    fs.writeFileSync(stateFile, JSON.stringify(data, null, 2));
+  }
+
+  async createInstance(instanceId, project, headless = false) {
+    const profilePath = path.join('./profiles', instanceId);
     
-    def _load_states(self):
-        """Load instance states from file"""
-        state_file = self.data_dir / "instances.json"
-        if state_file.exists():
-            with open(state_file) as f:
-                self.instance_states = json.load(f)
+    const player = new PlaywrightPlayer(profilePath, headless);
+    await player.start();
     
-    def _save_states(self):
-        """Save instance states to file"""
-        state_file = self.data_dir / "instances.json"
-        with open(state_file, 'w') as f:
-            json.dump(self.instance_states, f, indent=2)
+    this.instances.set(instanceId, player);
+    this.states.set(instanceId, {
+      projectId: project.id,
+      projectName: project.name,
+      userId: project.userId,
+      status: 'running',
+      profilePath
+    });
+    this._saveStates();
     
-    async def create_instance(self, instance_id: str, project: Dict, headless: bool = False):
-        """Create and start a new Chrome instance"""
-        profile_path = f"./profiles/{instance_id}"
-        
-        player = PlaywrightPlayer(profile_path, headless)
-        await player.start()
-        
-        self.instances[instance_id] = player
-        self.instance_states[instance_id] = {
-            'projectId': project['id'],
-            'projectName': project['name'],
-            'userId': project['userId'],
-            'status': 'running',
-            'profile_path': profile_path
-        }
-        self._save_states()
-        
-        return player
+    return player;
+  }
+
+  async stopInstance(instanceId) {
+    const player = this.instances.get(instanceId);
+    if (player) {
+      await player.stop();
+      this.instances.delete(instanceId);
+    }
     
-    async def stop_instance(self, instance_id: str):
-        """Stop a Chrome instance"""
-        if instance_id in self.instances:
-            await self.instances[instance_id].stop()
-            del self.instances[instance_id]
-            
-            if instance_id in self.instance_states:
-                self.instance_states[instance_id]['status'] = 'stopped'
-                self._save_states()
+    const state = this.states.get(instanceId);
+    if (state) {
+      state.status = 'stopped';
+      this._saveStates();
+    }
+  }
+
+  async runBlockOnInstance(instanceId, block, prompts) {
+    const player = this.instances.get(instanceId);
+    if (!player) {
+      console.error(`❌ Instance ${instanceId} not found`);
+      return false;
+    }
+
+    // Navigate to start URL if needed
+    if (block.startUrl) {
+      await player.page.goto(block.startUrl);
+      await player.sleep(2000);
+    }
+
+    return await player.executeBlock(block, prompts);
+  }
+
+  async runAllInstances(block, promptsMap) {
+    const tasks = [];
     
-    async def run_block_on_instance(self, instance_id: str, block_name: str):
-        """Run a block on a specific instance"""
-        if instance_id not in self.instances:
-            print(f"❌ Instance {instance_id} not found")
-            return False
-        
-        player = self.instances[instance_id]
-        state = self.instance_states[instance_id]
-        
-        # Fetch block
-        block = self.firebase.fetch_block(block_name)
-        if not block:
-            print(f"❌ Block {block_name} not found")
-            return False
-        
-        # Fetch prompts
-        prompts = self.firebase.fetch_prompts(state['userId'], state['projectId'])
-        
-        # Navigate to start URL if needed
-        if block.get('startUrl'):
-            await player.page.goto(block['startUrl'])
-            await asyncio.sleep(2)
-        
-        # Execute block
-        return await player.execute_block(block, prompts)
+    for (const [instanceId, state] of this.states.entries()) {
+      if (state.status !== 'running') continue;
+      
+      const prompts = promptsMap.get(instanceId) || [];
+      tasks.push(this.runBlockOnInstance(instanceId, block, prompts));
+    }
     
-    async def run_all_instances(self, block_name: str):
-        """Run block on all running instances simultaneously"""
-        tasks = []
-        for instance_id, state in self.instance_states.items():
-            if state.get('status') == 'running' and instance_id in self.instances:
-                task = self.run_block_on_instance(instance_id, block_name)
-                tasks.append(task)
-        
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            return results
-        return []
-    
-    def get_all_instances(self) -> List[Dict]:
-        """Get all instance states"""
-        return [
-            {'id': k, **v}
-            for k, v in self.instance_states.items()
-        ]
+    return await Promise.all(tasks);
+  }
+
+  getAllInstances() {
+    return Array.from(this.states.entries()).map(([id, state]) => ({
+      id,
+      ...state
+    }));
+  }
+}
+
+module.exports = { InstanceManager };
 ```
 
 ### 7.2 Task Checklist
 
-- [ ] **7.2.1** สร้าง `playwright/instance_manager.py`
-- [ ] **7.2.2** Implement `create_instance()` with persistent profile
-- [ ] **7.2.3** Implement `stop_instance()`
-- [ ] **7.2.4** Implement `run_block_on_instance()`
-- [ ] **7.2.5** Implement `run_all_instances()` (parallel execution)
-- [ ] **7.2.6** สร้าง UI สำหรับ Instance Management (`src/components/InstanceManager.jsx`)
-- [ ] **7.2.7** ทดสอบ Multi-instance execution
+- [ ] **7.2.1** สร้าง `automation/instance-manager.js`
+- [ ] **7.2.2** Implement `createInstance()`
+- [ ] **7.2.3** Implement `stopInstance()`
+- [ ] **7.2.4** Implement `runBlockOnInstance()`
+- [ ] **7.2.5** Implement `runAllInstances()`
+- [ ] **7.2.6** สร้าง UI สำหรับ Instance Management
+- [ ] **7.2.7** ทดสอบ Multi-instance
 
 ---
 
 ## Phase 8: Scheduler & Auto-Run
 
-### 8.1 Job Scheduler
+### 8.1 Task Checklist
 
-📁 **อ้างอิง:** `extension/src/background/index.js` บรรทัด 1200-1230
-
-```python
-# playwright/scheduler.py
-
-import asyncio
-from datetime import datetime
-from typing import Callable
-from firebase_client import FirebaseClient
-from instance_manager import InstanceManager
-
-class JobScheduler:
-    def __init__(self, instance_manager: InstanceManager):
-        self.instance_manager = instance_manager
-        self.firebase = FirebaseClient()
-        self.running = False
-        self.check_interval = 30  # seconds
-    
-    async def start(self):
-        """Start scheduler loop"""
-        self.running = True
-        print("🕐 Scheduler started")
-        
-        while self.running:
-            await self.check_jobs()
-            await asyncio.sleep(self.check_interval)
-    
-    def stop(self):
-        """Stop scheduler"""
-        self.running = False
-        print("🕐 Scheduler stopped")
-    
-    async def check_jobs(self):
-        """Check for pending jobs in all locked projects"""
-        # อ้างอิง: background/index.js บรรทัด 1210-1230
-        instances = self.instance_manager.get_all_instances()
-        processed_projects = set()
-        
-        for instance in instances:
-            if instance.get('status') != 'running':
-                continue
-            
-            project_id = instance.get('projectId')
-            user_id = instance.get('userId')
-            
-            if not project_id or project_id in processed_projects:
-                continue
-            
-            processed_projects.add(project_id)
-            
-            # Check for pending jobs
-            jobs = self.firebase.fetch_jobs(user_id, project_id, status='PENDING')
-            
-            for job in jobs:
-                scheduled_time = job.get('scheduledTime')
-                if scheduled_time and self._is_time_to_run(scheduled_time):
-                    print(f"🚀 Running job {job['id']} for project {project_id}")
-                    await self.run_job(instance['id'], job)
-    
-    def _is_time_to_run(self, scheduled_time: str) -> bool:
-        """Check if scheduled time has passed"""
-        try:
-            scheduled = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
-            return datetime.now(scheduled.tzinfo) >= scheduled
-        except:
-            return False
-    
-    async def run_job(self, instance_id: str, job: dict):
-        """Run a specific job"""
-        block_name = job.get('blockName', 'ADD_SCENE_TEXT')
-        await self.instance_manager.run_block_on_instance(instance_id, block_name)
-```
-
-### 8.2 Task Checklist
-
-- [ ] **8.2.1** สร้าง `playwright/scheduler.py`
-- [ ] **8.2.2** Implement `check_jobs()` (จาก background/index.js)
-- [ ] **8.2.3** Implement `run_job()`
-- [ ] **8.2.4** สร้าง UI สำหรับ Scheduler status (`src/components/SchedulerStatus.jsx`)
-- [ ] **8.2.5** ทดสอบ Auto-run jobs
+- [ ] **8.1.1** สร้าง `automation/scheduler.js`
+- [ ] **8.1.2** Implement job checking loop
+- [ ] **8.1.3** Implement scheduled job execution
+- [ ] **8.1.4** สร้าง UI สำหรับ Scheduler status
 
 ---
 
-## Phase 9: Testing & Polish
+## Phase 9: Auto-Update System ⭐
 
-### 9.1 Task Checklist
+### 9.1 How It Works
 
-- [ ] **9.1.1** End-to-end test: Login → Select Project → Lock Instance → Run Block
-- [ ] **9.1.2** Test multi-instance (3+ Chrome พร้อมกัน)
-- [ ] **9.1.3** Test scheduler with scheduled jobs
-- [ ] **9.1.4** Test Admin: Record → Save Block → Run
-- [ ] **9.1.5** Test error handling & recovery
-- [ ] **9.1.6** Polish UI (loading states, error messages)
-- [ ] **9.1.7** Build Electron app for Windows
-- [ ] **9.1.8** Create installer
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      AUTO-UPDATE FLOW                            │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Admin แก้โค้ด]                                                  │
+│       ↓                                                          │
+│  [npm run electron:publish]                                      │
+│       ↓                                                          │
+│  [Upload ไป GitHub Releases อัตโนมัติ]                            │
+│       ↓                                                          │
+│  ┌────────────────────────────────────────┐                      │
+│  │ GitHub Release v1.1.0                  │                      │
+│  │ - ContentAutoPost-Setup-1.1.0.exe     │                      │
+│  │ - latest.yml (metadata)               │                      │
+│  └────────────────────────────────────────┘                      │
+│                                                                  │
+│                         ↓ ลูกค้าเปิด App                          │
+│                                                                  │
+│  [App เช็ค GitHub] → [พบ Version ใหม่] → [แสดง Popup]             │
+│                                                                  │
+│  ┌────────────────────────────────────────┐                      │
+│  │  🔔 Update Available!                  │                      │
+│  │                                        │                      │
+│  │  New version 1.1.0 is available       │                      │
+│  │  Current version: 1.0.0               │                      │
+│  │                                        │                      │
+│  │  [Update Now]  [Later]                │                      │
+│  └────────────────────────────────────────┘                      │
+│                                                                  │
+│       ↓ กด Update Now                                            │
+│                                                                  │
+│  [ดาวน์โหลด .exe ใหม่] → [ติดตั้งทับ] → [รีสตาร์ท App]            │
+│                                                                  │
+│       ✅ ลูกค้าใช้งาน Version ใหม่ได้เลย!                         │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 9.2 Updater Module
+
+```javascript
+// electron/updater.js
+
+const { autoUpdater } = require('electron-updater');
+const { ipcMain } = require('electron');
+
+function setupAutoUpdater(mainWindow) {
+  // Check for updates on app start
+  autoUpdater.checkForUpdatesAndNotify();
+
+  // Events
+  autoUpdater.on('update-available', (info) => {
+    mainWindow.webContents.send('update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow.webContents.send('update-not-available');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow.webContents.send('update-progress', {
+      percent: progress.percent,
+      transferred: progress.transferred,
+      total: progress.total
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow.webContents.send('update-downloaded', {
+      version: info.version
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    mainWindow.webContents.send('update-error', error.message);
+  });
+
+  // IPC handlers
+  ipcMain.handle('check-for-updates', () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
+  ipcMain.handle('download-update', () => {
+    autoUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+}
+
+module.exports = { setupAutoUpdater };
+```
+
+### 9.3 Update Notification Component
+
+```jsx
+// src/components/UpdateNotification.jsx
+import { useState, useEffect } from 'react';
+
+export default function UpdateNotification() {
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Listen for update events from main process
+    window.electronAPI.onUpdateAvailable((info) => {
+      setUpdateInfo(info);
+    });
+
+    window.electronAPI.onUpdateProgress((prog) => {
+      setDownloading(true);
+      setProgress(prog.percent);
+    });
+
+    window.electronAPI.onUpdateDownloaded((info) => {
+      setDownloading(false);
+      setReady(true);
+    });
+  }, []);
+
+  if (!updateInfo) return null;
+
+  const handleDownload = () => {
+    window.electronAPI.downloadUpdate();
+    setDownloading(true);
+  };
+
+  const handleInstall = () => {
+    window.electronAPI.installUpdate();
+  };
+
+  return (
+    <div className="update-notification">
+      <div className="update-card">
+        <h3>🔔 Update Available!</h3>
+        <p>Version {updateInfo.version} is ready</p>
+        
+        {downloading && (
+          <div className="progress-bar">
+            <div className="progress" style={{ width: `${progress}%` }} />
+            <span>{Math.round(progress)}%</span>
+          </div>
+        )}
+
+        <div className="actions">
+          {!downloading && !ready && (
+            <>
+              <button onClick={handleDownload} className="primary">
+                Update Now
+              </button>
+              <button onClick={() => setUpdateInfo(null)}>
+                Later
+              </button>
+            </>
+          )}
+          
+          {ready && (
+            <button onClick={handleInstall} className="primary">
+              Restart & Install
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 9.4 Task Checklist
+
+- [ ] **9.4.1** สร้าง `electron/updater.js`
+- [ ] **9.4.2** สร้าง `src/components/UpdateNotification.jsx`
+- [ ] **9.4.3** เพิ่ม IPC handlers ใน `preload.js`
+- [ ] **9.4.4** สร้าง GitHub Repository สำหรับ Releases
+- [ ] **9.4.5** ตั้งค่า `electron-builder.yml` สำหรับ publish
+- [ ] **9.4.6** ทดสอบ Auto-Update flow
+
+---
+
+## Phase 10: Build & Release
+
+### 10.1 Build Commands
+
+```bash
+# Development
+npm run electron:dev
+
+# Build for Windows (local)
+npm run electron:build
+
+# Build & Publish to GitHub (triggers auto-update)
+npm run electron:publish
+```
+
+### 10.2 Release Process (สำหรับ Admin)
+
+```
+1. แก้ไขโค้ด
+2. อัพเดท version ใน package.json (เช่น 1.0.0 → 1.1.0)
+3. รัน: npm run electron:publish
+4. ไฟล์จะถูก upload ไป GitHub Releases อัตโนมัติ
+5. ลูกค้าจะได้รับแจ้งเตือนอัพเดทเมื่อเปิด App
+```
+
+### 10.3 Task Checklist
+
+- [ ] **10.3.1** สร้าง `assets/icon.ico`
+- [ ] **10.3.2** ตั้งค่า `electron-builder.yml`
+- [ ] **10.3.3** สร้าง GitHub Personal Access Token
+- [ ] **10.3.4** ทดสอบ Build local
+- [ ] **10.3.5** ทดสอบ Publish to GitHub
+- [ ] **10.3.6** ทดสอบติดตั้งบนเครื่อง Windows อื่น
 
 ---
 
@@ -1052,20 +1251,46 @@ class JobScheduler:
 
 | Phase | เวลาประมาณ | หมายเหตุ |
 |-------|-----------|----------|
-| Phase 1: Setup | 30 นาที | โครงสร้างโปรเจค |
-| Phase 2: Firebase | 1 ชม. | REST API client |
-| Phase 3: Auth | 30 นาที | Key decode + Login UI |
-| Phase 4: Project UI | 1 ชม. | Dashboard + Project list |
-| Phase 5: Player | 2 ชม. | Step execution engine |
-| Phase 6: Recorder | 1.5 ชม. | Admin recording |
+| Phase 1: Setup | 45 นาที | Electron + React + Playwright JS |
+| Phase 2: Firebase | 1 ชม. | JS version (คล้ายเดิม) |
+| Phase 3: Auth | 30 นาที | Key decode + Login |
+| Phase 4: Project UI | 1 ชม. | Dashboard + Components |
+| Phase 5: Player | 2 ชม. | Step execution (JS) |
+| Phase 6: Recorder | 1.5 ชม. | Admin only |
 | Phase 7: Multi-Instance | 1 ชม. | Parallel execution |
 | Phase 8: Scheduler | 30 นาที | Auto-run jobs |
-| Phase 9: Testing | 1 ชม. | E2E testing |
+| Phase 9: Auto-Update | 1 ชม. | electron-updater |
+| Phase 10: Build | 30 นาที | Installer + Release |
 
-**รวม: ~9 ชั่วโมง**
+**รวม: ~10 ชั่วโมง**
 
 ---
 
-## ✅ Next Step
+## ✅ Summary: ลูกค้าจะใช้งานอย่างไร
 
-เมื่อพร้อม พิมพ์ `เริ่ม Phase 1` เพื่อเริ่มสร้างโครงสร้างโปรเจค
+### การติดตั้ง (ครั้งแรก)
+
+1. ดาวน์โหลด `ContentAutoPost-Setup-1.0.0.exe`
+2. ดับเบิลคลิกติดตั้ง
+3. เปิดโปรแกรมจาก Desktop Shortcut
+4. ใส่ License Key → เริ่มใช้งาน
+
+### การใช้งาน
+
+1. เลือก Project
+2. กด "Create Instance" → เปิด Chrome
+3. Login Google ใน Chrome (ครั้งแรกเท่านั้น)
+4. กด "Run Block" → ระบบทำงานอัตโนมัติ
+
+### การอัพเดท
+
+1. เปิดโปรแกรม → เห็น Popup "Update Available"
+2. กด "Update Now"
+3. รอดาวน์โหลด → กด "Restart & Install"
+4. App รีสตาร์ท → ใช้งาน Version ใหม่ได้เลย
+
+---
+
+## ⏭️ Next Step
+
+พิมพ์ **`เริ่ม Phase 1`** เมื่อพร้อมสร้างโครงสร้างโปรเจค (Node.js version)

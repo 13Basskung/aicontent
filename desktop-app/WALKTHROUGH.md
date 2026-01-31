@@ -37,7 +37,8 @@
 | Component | Technology | เหตุผล |
 |-----------|------------|--------|
 | **UI Framework** | Electron + React | Cross-platform, ใช้ React ที่มีอยู่ |
-| **Browser Automation** | Playwright (Python) | เสถียร, headless ได้, multi-instance |
+| **Browser Automation** | Playwright (JavaScript) | เสถียร, headless ได้, multi-instance, Bundle ใน .exe ได้ |
+| **Auto-Update** | electron-updater | อัพเดทอัตโนมัติผ่าน GitHub Releases |
 | **Database** | Firebase Firestore | ใช้เดิม ไม่ต้องเปลี่ยน |
 | **Auth** | Key-based (base64) | ใช้เดิม ไม่ต้องเปลี่ยน |
 
@@ -493,6 +494,56 @@ async def run_multiple_projects(instances):
 | Player (Playwright) | ✅ | แทน content/player.js |
 | Recorder (Playwright Codegen) | ✅ | แทน content/recorder.js |
 | Instance Manager | ✅ | Multi-Chrome support |
+
+---
+
+## 12. Auto-Update System
+
+### 🔄 Flow การอัพเดท:
+
+```
+[Admin แก้โค้ด]
+      ↓
+[npm run electron:publish]
+      ↓
+[Upload ไป GitHub Releases อัตโนมัติ]
+      ↓
+[ลูกค้าเปิด App → เห็น Popup "Update Available"]
+      ↓
+[กด Update Now → ดาวน์โหลด → ติดตั้ง → รีสตาร์ท]
+      ↓
+✅ ใช้งาน Version ใหม่ได้เลย!
+```
+
+### 📦 ไม่ต้องใช้ Firestore สำหรับ Update:
+
+| ที่เก็บ | ใช้สำหรับ |
+|--------|----------|
+| **GitHub Releases** | เก็บไฟล์ .exe และข้อมูล version (ฟรี) |
+| **Firestore** | เก็บ Projects, Blocks, Jobs (เหมือนเดิม) |
+
+---
+
+## 13. ผลลัพธ์สำหรับลูกค้า
+
+### 🎯 สิ่งที่ลูกค้าจะได้:
+
+```
+✅ ไฟล์ติดตั้ง: ContentAutoPost-Setup-1.0.0.exe (~150MB)
+✅ ติดตั้งแล้วได้: Desktop Shortcut + Start Menu
+✅ ไม่ต้องติดตั้ง Python หรือรันคำสั่งใดๆ
+✅ Auto-Update: กดปุ่มเดียวอัพเดทเป็นเวอร์ชันใหม่
+```
+
+### 📱 การใช้งาน:
+
+1. **ติดตั้ง** - ดับเบิลคลิก .exe → ติดตั้ง → เปิดจาก Desktop
+2. **Login** - ใส่ License Key จากเว็บไซต์
+3. **เลือก Project** - เห็น Projects ทั้งหมดของตัวเอง
+4. **สร้าง Chrome Instance** - กดปุ่ม → เปิด Chrome ใหม่
+5. **Login Google** - ครั้งแรกเท่านั้น (จำไว้ใน Profile)
+6. **Run Block** - กดปุ่ม → ระบบทำงานอัตโนมัติ
+7. **อัพเดท** - เห็น Popup → กด Update Now → รีสตาร์ท
 
 ---
 

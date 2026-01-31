@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#gradient1)"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="128" cy="128" r="100" fill="url(#gradient2)"/>
+  
+  <!-- Play Button Triangle -->
+  <path d="M100 80 L180 128 L100 176 Z" fill="white" fill-opacity="0.95"/>
+  
+  <!-- Auto/Loop Arrow -->
+  <path d="M168 68 C200 68 220 100 220 128 C220 156 200 188 168 188" 
+        stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M168 188 L180 176 L156 176 Z" fill="white"/>
+  
+  <!-- Gear Icon (small) -->
+  <circle cx="190" cy="70" r="18" fill="white" fill-opacity="0.3"/>
+  <circle cx="190" cy="70" r="10" fill="url(#gradient1)"/>
+  
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#DC2626"/>
+      <stop offset="100%" style="stop-color:#7F1D1D"/>
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#B91C1C"/>
+      <stop offset="100%" style="stop-color:#450A0A"/>
+    </linearGradient>
+  </defs>
+</svg>
