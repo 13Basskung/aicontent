@@ -190,7 +190,12 @@ service cloud.firestore {
 
     // 🟢 EXTENSION: Allow reading user projects for Agent (key-based auth bypass)
     match /{path=**}/projects/{projectId} {
-      allow read: if true; // Allow reading projects from any user path
+      allow read, write: if true; // Allow Desktop Agent to read/write projects
+    }
+
+    // 🟢 DESKTOP APP: Allow Agent to read/write user project subcollections (jobs, readyPrompts, episodes)
+    match /users/{userId}/projects/{projectId}/{subcollection}/{docId} {
+      allow read, write: if true; // Allow Desktop Agent to manage jobs, prompts, etc.
     }
   }
 }
