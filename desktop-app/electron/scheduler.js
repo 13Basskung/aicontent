@@ -48,6 +48,42 @@ function fetchJSON(url) {
 }
 
 /**
+ * POST JSON helper for Firestore queries
+ */
+function postJSON(url, body) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const postData = JSON.stringify(body);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
  * Parse Firestore value
  */
 function parseFirestoreValue(value) {
@@ -78,15 +114,50 @@ function getDayCode(date) {
 
 /**
  * Fetch user timezone from Firestore
+ * Note: Web App stores timezone in users/{Firebase UID}
+ * But Desktop App uses email as userId, so we need to query by email
  */
 async function fetchUserTimezone(userId) {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}?key=${API_KEY}`;
-    const data = await fetchJSON(url);
+    // First try direct lookup (if userId is Firebase UID)
+    let url = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}?key=${API_KEY}`;
+    let data = await fetchJSON(url);
+    
     if (data.fields?.timezone?.stringValue) {
       userTimezone = data.fields.timezone.stringValue;
-      console.log('🌍 User timezone:', userTimezone);
+      console.log('🌍 User timezone (direct):', userTimezone);
+      return userTimezone;
     }
+    
+    // If userId is email, query users collection by email field
+    if (userId.includes('@')) {
+      console.log('🔍 Searching timezone by email:', userId);
+      const queryUrl = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents:runQuery?key=${API_KEY}`;
+      
+      const queryBody = {
+        structuredQuery: {
+          from: [{ collectionId: 'users' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'email' },
+              op: 'EQUAL',
+              value: { stringValue: userId }
+            }
+          },
+          limit: 1
+        }
+      };
+      
+      const queryResult = await postJSON(queryUrl, queryBody);
+      
+      if (queryResult && queryResult[0]?.document?.fields?.timezone?.stringValue) {
+        userTimezone = queryResult[0].document.fields.timezone.stringValue;
+        console.log('🌍 User timezone (by email):', userTimezone);
+        return userTimezone;
+      }
+    }
+    
+    console.log('⚠️ Timezone not found, using default: Asia/Bangkok');
     return userTimezone;
   } catch (error) {
     console.error('❌ Failed to fetch timezone:', error.message);
