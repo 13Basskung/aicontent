@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Clock, Play, Pause, Calendar, RefreshCw, 
-  CheckCircle, AlertCircle, Zap
+  CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
+
+// Timezone options with flags
+const TIMEZONE_OPTIONS = [
+  { value: 'Asia/Bangkok', code: 'th', label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', code: 'gb', label: 'UK (GMT+0)' },
+  { value: 'Asia/Shanghai', code: 'cn', label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', code: 'kr', label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', code: 'tw', label: 'Taiwan (GMT+8)' },
+];
 
 // Day names in Thai
 const DAY_NAMES = {
@@ -25,6 +34,8 @@ function SchedulerPanel({ keyData, instances }) {
   const [lastDay, setLastDay] = useState(new Date().getDay());
   const [executionStatus, setExecutionStatus] = useState(null);
   const [userTimezone, setUserTimezone] = useState('Asia/Bangkok');
+  const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Update current time every second + check day change
   useEffect(() => {
@@ -98,6 +109,17 @@ function SchedulerPanel({ keyData, instances }) {
     }
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsTimezoneDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   async function loadTimezone() {
     try {
       if (window.electronAPI?.scheduler && keyData?.userId) {
@@ -107,6 +129,16 @@ function SchedulerPanel({ keyData, instances }) {
       }
     } catch (error) {
       console.error('Load timezone error:', error);
+    }
+  }
+
+  async function handleTimezoneChange(newTimezone) {
+    setUserTimezone(newTimezone);
+    setIsTimezoneDropdownOpen(false);
+    // Save to Firestore via IPC
+    if (window.electronAPI?.scheduler && keyData?.userId) {
+      await window.electronAPI.scheduler.setTimezone(keyData.userId, newTimezone);
+      console.log('🌍 Timezone saved:', newTimezone);
     }
   }
 
@@ -206,19 +238,55 @@ function SchedulerPanel({ keyData, instances }) {
               <Clock className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                Scheduler
-                <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                  {getTimezoneLabel()}
-                </span>
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Scheduler</h2>
               <p className="text-white/50 text-sm">
-                {DAY_NAMES[getCurrentDayCode()]} {formatTimeWithSeconds(currentTime)}
+                {DAY_NAMES[getCurrentDayCode()]}
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Timezone Selector */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 border border-white/10 transition"
+              >
+                <img 
+                  src={`https://flagcdn.com/24x18/${TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.code || 'th'}.png`} 
+                  alt="flag" 
+                  className="w-6 h-4 object-cover rounded-sm"
+                />
+                <span className="text-white text-sm font-medium">
+                  {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isTimezoneDropdownOpen && (
+                <div className="absolute top-full mt-2 right-0 w-56 bg-slate-800 rounded-xl shadow-xl border border-white/10 overflow-hidden z-50">
+                  {TIMEZONE_OPTIONS.map(tz => (
+                    <button
+                      key={tz.value}
+                      onClick={() => handleTimezoneChange(tz.value)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300' : 'text-white'}`}
+                    >
+                      <img src={`https://flagcdn.com/24x18/${tz.code}.png`} alt="flag" className="w-6 h-4 object-cover rounded-sm" />
+                      <span className="text-sm">{tz.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Current Time Display */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+              <Clock className="w-4 h-4 text-green-400" />
+              <span className="font-mono font-bold text-lg text-white">
+                {formatTimeWithSeconds(currentTime)}
+              </span>
+            </div>
+            
             <button
               onClick={loadSchedules}
               className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 transition"

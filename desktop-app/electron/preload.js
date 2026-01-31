@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getToday: (userId) => ipcRenderer.invoke('scheduler:get-today', userId),
     getAll: (userId) => ipcRenderer.invoke('scheduler:get-all', userId),
     getTimezone: (userId) => ipcRenderer.invoke('scheduler:get-timezone', userId),
+    setTimezone: (userId, timezone) => ipcRenderer.invoke('scheduler:set-timezone', { userId, timezone }),
     checkChanges: (userId) => ipcRenderer.invoke('scheduler:check-changes', userId),
     onTrigger: (callback) => {
       ipcRenderer.on('scheduler:trigger', (event, data) => callback(data));

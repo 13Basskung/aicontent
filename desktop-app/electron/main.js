@@ -6,7 +6,7 @@ const playwrightBridge = require('./playwright-bridge');
 const { initPlaywrightBridge, closeAllInstances, getInstances } = playwrightBridge;
 const instanceManager = require('./instance-manager');
 const { initInstanceManager } = instanceManager;
-const { initScheduler, startScheduler, stopScheduler, getTodaySchedule, fetchUserSchedule, fetchUserTimezone, getUserTimezone, createScheduleHash, hasScheduleChanged } = require('./scheduler');
+const { initScheduler, startScheduler, stopScheduler, getTodaySchedule, fetchUserSchedule, fetchUserTimezone, getUserTimezone, saveUserTimezone, createScheduleHash, hasScheduleChanged } = require('./scheduler');
 const { initRecorder, startRecording, stopRecording, getRecordedSteps, clearSteps, addCustomStep } = require('./recorder');
 
 // Initialize electron-store for persistent config
@@ -267,6 +267,10 @@ ipcMain.handle('scheduler:check-changes', async (event, userId) => {
   const newHash = createScheduleHash(schedules);
   const changed = hasScheduleChanged(newHash);
   return { changed, schedules, timezone };
+});
+
+ipcMain.handle('scheduler:set-timezone', async (event, { userId, timezone }) => {
+  return await saveUserTimezone(userId, timezone);
 });
 
 // ============================================

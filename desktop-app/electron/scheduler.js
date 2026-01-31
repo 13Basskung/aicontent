@@ -173,6 +173,46 @@ function getUserTimezone() {
 }
 
 /**
+ * Save user timezone to Firestore (project document)
+ */
+async function saveUserTimezone(userId, timezone) {
+  try {
+    // Get first project to save timezone
+    const projectsUrl = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}/projects?key=${API_KEY}`;
+    const projectsData = await fetchJSON(projectsUrl);
+    
+    if (projectsData.documents?.length > 0) {
+      const projectDoc = projectsData.documents[0];
+      const projectPath = projectDoc.name;
+      
+      // Update project document with timezone
+      const updateUrl = `https://firestore.googleapis.com/v1/${projectPath}?updateMask.fieldPaths=timezone&key=${API_KEY}`;
+      
+      const response = await fetch(updateUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            timezone: { stringValue: timezone }
+          }
+        })
+      });
+      
+      if (response.ok) {
+        userTimezone = timezone;
+        console.log('🌍 Timezone saved to Firestore:', timezone);
+        return { success: true, timezone };
+      }
+    }
+    
+    return { success: false, error: 'No project found' };
+  } catch (error) {
+    console.error('❌ Failed to save timezone:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Create hash from schedules for change detection
  */
 function createScheduleHash(schedules) {
@@ -475,6 +515,7 @@ module.exports = {
   executeScheduledRun,
   fetchUserTimezone,
   getUserTimezone,
+  saveUserTimezone,
   createScheduleHash,
   hasScheduleChanged
 };
