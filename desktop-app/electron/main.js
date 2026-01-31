@@ -261,10 +261,12 @@ ipcMain.handle('scheduler:get-timezone', async (event, userId) => {
 });
 
 ipcMain.handle('scheduler:check-changes', async (event, userId) => {
+  // Always fetch fresh timezone from Firestore
+  const timezone = await fetchUserTimezone(userId);
   const schedules = await fetchUserSchedule(userId);
   const newHash = createScheduleHash(schedules);
   const changed = hasScheduleChanged(newHash);
-  return { changed, schedules, timezone: getUserTimezone() };
+  return { changed, schedules, timezone };
 });
 
 // ============================================

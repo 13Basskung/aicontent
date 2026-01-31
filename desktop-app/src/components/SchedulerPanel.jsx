@@ -48,15 +48,22 @@ function SchedulerPanel({ keyData, instances }) {
     loadTimezone();
   }, [keyData]);
 
-  // Smart-refresh: check for changes every 30 seconds (only update if changed)
+  // Smart-refresh: check for changes every 30 seconds
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       if (window.electronAPI?.scheduler && keyData?.userId) {
         const result = await window.electronAPI.scheduler.checkChanges(keyData.userId);
+        
+        // Always update timezone (user may have changed it in Web App)
+        if (result.timezone && result.timezone !== userTimezone) {
+          console.log('🌍 Timezone changed:', result.timezone);
+          setUserTimezone(result.timezone);
+        }
+        
+        // Update schedules only if changed
         if (result.changed) {
           console.log('🔄 Schedules changed - updating...');
           setSchedules(result.schedules);
-          setUserTimezone(result.timezone);
           // Filter today's schedules
           const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
           const todayCode = days[new Date().getDay()];
@@ -66,7 +73,7 @@ function SchedulerPanel({ keyData, instances }) {
     }, 30000);
     
     return () => clearInterval(syncInterval);
-  }, [keyData]);
+  }, [keyData, userTimezone]);
 
   // Listen for scheduler events
   useEffect(() => {
