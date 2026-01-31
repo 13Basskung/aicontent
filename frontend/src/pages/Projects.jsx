@@ -148,7 +148,11 @@ export default function Projects() {
         setUserTimezone(newTz);
         if (currentUser) {
             console.log("💾 Saving Timezone:", newTz);
-            await setDoc(doc(db, 'users', currentUser.uid), { timezone: newTz }, { merge: true });
+            // Save timezone AND email (for Desktop App to query by email)
+            await setDoc(doc(db, 'users', currentUser.uid), { 
+                timezone: newTz,
+                email: currentUser.email || ''
+            }, { merge: true });
             console.log("🌍 Timezone saved successfully.");
         }
     };
