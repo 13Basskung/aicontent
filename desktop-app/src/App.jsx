@@ -272,6 +272,9 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.5.6': [
+    { title: 'Block Permissions', desc: 'Instances tab - view only, Recorder tab - Edit/Delete (Admin)' },
+  ],
   '1.5.5': [
     { title: 'Firestore Rules', desc: 'แก้ไข permissions สำหรับ instance_settings' },
     { title: 'Block Description', desc: 'Popup แสดงรายละเอียดของ Block ที่เคยตั้งค่าไว้' },
