@@ -5,20 +5,13 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Import flag SVG images (Windows doesn't support emoji flags)
-import thFlag from '../assets/flags/th.svg';
-import gbFlag from '../assets/flags/gb.svg';
-import cnFlag from '../assets/flags/cn.svg';
-import krFlag from '../assets/flags/kr.svg';
-import twFlag from '../assets/flags/tw.svg';
-
-// Timezone options with SVG flag images
+// Timezone options with flag paths from public folder (Windows doesn't support emoji flags)
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', flag: thFlag, label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', flag: gbFlag, label: 'United Kingdom (GMT+0)' },
-  { value: 'Asia/Shanghai', flag: cnFlag, label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', flag: krFlag, label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', flag: twFlag, label: 'Taiwan (GMT+8)' },
+  { value: 'Asia/Bangkok', flag: '/flags/th.svg', label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', flag: '/flags/gb.svg', label: 'United Kingdom (GMT+0)' },
+  { value: 'Asia/Shanghai', flag: '/flags/cn.svg', label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', flag: '/flags/kr.svg', label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', flag: '/flags/tw.svg', label: 'Taiwan (GMT+8)' },
 ];
 
 // Day names in Thai
@@ -303,7 +296,7 @@ function SchedulerPanel({ keyData, instances }) {
                 className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
                 <img 
-                  src={TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || thFlag}
+                  src={TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || '/flags/th.svg'}
                   alt="flag"
                   className="w-6 h-4 object-cover rounded-sm"
                 />
