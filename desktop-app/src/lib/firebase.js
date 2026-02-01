@@ -384,6 +384,69 @@ export async function deleteUserBlock(userId, blockId) {
   return saveUserBlockSettings(userId, blockId, { deleted: true });
 }
 
+/**
+ * Save instance settings (selectedBlockId) to Firestore
+ */
+export async function saveInstanceSettings(userId, instanceId, data) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/instance_settings/${instanceId}?key=${API_KEY}`;
+    
+    const fields = {};
+    if (data.selectedBlockId !== undefined) fields.selectedBlockId = toFirestoreValue(data.selectedBlockId);
+    if (data.selectedBlockName !== undefined) fields.selectedBlockName = toFirestoreValue(data.selectedBlockName);
+    fields.updatedAt = toFirestoreValue(new Date());
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+    
+    console.log('✅ Instance settings saved:', instanceId);
+    return true;
+  } catch (error) {
+    console.error('saveInstanceSettings error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all instance settings for a user
+ */
+export async function fetchInstanceSettings(userId) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/instance_settings?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error('fetchInstanceSettings error:', data.error);
+      return {};
+    }
+    
+    // Convert to map: { instanceId: { selectedBlockId, ... } }
+    const settingsMap = {};
+    if (data.documents) {
+      data.documents.forEach(doc => {
+        const parsed = parseDocument(doc);
+        settingsMap[parsed.id] = parsed;
+      });
+    }
+    
+    console.log(`📊 Loaded ${Object.keys(settingsMap).length} instance settings`);
+    return settingsMap;
+  } catch (error) {
+    console.error('fetchInstanceSettings error:', error);
+    return {};
+  }
+}
+
 export default {
   fetchProjects,
   fetchBlocks,
@@ -395,5 +458,7 @@ export default {
   updateAgentStatus,
   fetchUserBlockSettings,
   saveUserBlockSettings,
-  deleteUserBlock
+  deleteUserBlock,
+  saveInstanceSettings,
+  fetchInstanceSettings
 };

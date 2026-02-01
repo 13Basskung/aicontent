@@ -15,7 +15,7 @@ const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', short: 'TikTok', color: 'bg-black', icon: '🎵' },
   { id: 'instagram', name: 'Instagram', short: 'IG', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📷' }
 ];
-import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock } from '../lib/firebase';
+import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock, saveInstanceSettings, fetchInstanceSettings } from '../lib/firebase';
 
 function Dashboard({ keyData }) {
   const [projects, setProjects] = useState([]);
@@ -51,6 +51,15 @@ function Dashboard({ keyData }) {
   
   // Toast notification state (แทน native alert)
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  // Block selection confirmation modal
+  const [blockSelectModal, setBlockSelectModal] = useState({ 
+    open: false, 
+    instanceId: null, 
+    instanceName: '',
+    blockId: null, 
+    blockName: '' 
+  });
   
   // Show toast helper
   function showToast(message, type = 'success') {
@@ -205,8 +214,21 @@ function Dashboard({ keyData }) {
           return isValid;
         });
         
-        console.log(`📊 Loaded ${validInstances.length}/${allInstances.length} instances for this user`);
-        setInstances(validInstances);
+        // Load instance settings from Firestore (selectedBlockId)
+        const instanceSettings = await fetchInstanceSettings(keyData.userId);
+        
+        // Merge instance settings with instances
+        const instancesWithSettings = validInstances.map(instance => {
+          const settings = instanceSettings[instance.id];
+          if (settings?.selectedBlockId) {
+            console.log(`� Instance "${instance.customName || instance.projectName}" has saved block: ${settings.selectedBlockId}`);
+            return { ...instance, selectedBlockId: settings.selectedBlockId };
+          }
+          return instance;
+        });
+        
+        console.log(`📊 Loaded ${instancesWithSettings.length}/${allInstances.length} instances for this user`);
+        setInstances(instancesWithSettings);
         
         // Update store to remove invalid instances
         if (validInstances.length !== allInstances.length) {
@@ -944,20 +966,19 @@ function Dashboard({ keyData }) {
                       <div className="relative flex-1 max-w-[200px]">
                         <select
                           value={instance.selectedBlockId || ''}
-                          onChange={async (e) => {
+                          onChange={(e) => {
                             const blockId = e.target.value;
-                            // Update state
-                            setInstances(prev => prev.map(i => 
-                              i.id === instance.id ? { ...i, selectedBlockId: blockId } : i
-                            ));
-                            // Save to electron-store for persistence
-                            if (window.electronAPI?.store) {
-                              const current = await window.electronAPI.store.get('instances') || [];
-                              const updated = current.map(i => 
-                                i.id === instance.id ? { ...i, selectedBlockId: blockId } : i
-                              );
-                              await window.electronAPI.store.set('instances', updated);
-                              console.log(`💾 Saved Block selection for instance: ${instance.id}`);
+                            const block = blocks.find(b => b.id === blockId);
+                            
+                            // Only show popup if selecting a different block (not same or empty)
+                            if (blockId && blockId !== instance.selectedBlockId) {
+                              setBlockSelectModal({
+                                open: true,
+                                instanceId: instance.id,
+                                instanceName: instance.customName || instance.projectName,
+                                blockId: blockId,
+                                blockName: block?.name || ''
+                              });
                             }
                           }}
                           className="w-full appearance-none bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
@@ -1080,6 +1101,76 @@ function Dashboard({ keyData }) {
           </div>
         )}
       </section>
+      )}
+
+      {/* Block Selection Confirmation Modal */}
+      {blockSelectModal.open && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass rounded-2xl p-6 max-w-md w-full mx-4 border border-purple-500/30 bg-gradient-to-br from-purple-900/50 to-slate-900/90">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <Settings className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-white text-lg font-semibold">ยืนยันการเลือก Block</h3>
+                <p className="text-white/50 text-sm">Block นี้จะถูกใช้สำหรับ Instance นี้</p>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/50 text-sm">Instance:</span>
+                <span className="text-white font-medium">{blockSelectModal.instanceName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/50 text-sm">Block:</span>
+                <span className="text-purple-300 font-medium">{blockSelectModal.blockName}</span>
+              </div>
+            </div>
+
+            <p className="text-white/60 text-sm mb-6 flex items-center gap-2">
+              <span className="text-yellow-400">⚠️</span>
+              การเลือกนี้จะถูกบันทึกและใช้งานทันที
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '' })}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={async () => {
+                  const { instanceId, blockId, blockName } = blockSelectModal;
+                  
+                  try {
+                    // Save to Firestore
+                    await saveInstanceSettings(keyData.userId, instanceId, { 
+                      selectedBlockId: blockId,
+                      selectedBlockName: blockName
+                    });
+                    
+                    // Update local state
+                    setInstances(prev => prev.map(i => 
+                      i.id === instanceId ? { ...i, selectedBlockId: blockId } : i
+                    ));
+                    
+                    showToast(`✅ บันทึก Block "${blockName}" สำเร็จ`, 'success');
+                  } catch (error) {
+                    console.error('Failed to save block selection:', error);
+                    showToast(`❌ บันทึกไม่สำเร็จ: ${error.message}`, 'error');
+                  }
+                  
+                  setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '' });
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition font-medium"
+              >
+                ✓ ยืนยัน
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
