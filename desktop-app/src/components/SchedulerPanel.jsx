@@ -337,10 +337,15 @@ function SchedulerPanel({ keyData, instances }) {
                 <ChevronDown className={`w-4 h-4 text-yellow-500 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               
-              {/* Dropdown */}
+              {/* Dropdown - Selected timezone shows first */}
               {isTimezoneDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50">
-                  {TIMEZONES.map(tz => (
+                  {/* Sort: selected timezone first, then others */}
+                  {[...TIMEZONES].sort((a, b) => {
+                    if (a.id === userTimezone) return -1;
+                    if (b.id === userTimezone) return 1;
+                    return 0;
+                  }).map(tz => (
                     <button
                       key={tz.id}
                       onClick={() => {

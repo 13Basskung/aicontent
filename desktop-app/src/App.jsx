@@ -270,26 +270,48 @@ function UpdateBadge({ status, onInstall }) {
   return null;
 }
 
+// Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
+const VERSION_CHANGELOG = {
+  '1.4.9': [
+    { title: 'Timezone Dropdown', desc: 'แสดง timezone ที่เลือกไว้บนสุดของรายการ' },
+    { title: 'Update Popup', desc: 'แสดงรายละเอียดการแก้ไขจริงในแต่ละเวอร์ชัน' },
+  ],
+  '1.4.8': [
+    { title: 'Flag Icons', desc: 'ธงชาติแบบ CSS แสดงได้ทุกเครื่อง' },
+    { title: 'Timezone Time', desc: 'คำนวณเวลาตาม offset ถูกต้อง 100%' },
+  ],
+  '1.4.7': [
+    { title: 'SVG Flags', desc: 'เปลี่ยนเป็น Base64 encoding' },
+  ],
+  '1.4.6': [
+    { title: 'Update Modal', desc: 'เปลี่ยนจาก native dialog เป็น custom modal สวยงาม' },
+    { title: 'Toast Notification', desc: 'แทน alert สีขาวด้วย toast ตรงธีม' },
+  ],
+};
+
 // Custom Update Modal Component (Beautiful Dark Theme)
 function UpdateModal({ version, releaseNotes, onInstall, onLater }) {
-  // Parse release notes (could be markdown or plain text)
+  // Get changelog for this version
   const getChangelogItems = () => {
-    if (!releaseNotes) {
-      return [
-        { icon: '🔧', text: 'แก้ไขข้อบกพร่องและปรับปรุงประสิทธิภาพ' },
-        { icon: '✨', text: 'ปรับปรุง UI/UX ให้ดีขึ้น' },
-        { icon: '🚀', text: 'เพิ่มความเสถียรของระบบ' }
-      ];
+    // Check if we have predefined changelog for this version
+    if (VERSION_CHANGELOG[version]) {
+      return VERSION_CHANGELOG[version];
     }
     
-    // Try to parse release notes
-    const lines = releaseNotes.split('\n').filter(line => line.trim());
-    return lines.slice(0, 5).map(line => ({
-      icon: line.includes('fix') || line.includes('แก้') ? '🔧' : 
-            line.includes('add') || line.includes('เพิ่ม') ? '✨' : 
-            line.includes('improve') || line.includes('ปรับปรุง') ? '🚀' : '📌',
-      text: line.replace(/^[-*•]\s*/, '').trim()
-    }));
+    // Try to parse release notes from GitHub
+    if (releaseNotes && releaseNotes.trim()) {
+      const lines = releaseNotes.split('\n').filter(line => line.trim());
+      return lines.slice(0, 5).map(line => ({
+        title: 'Update',
+        desc: line.replace(/^[-*•]\s*/, '').trim()
+      }));
+    }
+    
+    // Default fallback
+    return [
+      { title: 'Bug Fixes', desc: 'แก้ไขข้อบกพร่องและปรับปรุงประสิทธิภาพ' },
+      { title: 'UI/UX', desc: 'ปรับปรุงหน้าตาและการใช้งานให้ดีขึ้น' },
+    ];
   };
 
   const changelog = getChangelogItems();
@@ -320,13 +342,16 @@ function UpdateModal({ version, releaseNotes, onInstall, onLater }) {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-yellow-400" />
-            <h3 className="text-white/80 font-medium">มีอะไรใหม่</h3>
+            <h3 className="text-white/80 font-medium">มีอะไรใหม่ใน v{version}</h3>
           </div>
           <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/10">
             {changelog.map((item, index) => (
               <div key={index} className="flex items-start gap-3">
-                <span className="text-lg">{item.icon}</span>
-                <span className="text-white/70 text-sm leading-relaxed">{item.text}</span>
+                <div className="w-2 h-2 rounded-full bg-green-400 mt-1.5 flex-shrink-0"></div>
+                <div>
+                  <span className="text-white font-medium text-sm">{item.title}</span>
+                  <p className="text-white/50 text-xs mt-0.5">{item.desc}</p>
+                </div>
               </div>
             ))}
           </div>
