@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Download, CheckCircle, RefreshCw, Key, LogOut, Shield } from 'lucide-react';
+import { AlertTriangle, Download, CheckCircle, RefreshCw, Key, LogOut, Shield, Sparkles, Rocket, X } from 'lucide-react';
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
 
@@ -8,6 +8,7 @@ function App() {
   const [keyData, setKeyData] = useState(null);
   const [appInfo, setAppInfo] = useState({ version: '1.0.0', isDev: true });
   const [updateStatus, setUpdateStatus] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showReminder, setShowReminder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +37,10 @@ function App() {
         // Listen for update status
         window.electronAPI.onUpdateStatus((status) => {
           setUpdateStatus(status);
+          // Show modal when update is downloaded
+          if (status.status === 'downloaded') {
+            setShowUpdateModal(true);
+          }
         });
 
         // Listen for Google login reminder
@@ -198,6 +203,16 @@ function App() {
           <LoginScreen onLogin={handleLogin} />
         )}
       </main>
+
+      {/* Custom Update Modal */}
+      {showUpdateModal && updateStatus?.status === 'downloaded' && (
+        <UpdateModal 
+          version={updateStatus.version}
+          releaseNotes={updateStatus.releaseNotes}
+          onInstall={installUpdate}
+          onLater={() => setShowUpdateModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -253,6 +268,96 @@ function UpdateBadge({ status, onInstall }) {
   }
 
   return null;
+}
+
+// Custom Update Modal Component (Beautiful Dark Theme)
+function UpdateModal({ version, releaseNotes, onInstall, onLater }) {
+  // Parse release notes (could be markdown or plain text)
+  const getChangelogItems = () => {
+    if (!releaseNotes) {
+      return [
+        { icon: '🔧', text: 'แก้ไขข้อบกพร่องและปรับปรุงประสิทธิภาพ' },
+        { icon: '✨', text: 'ปรับปรุง UI/UX ให้ดีขึ้น' },
+        { icon: '🚀', text: 'เพิ่มความเสถียรของระบบ' }
+      ];
+    }
+    
+    // Try to parse release notes
+    const lines = releaseNotes.split('\n').filter(line => line.trim());
+    return lines.slice(0, 5).map(line => ({
+      icon: line.includes('fix') || line.includes('แก้') ? '🔧' : 
+            line.includes('add') || line.includes('เพิ่ม') ? '✨' : 
+            line.includes('improve') || line.includes('ปรับปรุง') ? '🚀' : '📌',
+      text: line.replace(/^[-*•]\s*/, '').trim()
+    }));
+  };
+
+  const changelog = getChangelogItems();
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] animate-fadeIn">
+      <div className="glass rounded-3xl p-8 max-w-lg w-full mx-4 border border-white/20 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/30">
+              <Rocket className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">อัพเดทพร้อมแล้ว!</h2>
+              <p className="text-white/60 text-sm">Version {version}</p>
+            </div>
+          </div>
+          <button 
+            onClick={onLater}
+            className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Changelog Section */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-yellow-400" />
+            <h3 className="text-white/80 font-medium">มีอะไรใหม่</h3>
+          </div>
+          <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/10">
+            {changelog.map((item, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <span className="text-lg">{item.icon}</span>
+                <span className="text-white/70 text-sm leading-relaxed">{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Info Note */}
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-6">
+          <p className="text-blue-300/80 text-xs text-center">
+            💡 แอปจะรีสตาร์ทเพื่อติดตั้งเวอร์ชันใหม่
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onLater}
+            className="flex-1 px-4 py-3 bg-white/10 hover:bg-white/20 text-white/70 rounded-xl font-medium transition"
+          >
+            ภายหลัง
+          </button>
+          <button
+            onClick={onInstall}
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white rounded-xl font-bold transition shadow-lg shadow-green-500/30 flex items-center justify-center gap-2"
+          >
+            <Download className="w-5 h-5" />
+            อัพเดทเลย
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default App;

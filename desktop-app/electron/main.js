@@ -140,22 +140,12 @@ autoUpdater.on('download-progress', (progress) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('✅ Update downloaded:', info.version);
+  // Send to renderer for custom modal (no native dialog)
   sendToRenderer('update-status', { 
     status: 'downloaded', 
-    version: info.version 
-  });
-  
-  // Show dialog to restart
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'อัพเดทพร้อมติดตั้ง',
-    message: `Version ${info.version} พร้อมติดตั้งแล้ว\nต้องการรีสตาร์ทเพื่ออัพเดทตอนนี้หรือไม่?`,
-    buttons: ['รีสตาร์ทตอนนี้', 'ภายหลัง'],
-    defaultId: 0
-  }).then((result) => {
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall();
-    }
+    version: info.version,
+    releaseNotes: info.releaseNotes || '',
+    releaseDate: info.releaseDate || new Date().toISOString()
   });
 });
 
