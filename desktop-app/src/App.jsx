@@ -272,6 +272,9 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.5.7': [
+    { title: 'Recorder Save', desc: 'บันทึก Block ไป Firestore และแสดงใน Available Blocks ทันที' },
+  ],
   '1.5.6': [
     { title: 'Block Permissions', desc: 'Instances tab - view only, Recorder tab - Edit/Delete (Admin)' },
   ],
