@@ -550,7 +550,57 @@ function Dashboard({ keyData }) {
         </div>
       )}
 
-      {/* Projects Section */}
+      {/* Tabs Navigation - Moved here (under Admin Mode) */}
+      <div className="flex items-center gap-1 p-1 bg-white/5 rounded-xl">
+        <button
+          onClick={() => setActiveTab('instances')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+            activeTab === 'instances' 
+              ? 'bg-white/10 text-white' 
+              : 'text-white/50 hover:text-white/70'
+          }`}
+        >
+          <Chrome className="w-4 h-4" />
+          Instances
+        </button>
+        <button
+          onClick={() => setActiveTab('scheduler')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+            activeTab === 'scheduler' 
+              ? 'bg-white/10 text-white' 
+              : 'text-white/50 hover:text-white/70'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          Scheduler
+        </button>
+        {keyData?.isAdmin && (
+          <button
+            onClick={() => setActiveTab('recorder')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+              activeTab === 'recorder' 
+                ? 'bg-white/10 text-white' 
+                : 'text-white/50 hover:text-white/70'
+            }`}
+          >
+            <Circle className="w-4 h-4" />
+            Recorder
+          </button>
+        )}
+      </div>
+
+      {/* Tab Content: Scheduler */}
+      {activeTab === 'scheduler' && (
+        <SchedulerPanel keyData={keyData} instances={instances} />
+      )}
+
+      {/* Tab Content: Recorder (Admin only) */}
+      {activeTab === 'recorder' && keyData?.isAdmin && (
+        <RecorderPanel keyData={keyData} instances={instances} />
+      )}
+
+      {/* Projects Section - Only show on Instances tab */}
+      {activeTab === 'instances' && (
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-white font-semibold flex items-center gap-2">
@@ -621,9 +671,10 @@ function Dashboard({ keyData }) {
           )}
         </div>
       </section>
+      )}
 
       {/* Instance ล็อกกับ Project ที่เลือก */}
-      {selectedProject && (
+      {activeTab === 'instances' && selectedProject && (
         <section className="glass rounded-xl p-4 border border-green-500/30 bg-green-500/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -642,55 +693,7 @@ function Dashboard({ keyData }) {
         </section>
       )}
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-1 p-1 bg-white/5 rounded-xl">
-        <button
-          onClick={() => setActiveTab('instances')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-            activeTab === 'instances' 
-              ? 'bg-white/10 text-white' 
-              : 'text-white/50 hover:text-white/70'
-          }`}
-        >
-          <Chrome className="w-4 h-4" />
-          Instances
-        </button>
-        <button
-          onClick={() => setActiveTab('scheduler')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-            activeTab === 'scheduler' 
-              ? 'bg-white/10 text-white' 
-              : 'text-white/50 hover:text-white/70'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          Scheduler
-        </button>
-        {keyData?.isAdmin && (
-          <button
-            onClick={() => setActiveTab('recorder')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
-              activeTab === 'recorder' 
-                ? 'bg-white/10 text-white' 
-                : 'text-white/50 hover:text-white/70'
-            }`}
-          >
-            <Circle className="w-4 h-4" />
-            Recorder
-          </button>
-        )}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'scheduler' && (
-        <SchedulerPanel keyData={keyData} instances={instances} />
-      )}
-
-      {activeTab === 'recorder' && keyData?.isAdmin && (
-        <RecorderPanel keyData={keyData} instances={instances} />
-      )}
-
-      {/* Chrome Instances Section - only show when activeTab is 'instances' */}
+      {/* Chrome Instances Section - Only show on Instances tab */}
       {activeTab === 'instances' && (
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -1000,7 +1003,8 @@ function Dashboard({ keyData }) {
       </section>
       )}
 
-      {/* Available Blocks Section */}
+      {/* Available Blocks Section - Only show on Instances tab */}
+      {activeTab === 'instances' && (
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-white font-semibold flex items-center gap-2">
@@ -1066,6 +1070,7 @@ function Dashboard({ keyData }) {
           </div>
         )}
       </section>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteModal.open && (
