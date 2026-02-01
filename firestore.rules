@@ -197,5 +197,10 @@ service cloud.firestore {
     match /users/{userId}/projects/{projectId}/{subcollection}/{docId} {
       allow read, write: if true; // Allow Desktop Agent to manage jobs, prompts, etc.
     }
+
+    // 🟢 DESKTOP APP: Allow Agent to read/write user block_settings (for Available Blocks customization)
+    match /users/{userId}/block_settings/{blockId} {
+      allow read, write: if true; // Allow Desktop Agent to save/delete block settings
+    }
   }
 }
