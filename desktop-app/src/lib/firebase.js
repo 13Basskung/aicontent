@@ -312,6 +312,78 @@ export async function updateAgentStatus(projectId, status) {
   }
 }
 
+/**
+ * Fetch user-specific block settings (description, deleted status)
+ */
+export async function fetchUserBlockSettings(userId) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/block_settings?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.warn('fetchUserBlockSettings warning:', data.error.message);
+      return {};
+    }
+    
+    if (!data.documents) {
+      return {};
+    }
+    
+    // Convert to map: { blockId: { description, deleted } }
+    const settings = {};
+    data.documents.forEach(doc => {
+      const parsed = parseDocument(doc);
+      settings[parsed.id] = parsed;
+    });
+    
+    return settings;
+  } catch (error) {
+    console.error('fetchUserBlockSettings error:', error);
+    return {};
+  }
+}
+
+/**
+ * Save user-specific block settings (description)
+ */
+export async function saveUserBlockSettings(userId, blockId, data) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/block_settings/${blockId}?key=${API_KEY}`;
+    
+    const fields = {};
+    if (data.name !== undefined) fields.name = toFirestoreValue(data.name);
+    if (data.description !== undefined) fields.description = toFirestoreValue(data.description);
+    if (data.deleted !== undefined) fields.deleted = toFirestoreValue(data.deleted);
+    fields.updatedAt = toFirestoreValue(new Date());
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+    
+    console.log('✅ Block settings saved:', blockId);
+    return true;
+  } catch (error) {
+    console.error('saveUserBlockSettings error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark block as deleted for user
+ */
+export async function deleteUserBlock(userId, blockId) {
+  return saveUserBlockSettings(userId, blockId, { deleted: true });
+}
+
 export default {
   fetchProjects,
   fetchBlocks,
@@ -320,5 +392,8 @@ export default {
   fetchReadyPrompts,
   fetchSlots,
   updateJobStatus,
-  updateAgentStatus
+  updateAgentStatus,
+  fetchUserBlockSettings,
+  saveUserBlockSettings,
+  deleteUserBlock
 };

@@ -5,13 +5,13 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Timezone options with flag images (same as Web App)
+// Timezone options with flag emojis (reliable, no external loading)
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', code: 'th', label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', code: 'gb', label: 'United Kingdom (GMT+0)' },
-  { value: 'Asia/Shanghai', code: 'cn', label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', code: 'kr', label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', code: 'tw', label: 'Taiwan (GMT+8)' },
+  { value: 'Asia/Bangkok', flag: '🇹🇭', label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', flag: '🇬🇧', label: 'United Kingdom (GMT+0)' },
+  { value: 'Asia/Shanghai', flag: '🇨🇳', label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', flag: '🇰🇷', label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', flag: '🇹🇼', label: 'Taiwan (GMT+8)' },
 ];
 
 // Day names in Thai
@@ -295,12 +295,9 @@ function SchedulerPanel({ keyData, instances }) {
                 }}
                 className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
-                <img 
-                  src={`https://flagcdn.com/24x18/${TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.code || 'th'}.png`}
-                  alt="flag"
-                  className="w-6 h-4 object-cover rounded-sm"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
+                <span className="text-xl leading-none">
+                  {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || '🇹🇭'}
+                </span>
                 <span className="flex-1 text-left">
                   {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
                 </span>
@@ -323,12 +320,7 @@ function SchedulerPanel({ keyData, instances }) {
                         onClick={() => handleTimezoneChange(tz.value)}
                         className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
                       >
-                        <img 
-                          src={`https://flagcdn.com/24x18/${tz.code}.png`} 
-                          alt="flag" 
-                          className="w-6 h-4 object-cover rounded-sm shadow-sm"
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
+                        <span className="text-xl leading-none">{tz.flag}</span>
                         <span className="text-sm font-medium">{tz.label}</span>
                       </button>
                     ))}

@@ -15,7 +15,7 @@ const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', short: 'TikTok', color: 'bg-black', icon: '🎵' },
   { id: 'instagram', name: 'Instagram', short: 'IG', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📷' }
 ];
-import { fetchProjects, fetchBlocks, fetchSlots } from '../lib/firebase';
+import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock } from '../lib/firebase';
 
 function Dashboard({ keyData }) {
   const [projects, setProjects] = useState([]);
@@ -161,9 +161,26 @@ function Dashboard({ keyData }) {
       const validProjectIds = new Set(projectsData.map(p => p.id));
       console.log(`✅ Valid projectIds for user ${keyData.userId}:`, Array.from(validProjectIds));
 
-      // Fetch global blocks
-      const blocksData = await fetchBlocks();
-      setBlocks(blocksData);
+      // Fetch global blocks + user-specific settings
+      const [blocksData, userBlockSettings] = await Promise.all([
+        fetchBlocks(),
+        fetchUserBlockSettings(keyData.userId)
+      ]);
+      
+      // Merge global blocks with user-specific settings (description, deleted)
+      const mergedBlocks = blocksData
+        .map(block => {
+          const userSettings = userBlockSettings[block.id] || {};
+          return {
+            ...block,
+            description: userSettings.description || block.description || '',
+            deleted: userSettings.deleted || false
+          };
+        })
+        .filter(block => !block.deleted); // Filter out deleted blocks
+      
+      console.log(`📦 Loaded ${mergedBlocks.length} blocks (${blocksData.length - mergedBlocks.length} deleted)`);
+      setBlocks(mergedBlocks);
 
       // Load instances from store - FILTER only instances that belong to this user's projects
       if (window.electronAPI) {
@@ -393,21 +410,19 @@ function Dashboard({ keyData }) {
     if (!block) return;
     
     try {
-      // Update block in local store
-      if (window.electronAPI) {
-        const updatedBlocks = blocks.map(b => 
-          b.id === block.id ? { ...b, name: block.name, description: block.description } : b
-        );
-        await window.electronAPI.store.set('blocks', updatedBlocks);
-        setBlocks(updatedBlocks);
-        
-        // Also save to Firestore for persistence across devices
-        await window.electronAPI.store.saveBlockToFirestore(keyData.userId, block.id, {
-          name: block.name,
-          description: block.description
-        });
-        console.log('✅ Block saved to Firestore:', block.id);
-      }
+      // Update block in local state
+      const updatedBlocks = blocks.map(b => 
+        b.id === block.id ? { ...b, name: block.name, description: block.description } : b
+      );
+      setBlocks(updatedBlocks);
+      
+      // Save to Firestore for persistence
+      await saveUserBlockSettings(keyData.userId, block.id, {
+        name: block.name,
+        description: block.description
+      });
+      console.log('✅ Block saved to Firestore:', block.id);
+      
       setBlockEditModal({ open: false, block: null });
     } catch (error) {
       console.error('Save block error:', error);
@@ -419,15 +434,17 @@ function Dashboard({ keyData }) {
     if (!block) return;
     
     try {
-      // Remove block from store
-      if (window.electronAPI) {
-        const updatedBlocks = blocks.filter(b => b.id !== block.id);
-        await window.electronAPI.store.set('blocks', updatedBlocks);
-        setBlocks(updatedBlocks);
-        if (selectedBlock?.id === block.id) {
-          setSelectedBlock(null);
-        }
+      // Remove block from local state
+      const updatedBlocks = blocks.filter(b => b.id !== block.id);
+      setBlocks(updatedBlocks);
+      if (selectedBlock?.id === block.id) {
+        setSelectedBlock(null);
       }
+      
+      // Mark as deleted in Firestore (persistent)
+      await deleteUserBlock(keyData.userId, block.id);
+      console.log('✅ Block marked as deleted in Firestore:', block.id);
+      
       setBlockDeleteModal({ open: false, block: null });
     } catch (error) {
       console.error('Delete block error:', error);
