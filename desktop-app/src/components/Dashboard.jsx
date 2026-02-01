@@ -1036,7 +1036,7 @@ function Dashboard({ keyData }) {
       </section>
       )}
 
-      {/* Available Blocks Section - Only show on Instances tab */}
+      {/* Available Blocks Section - Instances tab (View-only, no Edit/Delete) */}
       {activeTab === 'instances' && (
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -1068,6 +1068,48 @@ function Dashboard({ keyData }) {
                 <p className="text-white/50 text-xs mt-1">{block.steps?.length || 0} steps</p>
               </button>
               
+              {/* Tooltip with description (View-only) */}
+              {hoveredBlockId === block.id && block.description && (
+                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
+                  {block.description}
+                </div>
+              )}
+              {/* No Edit/Delete buttons for User - View only */}
+            </div>
+          ))}
+        </div>
+        {blocks.length === 0 && (
+          <div className="text-center py-4 text-white/30 glass rounded-xl">
+            ไม่พบ Blocks
+          </div>
+        )}
+      </section>
+      )}
+
+      {/* Available Blocks Section - Recorder tab (Admin with Edit/Delete) */}
+      {activeTab === 'recorder' && keyData?.isAdmin && (
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-white font-semibold flex items-center gap-2">
+            <Settings className="w-5 h-5 text-purple-400" />
+            Available Blocks ({blocks.length})
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {blocks.map(block => (
+            <div
+              key={block.id}
+              className="relative group"
+              onMouseEnter={() => setHoveredBlockId(block.id)}
+              onMouseLeave={() => setHoveredBlockId(null)}
+            >
+              <div
+                className="w-full glass rounded-lg p-3 text-left transition hover:bg-white/20"
+              >
+                <p className="text-white text-sm font-medium truncate">{block.name}</p>
+                <p className="text-white/50 text-xs mt-1">{block.steps?.length || 0} steps</p>
+              </div>
+              
               {/* Tooltip with description */}
               {hoveredBlockId === block.id && block.description && (
                 <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
@@ -1075,8 +1117,8 @@ function Dashboard({ keyData }) {
                 </div>
               )}
               
-              {/* Admin buttons (Edit/Delete) */}
-              {keyData.isAdmin && hoveredBlockId === block.id && (
+              {/* Admin buttons (Edit/Delete) - Only in Recorder tab */}
+              {hoveredBlockId === block.id && (
                 <div className="absolute top-1 right-1 flex gap-1 z-10">
                   <button
                     onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
