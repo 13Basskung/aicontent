@@ -4,13 +4,13 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Timezone options with emoji flags (more reliable in Electron)
+// Timezone options with flag images (same as Web App)
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', flag: '🇹🇭', label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', flag: '🇬🇧', label: 'UK (GMT+0)' },
-  { value: 'Asia/Shanghai', flag: '🇨🇳', label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', flag: '🇰🇷', label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', flag: '🇹🇼', label: 'Taiwan (GMT+8)' },
+  { value: 'Asia/Bangkok', code: 'th', label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', code: 'gb', label: 'United Kingdom (GMT+0)' },
+  { value: 'Asia/Shanghai', code: 'cn', label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', code: 'kr', label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', code: 'tw', label: 'Taiwan (GMT+8)' },
 ];
 
 // Day names in Thai
@@ -251,30 +251,34 @@ function SchedulerPanel({ keyData, instances }) {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 border border-white/10 transition"
+                className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
-                <span className="text-xl">
-                  {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || '🇹🇭'}
-                </span>
-                <span className="text-white text-sm font-medium">
+                <img 
+                  src={`https://flagcdn.com/24x18/${TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.code || 'th'}.png`}
+                  alt="flag"
+                  className="w-6 h-4 object-cover rounded-sm"
+                />
+                <span className="flex-1 text-left">
                   {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-yellow-500 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               
+              {/* Backdrop */}
               {isTimezoneDropdownOpen && (
-                <div className="fixed inset-0 z-[9998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
+                <div className="fixed inset-0 z-[99998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
               )}
+              {/* Dropdown - Fixed position with very high z-index */}
               {isTimezoneDropdownOpen && (
-                <div className="absolute top-full mt-2 right-0 w-56 bg-slate-800 rounded-xl shadow-2xl border border-white/20 overflow-hidden z-[9999]">
+                <div className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-[99999]" style={{ top: dropdownRef.current?.getBoundingClientRect().bottom + 8, left: dropdownRef.current?.getBoundingClientRect().left, width: 256 }}>
                   {TIMEZONE_OPTIONS.map(tz => (
                     <button
                       key={tz.value}
                       onClick={() => handleTimezoneChange(tz.value)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300' : 'text-white'}`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
                     >
-                      <span className="text-xl">{tz.flag}</span>
-                      <span className="text-sm">{tz.label}</span>
+                      <img src={`https://flagcdn.com/24x18/${tz.code}.png`} alt="flag" className="w-6 h-4 object-cover rounded-sm shadow-sm" />
+                      <span className="text-sm font-medium">{tz.label}</span>
                     </button>
                   ))}
                 </div>
@@ -458,8 +462,8 @@ function SchedulerPanel({ keyData, instances }) {
           ))}
         </div>
         
-        {/* Selected Day Detail */}
-        {selectedDay && (
+        {/* Selected Day Detail - Don't show if it's today (already shown above) */}
+        {selectedDay && selectedDay !== getCurrentDayCode() && (
           <div className="mt-4 pt-4 border-t border-white/10">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-white font-medium flex items-center gap-2">
