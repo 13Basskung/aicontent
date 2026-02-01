@@ -944,11 +944,21 @@ function Dashboard({ keyData }) {
                       <div className="relative flex-1 max-w-[200px]">
                         <select
                           value={instance.selectedBlockId || ''}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const blockId = e.target.value;
+                            // Update state
                             setInstances(prev => prev.map(i => 
                               i.id === instance.id ? { ...i, selectedBlockId: blockId } : i
                             ));
+                            // Save to electron-store for persistence
+                            if (window.electronAPI?.store) {
+                              const current = await window.electronAPI.store.get('instances') || [];
+                              const updated = current.map(i => 
+                                i.id === instance.id ? { ...i, selectedBlockId: blockId } : i
+                              );
+                              await window.electronAPI.store.set('instances', updated);
+                              console.log(`💾 Saved Block selection for instance: ${instance.id}`);
+                            }
                           }}
                           className="w-full appearance-none bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 cursor-pointer"
                           style={{ colorScheme: 'dark' }}

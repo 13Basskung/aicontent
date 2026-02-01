@@ -272,6 +272,13 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.5.3': [
+    { title: 'Block Selection', desc: 'บันทึก Block ที่เลือกไว้ ไม่รีเซตเมื่ออัพเดท' },
+  ],
+  '1.5.2': [
+    { title: 'UI Cleanup', desc: 'ย้าย Tabs ไปใต้ Admin Mode, ซ่อน Projects/Blocks ใน Scheduler' },
+    { title: 'Recorder Tab', desc: 'แสดงเฉพาะ Admin เท่านั้น' },
+  ],
   '1.5.1': [
     { title: 'Timezone Dropdown', desc: 'แสดงเหนือปุ่มเพื่อให้เห็นรายละเอียดชัดเจน' },
   ],
