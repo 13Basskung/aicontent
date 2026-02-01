@@ -58,7 +58,8 @@ function Dashboard({ keyData }) {
     instanceId: null, 
     instanceName: '',
     blockId: null, 
-    blockName: '' 
+    blockName: '',
+    blockDescription: ''
   });
   
   // Show toast helper
@@ -977,7 +978,8 @@ function Dashboard({ keyData }) {
                                 instanceId: instance.id,
                                 instanceName: instance.customName || instance.projectName,
                                 blockId: blockId,
-                                blockName: block?.name || ''
+                                blockName: block?.name || '',
+                                blockDescription: block?.description || ''
                               });
                             }
                           }}
@@ -1117,15 +1119,21 @@ function Dashboard({ keyData }) {
               </div>
             </div>
             
-            <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
+            <div className="bg-white/5 rounded-xl p-4 mb-4 border border-white/10">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-white/50 text-sm">Instance:</span>
                 <span className="text-white font-medium">{blockSelectModal.instanceName}</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-white/50 text-sm">Block:</span>
                 <span className="text-purple-300 font-medium">{blockSelectModal.blockName}</span>
               </div>
+              {blockSelectModal.blockDescription && (
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <span className="text-white/50 text-xs block mb-1">รายละเอียด:</span>
+                  <p className="text-white/80 text-sm">{blockSelectModal.blockDescription}</p>
+                </div>
+              )}
             </div>
 
             <p className="text-white/60 text-sm mb-6 flex items-center gap-2">
@@ -1135,7 +1143,7 @@ function Dashboard({ keyData }) {
 
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '' })}
+                onClick={() => setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '', blockDescription: '' })}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
               >
                 ยกเลิก
@@ -1162,7 +1170,7 @@ function Dashboard({ keyData }) {
                     showToast(`❌ บันทึกไม่สำเร็จ: ${error.message}`, 'error');
                   }
                   
-                  setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '' });
+                  setBlockSelectModal({ open: false, instanceId: null, instanceName: '', blockId: null, blockName: '', blockDescription: '' });
                 }}
                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition font-medium"
               >
