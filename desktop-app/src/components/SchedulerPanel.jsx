@@ -4,13 +4,13 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Timezone options with flags
+// Timezone options with emoji flags (more reliable in Electron)
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', code: 'th', label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', code: 'gb', label: 'UK (GMT+0)' },
-  { value: 'Asia/Shanghai', code: 'cn', label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', code: 'kr', label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', code: 'tw', label: 'Taiwan (GMT+8)' },
+  { value: 'Asia/Bangkok', flag: '🇹🇭', label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', flag: '🇬🇧', label: 'UK (GMT+0)' },
+  { value: 'Asia/Shanghai', flag: '🇨🇳', label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', flag: '🇰🇷', label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', flag: '🇹🇼', label: 'Taiwan (GMT+8)' },
 ];
 
 // Day names in Thai
@@ -35,6 +35,7 @@ function SchedulerPanel({ keyData, instances }) {
   const [executionStatus, setExecutionStatus] = useState(null);
   const [userTimezone, setUserTimezone] = useState('Asia/Bangkok');
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null); // null = show today, string = show selected day
   const dropdownRef = useRef(null);
 
   // Update current time every second + check day change
@@ -252,11 +253,9 @@ function SchedulerPanel({ keyData, instances }) {
                 onClick={() => setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 border border-white/10 transition"
               >
-                <img 
-                  src={`https://flagcdn.com/24x18/${TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.code || 'th'}.png`} 
-                  alt="flag" 
-                  className="w-6 h-4 object-cover rounded-sm"
-                />
+                <span className="text-xl">
+                  {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || '🇹🇭'}
+                </span>
                 <span className="text-white text-sm font-medium">
                   {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
                 </span>
@@ -264,14 +263,17 @@ function SchedulerPanel({ keyData, instances }) {
               </button>
               
               {isTimezoneDropdownOpen && (
-                <div className="absolute top-full mt-2 right-0 w-56 bg-slate-800 rounded-xl shadow-xl border border-white/10 overflow-hidden z-50">
+                <div className="fixed inset-0 z-[9998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
+              )}
+              {isTimezoneDropdownOpen && (
+                <div className="absolute top-full mt-2 right-0 w-56 bg-slate-800 rounded-xl shadow-2xl border border-white/20 overflow-hidden z-[9999]">
                   {TIMEZONE_OPTIONS.map(tz => (
                     <button
                       key={tz.value}
                       onClick={() => handleTimezoneChange(tz.value)}
                       className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300' : 'text-white'}`}
                     >
-                      <img src={`https://flagcdn.com/24x18/${tz.code}.png`} alt="flag" className="w-6 h-4 object-cover rounded-sm" />
+                      <span className="text-xl">{tz.flag}</span>
                       <span className="text-sm">{tz.label}</span>
                     </button>
                   ))}
@@ -428,16 +430,23 @@ function SchedulerPanel({ keyData, instances }) {
         
         <div className="grid grid-cols-7 gap-2">
           {['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map((day) => (
-            <div 
+            <button 
               key={day}
-              className={`p-2 rounded-lg text-center ${
-                day === getCurrentDayCode() 
-                  ? 'bg-purple-500/20 border border-purple-500/30' 
-                  : 'bg-white/5'
+              onClick={() => setSelectedDay(selectedDay === day ? null : day)}
+              className={`p-2 rounded-lg text-center transition cursor-pointer hover:bg-white/10 ${
+                selectedDay === day
+                  ? 'bg-yellow-500/20 border-2 border-yellow-500/50'
+                  : day === getCurrentDayCode() 
+                    ? 'bg-purple-500/20 border border-purple-500/30' 
+                    : 'bg-white/5 border border-transparent'
               }`}
             >
               <div className={`text-xs font-medium mb-1 ${
-                day === getCurrentDayCode() ? 'text-purple-400' : 'text-white/50'
+                selectedDay === day 
+                  ? 'text-yellow-400' 
+                  : day === getCurrentDayCode() 
+                    ? 'text-purple-400' 
+                    : 'text-white/50'
               }`}>
                 {DAY_NAMES[day]}
               </div>
@@ -445,9 +454,59 @@ function SchedulerPanel({ keyData, instances }) {
                 {schedulesByDay[day]?.length || 0}
               </div>
               <div className="text-xs text-white/30">slots</div>
-            </div>
+            </button>
           ))}
         </div>
+        
+        {/* Selected Day Detail */}
+        {selectedDay && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-white font-medium flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-yellow-400" />
+                รายการวัน{DAY_NAMES[selectedDay]}
+              </h4>
+              <button 
+                onClick={() => setSelectedDay(null)}
+                className="text-xs text-white/50 hover:text-white px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition"
+              >
+                ปิด
+              </button>
+            </div>
+            
+            {(schedulesByDay[selectedDay]?.length || 0) === 0 ? (
+              <div className="text-center py-4 text-white/30">
+                ไม่มีตารางสำหรับวัน{DAY_NAMES[selectedDay]}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {schedulesByDay[selectedDay]?.map((slot, index) => (
+                  <div 
+                    key={index}
+                    className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-lg font-mono text-white">
+                          {slot.start}
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">
+                            {slot.projectName}
+                          </div>
+                          <div className="text-xs text-white/50">
+                            {slot.scenes} scenes • {slot.platforms?.length || 0} platforms
+                          </div>
+                        </div>
+                      </div>
+                      <Clock className="w-4 h-4 text-yellow-400" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
