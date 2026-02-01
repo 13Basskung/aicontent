@@ -5,28 +5,60 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Base64 encoded SVG flags (most reliable method for Electron)
-const FLAG_BASE64 = {
-  // Thailand flag
-  th: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjQTUxOTMxIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxyZWN0IGZpbGw9IiNGNEY1RjgiIHk9IjEwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0MDAiLz48cmVjdCBmaWxsPSIjMkQyQTRBIiB5PSIyMDAiIHdpZHRoPSI5MDAiIGhlaWdodD0iMjAwIi8+PC9zdmc+',
-  // UK flag
-  gb: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCAzMCI+PHJlY3QgZmlsbD0iIzAxMjE2OSIgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIi8+PHBhdGggZD0iTTAsMCBMNjAsMzAgTTYwLDAgTDAsMzAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI2Ii8+PHBhdGggZD0iTTAsMCBMNjAsMzAgTTYwLDAgTDAsMzAiIHN0cm9rZT0iI0M4MTAyRSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTMwLDAgdjMwIE0wLDE1IGg2MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PHBhdGggZD0iTTMwLDAgdjMwIE0wLDE1IGg2MCIgc3Ryb2tlPSIjQzgxMDJFIiBzdHJva2Utd2lkdGg9IjYiLz48L3N2Zz4=',
-  // China flag
-  cn: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMCAyMCI+PHJlY3QgZmlsbD0iI0RFMjkxMCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjIwIi8+PGcgZmlsbD0iI0ZGREUwMCI+PHBvbHlnb24gcG9pbnRzPSI2LDQgNi45LDYuOCA0LDUgOCw1IDUuMSw2LjgiLz48cG9seWdvbiBwb2ludHM9IjEwLDEgMTAuMywyIDksMS41IDExLDEuNSA5LjcsMiIvPjxwb2x5Z29uIHBvaW50cz0iMTIsMyAxMi4zLDQgMTEsMy41IDEzLDMuNSAxMS43LDQiLz48cG9seWdvbiBwb2ludHM9IjEyLDYgMTIuMyw3IDExLDYuNSAxMyw2LjUgMTEuNyw3Ii8+PHBvbHlnb24gcG9pbnRzPSIxMCw4IDEwLjMsOSA5LDguNSAxMSw4LjUgOS43LDkiLz48L2c+PC9zdmc+',
-  // South Korea flag
-  kr: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjZmZmIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxjaXJjbGUgZmlsbD0iI0M2MEMzMCIgY3g9IjQ1MCIgY3k9IjMwMCIgcj0iMTUwIi8+PHBhdGggZmlsbD0iIzAwMzQ3OCIgZD0iTTQ1MCwzMDAgYTc1LDc1IDAgMCwxIDAsLTE1MCBhNzUsNzUgMCAwLDAgMCwxNTAiLz48L3N2Zz4=',
-  // Taiwan flag
-  tw: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjRkUwMDAwIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxyZWN0IGZpbGw9IiMwMDAwOTUiIHdpZHRoPSI0NTAiIGhlaWdodD0iMzAwIi8+PGNpcmNsZSBmaWxsPSIjZmZmIiBjeD0iMjI1IiBjeT0iMTUwIiByPSI3NSIvPjxjaXJjbGUgZmlsbD0iIzAwMDA5NSIgY3g9IjIyNSIgY3k9IjE1MCIgcj0iNTAiLz48L3N2Zz4='
-};
-
-// Timezone options with base64 SVG flags
-const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', flag: FLAG_BASE64.th, label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', flag: FLAG_BASE64.gb, label: 'United Kingdom (GMT+0)' },
-  { value: 'Asia/Shanghai', flag: FLAG_BASE64.cn, label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', flag: FLAG_BASE64.kr, label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', flag: FLAG_BASE64.tw, label: 'Taiwan (GMT+8)' },
+// Timezone configuration with emoji flags (simple and reliable)
+const TIMEZONES = [
+  { id: 'Asia/Bangkok', label: 'Thailand', gmt: 'GMT+7', offset: 7 },
+  { id: 'Europe/London', label: 'UK', gmt: 'GMT+0', offset: 0 },
+  { id: 'Asia/Shanghai', label: 'China', gmt: 'GMT+8', offset: 8 },
+  { id: 'Asia/Seoul', label: 'South Korea', gmt: 'GMT+9', offset: 9 },
+  { id: 'Asia/Taipei', label: 'Taiwan', gmt: 'GMT+8', offset: 8 },
 ];
+
+// Flag component using simple colored rectangles (guaranteed to work)
+function FlagIcon({ timezone, size = 'md' }) {
+  const sizeClass = size === 'sm' ? 'w-5 h-3' : 'w-6 h-4';
+  
+  const flags = {
+    'Asia/Bangkok': ( // Thailand
+      <div className={`${sizeClass} rounded-sm overflow-hidden flex flex-col`}>
+        <div className="flex-1 bg-red-600"></div>
+        <div className="flex-1 bg-white"></div>
+        <div className="flex-[2] bg-blue-900"></div>
+        <div className="flex-1 bg-white"></div>
+        <div className="flex-1 bg-red-600"></div>
+      </div>
+    ),
+    'Europe/London': ( // UK
+      <div className={`${sizeClass} rounded-sm overflow-hidden bg-blue-800 relative`}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-full h-1 bg-white absolute"></div>
+          <div className="h-full w-1 bg-white absolute"></div>
+          <div className="w-full h-0.5 bg-red-600 absolute"></div>
+          <div className="h-full w-0.5 bg-red-600 absolute"></div>
+        </div>
+      </div>
+    ),
+    'Asia/Shanghai': ( // China
+      <div className={`${sizeClass} rounded-sm overflow-hidden bg-red-600 flex items-center justify-start pl-1`}>
+        <span className="text-yellow-400 text-[8px]">★</span>
+      </div>
+    ),
+    'Asia/Seoul': ( // South Korea
+      <div className={`${sizeClass} rounded-sm overflow-hidden bg-white flex items-center justify-center`}>
+        <div className="w-2 h-2 rounded-full bg-gradient-to-b from-red-500 to-blue-600"></div>
+      </div>
+    ),
+    'Asia/Taipei': ( // Taiwan
+      <div className={`${sizeClass} rounded-sm overflow-hidden bg-red-600`}>
+        <div className="w-1/2 h-1/2 bg-blue-800 flex items-center justify-center">
+          <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+        </div>
+      </div>
+    ),
+  };
+  
+  return flags[timezone] || <div className={`${sizeClass} rounded-sm bg-gray-500`}></div>;
+}
 
 // Day names in Thai
 const DAY_NAMES = {
@@ -207,25 +239,26 @@ function SchedulerPanel({ keyData, instances }) {
     });
   }
 
-  function formatTimeWithSeconds(date) {
-    return date.toLocaleTimeString('th-TH', { 
-      timeZone: userTimezone,
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false 
-    });
+  // Get current time for selected timezone using offset calculation
+  function getTimeForTimezone() {
+    const tz = TIMEZONES.find(t => t.id === userTimezone) || TIMEZONES[0];
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const tzTime = new Date(utc + (tz.offset * 3600000));
+    return tzTime;
+  }
+
+  function formatTimeWithSeconds() {
+    const tzTime = getTimeForTimezone();
+    const hours = String(tzTime.getHours()).padStart(2, '0');
+    const minutes = String(tzTime.getMinutes()).padStart(2, '0');
+    const seconds = String(tzTime.getSeconds()).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
   }
 
   function getTimezoneLabel() {
-    const labels = {
-      'Asia/Bangkok': 'Thailand (GMT+7)',
-      'Europe/London': 'UK (GMT+0)',
-      'Asia/Shanghai': 'China (GMT+8)',
-      'Asia/Seoul': 'Korea (GMT+9)',
-      'Asia/Taipei': 'Taiwan (GMT+8)'
-    };
-    return labels[userTimezone] || userTimezone;
+    const tz = TIMEZONES.find(t => t.id === userTimezone);
+    return tz ? `${tz.label} (${tz.gmt})` : 'Thailand (GMT+7)';
   }
 
   function isUpcoming(slot) {
@@ -293,56 +326,40 @@ function SchedulerPanel({ keyData, instances }) {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Timezone Selector */}
+            {/* Timezone Selector - NEW SIMPLE VERSION */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => {
-                  if (dropdownRef.current) {
-                    const rect = dropdownRef.current.getBoundingClientRect();
-                    setDropdownPos({
-                      top: rect.bottom + 8,
-                      left: rect.left,
-                      width: Math.max(256, rect.width)
-                    });
-                  }
-                  setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen);
-                }}
+                onClick={() => setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)}
                 className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
-                <img 
-                  src={TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || FLAG_BASE64.th}
-                  alt="flag"
-                  className="w-6 h-4 object-cover rounded-sm"
-                />
-                <span className="flex-1 text-left">
-                  {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
-                </span>
+                <FlagIcon timezone={userTimezone} />
+                <span className="flex-1 text-left">{getTimezoneLabel()}</span>
                 <ChevronDown className={`w-4 h-4 text-yellow-500 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               
-              {/* Dropdown using createPortal - renders to document.body */}
-              {isTimezoneDropdownOpen && createPortal(
-                <>
-                  {/* Backdrop */}
-                  <div className="fixed inset-0 z-[999998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
-                  {/* Dropdown */}
-                  <div 
-                    className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-[999999]"
-                    style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-                  >
-                    {TIMEZONE_OPTIONS.map(tz => (
-                      <button
-                        key={tz.value}
-                        onClick={() => handleTimezoneChange(tz.value)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
-                      >
-                        <img src={tz.flag} alt="flag" className="w-6 h-4 object-cover rounded-sm" />
-                        <span className="text-sm font-medium">{tz.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>,
-                document.body
+              {/* Dropdown */}
+              {isTimezoneDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50">
+                  {TIMEZONES.map(tz => (
+                    <button
+                      key={tz.id}
+                      onClick={() => {
+                        setUserTimezone(tz.id);
+                        setIsTimezoneDropdownOpen(false);
+                        // Save to Firestore
+                        if (window.electronAPI?.scheduler && keyData?.userId) {
+                          window.electronAPI.scheduler.setTimezone(keyData.userId, tz.id);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${
+                        userTimezone === tz.id ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'
+                      }`}
+                    >
+                      <FlagIcon timezone={tz.id} />
+                      <span className="text-sm font-medium">{tz.label} ({tz.gmt})</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
             
@@ -350,7 +367,7 @@ function SchedulerPanel({ keyData, instances }) {
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
               <Clock className="w-4 h-4 text-green-400" />
               <span className="font-mono font-bold text-lg text-white">
-                {formatTimeWithSeconds(currentTime)}
+                {formatTimeWithSeconds()}
               </span>
             </div>
             
