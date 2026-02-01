@@ -272,6 +272,10 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.5.4': [
+    { title: 'Block Selection', desc: 'Popup ยืนยันและบันทึกลง Firestore ถาวร' },
+    { title: 'Persistence', desc: 'Block ที่เลือกไม่รีเซตเมื่ออัพเดทหรือรีสตาร์ท' },
+  ],
   '1.5.3': [
     { title: 'Block Selection', desc: 'บันทึก Block ที่เลือกไว้ ไม่รีเซตเมื่ออัพเดท' },
   ],

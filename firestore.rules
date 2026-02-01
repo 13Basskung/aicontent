@@ -202,5 +202,10 @@ service cloud.firestore {
     match /users/{userId}/block_settings/{blockId} {
       allow read, write: if true; // Allow Desktop Agent to save/delete block settings
     }
+
+    // 🟢 DESKTOP APP: Allow Agent to read/write user instance_settings (for Block selection persistence)
+    match /users/{userId}/instance_settings/{instanceId} {
+      allow read, write: if true; // Allow Desktop Agent to save instance block selections
+    }
   }
 }
