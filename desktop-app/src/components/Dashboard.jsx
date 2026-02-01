@@ -407,47 +407,61 @@ function Dashboard({ keyData }) {
 
   async function saveBlockEdit() {
     const { block } = blockEditModal;
-    if (!block) return;
+    if (!block) {
+      console.error('No block to save');
+      return;
+    }
+    
+    console.log('📝 Saving block:', block.id, block.name, block.description);
     
     try {
-      // Update block in local state
+      // Save to Firestore FIRST for persistence
+      const result = await saveUserBlockSettings(keyData.userId, block.id, {
+        name: block.name,
+        description: block.description || ''
+      });
+      console.log('✅ Block saved to Firestore:', block.id, result);
+      
+      // Then update block in local state
       const updatedBlocks = blocks.map(b => 
-        b.id === block.id ? { ...b, name: block.name, description: block.description } : b
+        b.id === block.id ? { ...b, name: block.name, description: block.description || '' } : b
       );
       setBlocks(updatedBlocks);
       
-      // Save to Firestore for persistence
-      await saveUserBlockSettings(keyData.userId, block.id, {
-        name: block.name,
-        description: block.description
-      });
-      console.log('✅ Block saved to Firestore:', block.id);
-      
       setBlockEditModal({ open: false, block: null });
+      alert('✅ บันทึกสำเร็จ!');
     } catch (error) {
       console.error('Save block error:', error);
+      alert('❌ บันทึกไม่สำเร็จ: ' + error.message);
     }
   }
 
   async function confirmDeleteBlock() {
     const { block } = blockDeleteModal;
-    if (!block) return;
+    if (!block) {
+      console.error('No block to delete');
+      return;
+    }
+    
+    console.log('🗑️ Deleting block:', block.id, block.name);
     
     try {
-      // Remove block from local state
+      // Mark as deleted in Firestore FIRST (persistent)
+      const result = await deleteUserBlock(keyData.userId, block.id);
+      console.log('✅ Block marked as deleted in Firestore:', block.id, result);
+      
+      // Then remove block from local state
       const updatedBlocks = blocks.filter(b => b.id !== block.id);
       setBlocks(updatedBlocks);
       if (selectedBlock?.id === block.id) {
         setSelectedBlock(null);
       }
       
-      // Mark as deleted in Firestore (persistent)
-      await deleteUserBlock(keyData.userId, block.id);
-      console.log('✅ Block marked as deleted in Firestore:', block.id);
-      
       setBlockDeleteModal({ open: false, block: null });
+      alert('✅ ลบสำเร็จ!');
     } catch (error) {
       console.error('Delete block error:', error);
+      alert('❌ ลบไม่สำเร็จ: ' + error.message);
     }
   }
 
