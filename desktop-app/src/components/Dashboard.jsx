@@ -48,6 +48,15 @@ function Dashboard({ keyData }) {
   
   // Active tab: 'instances' | 'scheduler' | 'recorder'
   const [activeTab, setActiveTab] = useState('instances');
+  
+  // Toast notification state (แทน native alert)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  // Show toast helper
+  function showToast(message, type = 'success') {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  }
 
   // Load data on mount
   useEffect(() => {
@@ -429,10 +438,10 @@ function Dashboard({ keyData }) {
       setBlocks(updatedBlocks);
       
       setBlockEditModal({ open: false, block: null });
-      alert('✅ บันทึกสำเร็จ!');
+      showToast('บันทึกสำเร็จ!', 'success');
     } catch (error) {
       console.error('Save block error:', error);
-      alert('❌ บันทึกไม่สำเร็จ: ' + error.message);
+      showToast('บันทึกไม่สำเร็จ: ' + error.message, 'error');
     }
   }
 
@@ -458,10 +467,10 @@ function Dashboard({ keyData }) {
       }
       
       setBlockDeleteModal({ open: false, block: null });
-      alert('✅ ลบสำเร็จ!');
+      showToast('ลบสำเร็จ!', 'success');
     } catch (error) {
       console.error('Delete block error:', error);
-      alert('❌ ลบไม่สำเร็จ: ' + error.message);
+      showToast('ลบไม่สำเร็จ: ' + error.message, 'error');
     }
   }
 
@@ -1180,6 +1189,24 @@ function Dashboard({ keyData }) {
                 ลบ Block
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification (แทน native alert) */}
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-[9999] animate-pulse">
+          <div className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border ${
+            toast.type === 'success' 
+              ? 'bg-green-900/90 border-green-500/50 text-green-100' 
+              : 'bg-red-900/90 border-red-500/50 text-red-100'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-green-400" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-400" />
+            )}
+            <span className="font-medium">{toast.message}</span>
           </div>
         </div>
       )}
