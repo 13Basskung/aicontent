@@ -619,7 +619,7 @@ function Dashboard({ keyData }) {
 
       {/* Tab Content: Recorder (Admin only) */}
       {activeTab === 'recorder' && keyData?.isAdmin && (
-        <RecorderPanel keyData={keyData} instances={instances} />
+        <RecorderPanel keyData={keyData} instances={instances} onBlockCreated={loadData} />
       )}
 
       {/* Projects Section - Only show on Instances tab */}

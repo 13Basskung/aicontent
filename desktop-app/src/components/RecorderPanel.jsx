@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   Circle, Square, Play, Trash2, Save, 
   MousePointer, Type, ChevronDown, Plus, 
-  Edit3, X, Clock, AlertCircle
+  Edit3, X, Clock, AlertCircle, CheckCircle
 } from 'lucide-react';
+import { createBlock } from '../lib/firebase';
 
 // Step action icons
 const ACTION_ICONS = {
@@ -14,14 +15,17 @@ const ACTION_ICONS = {
   goto: Play
 };
 
-function RecorderPanel({ keyData, instances }) {
+function RecorderPanel({ keyData, instances, onBlockCreated }) {
   const [isRecording, setIsRecording] = useState(false);
   const [steps, setSteps] = useState([]);
   const [startUrl, setStartUrl] = useState('https://www.google.com');
   const [selectedInstance, setSelectedInstance] = useState(null);
   const [editingStep, setEditingStep] = useState(null);
   const [blockName, setBlockName] = useState('');
+  const [blockDescription, setBlockDescription] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Listen for recorder events
   useEffect(() => {
@@ -103,22 +107,50 @@ function RecorderPanel({ keyData, instances }) {
       return;
     }
     
-    // TODO: Save to Firestore
-    const block = {
-      name: blockName,
-      steps: steps.map(s => ({
-        action: s.action,
-        selector: s.selector,
-        value: s.value,
-        text: s.text
-      })),
-      createdAt: new Date().toISOString()
-    };
+    setSaving(true);
+    setSaveSuccess(false);
     
-    console.log('📦 Block to save:', block);
-    alert(`Block "${blockName}" บันทึกแล้ว! (${steps.length} steps)\n\nหมายเหตุ: ต้อง implement การบันทึกไป Firestore`);
-    setShowSaveModal(false);
-    setBlockName('');
+    try {
+      const blockData = {
+        name: blockName.trim(),
+        description: blockDescription.trim(),
+        steps: steps.map(s => ({
+          action: s.action,
+          selector: s.selector || '',
+          value: s.value || '',
+          text: s.text || ''
+        })),
+        createdBy: keyData?.userId || 'admin'
+      };
+      
+      console.log('📦 Saving block to Firestore:', blockData);
+      
+      const result = await createBlock(blockData);
+      
+      if (result.success) {
+        console.log('✅ Block saved successfully:', result.blockId);
+        setSaveSuccess(true);
+        
+        // Callback to reload blocks in parent component
+        if (onBlockCreated) {
+          onBlockCreated();
+        }
+        
+        // Reset form after short delay to show success
+        setTimeout(() => {
+          setShowSaveModal(false);
+          setBlockName('');
+          setBlockDescription('');
+          setSteps([]);
+          setSaveSuccess(false);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save block:', error);
+      alert(`บันทึกไม่สำเร็จ: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Admin check
@@ -340,42 +372,80 @@ function RecorderPanel({ keyData, instances }) {
       {showSaveModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="glass rounded-xl p-6 w-96">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">บันทึก Block</h3>
-              <button onClick={() => setShowSaveModal(false)} className="text-white/50 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-white/70 text-sm mb-1">ชื่อ Block</label>
-              <input
-                type="text"
-                value={blockName}
-                onChange={(e) => setBlockName(e.target.value)}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="เช่น: Post to Facebook"
-              />
-            </div>
-            
-            <div className="text-white/50 text-sm mb-4">
-              {steps.length} steps จะถูกบันทึก
-            </div>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowSaveModal(false)}
-                className="flex-1 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"
-              >
-                ยกเลิก
-              </button>
-              <button
-                onClick={handleSaveBlock}
-                className="flex-1 px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white transition"
-              >
-                บันทึก
-              </button>
-            </div>
+            {saveSuccess ? (
+              // Success state
+              <div className="text-center py-4">
+                <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-white mb-2">บันทึกสำเร็จ!</h3>
+                <p className="text-white/50">Block "{blockName}" ถูกบันทึกแล้ว</p>
+              </div>
+            ) : (
+              // Form state
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">บันทึก Block</h3>
+                  <button onClick={() => setShowSaveModal(false)} className="text-white/50 hover:text-white" disabled={saving}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-white/70 text-sm mb-1">ชื่อ Block *</label>
+                  <input
+                    type="text"
+                    value={blockName}
+                    onChange={(e) => setBlockName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="เช่น: Post to Facebook"
+                    disabled={saving}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-white/70 text-sm mb-1">รายละเอียด (แสดงเมื่อ hover)</label>
+                  <textarea
+                    value={blockDescription}
+                    onChange={(e) => setBlockDescription(e.target.value)}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    placeholder="อธิบายการทำงานของ Block นี้..."
+                    rows={3}
+                    disabled={saving}
+                  />
+                </div>
+                
+                <div className="text-white/50 text-sm mb-4 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                  {steps.length} steps จะถูกบันทึก
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSaveModal(false)}
+                    className="flex-1 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"
+                    disabled={saving}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleSaveBlock}
+                    className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white transition flex items-center justify-center gap-2"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        กำลังบันทึก...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        บันทึก
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

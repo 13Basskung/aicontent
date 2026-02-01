@@ -447,6 +447,42 @@ export async function fetchInstanceSettings(userId) {
   }
 }
 
+/**
+ * Create a new block in global_recipe_blocks
+ */
+export async function createBlock(blockData) {
+  try {
+    // Generate a unique ID
+    const blockId = `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const url = `${FIRESTORE_BASE}/global_recipe_blocks/${blockId}?key=${API_KEY}`;
+    
+    const fields = {
+      name: toFirestoreValue(blockData.name),
+      description: toFirestoreValue(blockData.description || ''),
+      steps: toFirestoreValue(blockData.steps || []),
+      createdAt: toFirestoreValue(new Date()),
+      createdBy: toFirestoreValue(blockData.createdBy || 'admin')
+    };
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to create block');
+    }
+    
+    console.log('✅ Block created:', blockId);
+    return { success: true, blockId };
+  } catch (error) {
+    console.error('createBlock error:', error);
+    throw error;
+  }
+}
+
 export default {
   fetchProjects,
   fetchBlocks,
@@ -460,5 +496,6 @@ export default {
   saveUserBlockSettings,
   deleteUserBlock,
   saveInstanceSettings,
-  fetchInstanceSettings
+  fetchInstanceSettings,
+  createBlock
 };
