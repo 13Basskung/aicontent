@@ -393,13 +393,20 @@ function Dashboard({ keyData }) {
     if (!block) return;
     
     try {
-      // Update block in store
+      // Update block in local store
       if (window.electronAPI) {
         const updatedBlocks = blocks.map(b => 
           b.id === block.id ? { ...b, name: block.name, description: block.description } : b
         );
         await window.electronAPI.store.set('blocks', updatedBlocks);
         setBlocks(updatedBlocks);
+        
+        // Also save to Firestore for persistence across devices
+        await window.electronAPI.store.saveBlockToFirestore(keyData.userId, block.id, {
+          name: block.name,
+          description: block.description
+        });
+        console.log('✅ Block saved to Firestore:', block.id);
       }
       setBlockEditModal({ open: false, block: null });
     } catch (error) {
@@ -559,10 +566,9 @@ function Dashboard({ keyData }) {
                 )}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <span className={`px-2 py-0.5 rounded text-xs ${
-                  project.status === 'active' ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'
-                }`}>
-                  {project.status}
+                <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span className={`w-2 h-2 rounded-full ${project.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                  {project.status === 'active' ? 'มีงานวันนี้' : 'ไม่มีงานวันนี้'}
                 </span>
               </div>
             </button>

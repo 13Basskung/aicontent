@@ -505,6 +505,19 @@ function notifyUI(status, slot, error = null) {
   }
 }
 
+// Save block metadata to Firestore
+async function saveBlockToFirestore(userId, blockId, data) {
+  try {
+    const blockRef = db.collection('users').doc(userId).collection('blocks').doc(blockId);
+    await blockRef.set(data, { merge: true });
+    console.log(`✅ Block ${blockId} saved to Firestore`);
+    return true;
+  } catch (error) {
+    console.error('Save block to Firestore error:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   initScheduler,
   startScheduler,
@@ -516,6 +529,7 @@ module.exports = {
   fetchUserTimezone,
   getUserTimezone,
   saveUserTimezone,
+  saveBlockToFirestore,
   createScheduleHash,
   hasScheduleChanged
 };

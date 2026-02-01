@@ -189,6 +189,18 @@ ipcMain.handle('store:delete', (event, key) => {
   return true;
 });
 
+// Save block metadata to Firestore
+ipcMain.handle('store:save-block-firestore', async (event, { userId, blockId, data }) => {
+  try {
+    const { saveBlockToFirestore } = require('./scheduler');
+    await saveBlockToFirestore(userId, blockId, data);
+    return { success: true };
+  } catch (error) {
+    console.error('Save block to Firestore error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Check for updates manually
 ipcMain.handle('check-for-updates', () => {
   if (!isDev) {

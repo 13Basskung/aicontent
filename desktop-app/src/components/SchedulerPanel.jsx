@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Clock, Play, Pause, Calendar, RefreshCw, 
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
@@ -37,6 +38,7 @@ function SchedulerPanel({ keyData, instances }) {
   const [isTimezoneDropdownOpen, setIsTimezoneDropdownOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null); // null = show today, string = show selected day
   const dropdownRef = useRef(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 256 });
 
   // Update current time every second + check day change
   useEffect(() => {
@@ -222,6 +224,36 @@ function SchedulerPanel({ keyData, instances }) {
     return slot.start < now;
   }
 
+  // Calculate countdown to slot time (returns { hours, minutes, seconds })
+  function getCountdown(slot) {
+    const now = new Date();
+    const [hours, minutes] = slot.start.split(':').map(Number);
+    
+    // Create target time in user timezone
+    const target = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+    target.setHours(hours, minutes, 0, 0);
+    
+    // Get current time in user timezone
+    const current = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }));
+    
+    const diff = target.getTime() - current.getTime();
+    if (diff <= 0) return null;
+    
+    const totalSeconds = Math.floor(diff / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    
+    return { hours: h, minutes: m, seconds: s };
+  }
+
+  function formatCountdown(countdown) {
+    if (!countdown) return '';
+    const { hours, minutes, seconds } = countdown;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+
   // Group schedules by day
   const schedulesByDay = schedules.reduce((acc, slot) => {
     if (!acc[slot.day]) acc[slot.day] = [];
@@ -250,13 +282,24 @@ function SchedulerPanel({ keyData, instances }) {
             {/* Timezone Selector */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen)}
+                onClick={() => {
+                  if (dropdownRef.current) {
+                    const rect = dropdownRef.current.getBoundingClientRect();
+                    setDropdownPos({
+                      top: rect.bottom + 8,
+                      left: rect.left,
+                      width: Math.max(256, rect.width)
+                    });
+                  }
+                  setIsTimezoneDropdownOpen(!isTimezoneDropdownOpen);
+                }}
                 className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
                 <img 
                   src={`https://flagcdn.com/24x18/${TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.code || 'th'}.png`}
                   alt="flag"
                   className="w-6 h-4 object-cover rounded-sm"
+                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
                 <span className="flex-1 text-left">
                   {TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.label || 'Thailand (GMT+7)'}
@@ -264,24 +307,34 @@ function SchedulerPanel({ keyData, instances }) {
                 <ChevronDown className={`w-4 h-4 text-yellow-500 transition-transform ${isTimezoneDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               
-              {/* Backdrop */}
-              {isTimezoneDropdownOpen && (
-                <div className="fixed inset-0 z-[99998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
-              )}
-              {/* Dropdown - Fixed position with very high z-index */}
-              {isTimezoneDropdownOpen && (
-                <div className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-[99999]" style={{ top: dropdownRef.current?.getBoundingClientRect().bottom + 8, left: dropdownRef.current?.getBoundingClientRect().left, width: 256 }}>
-                  {TIMEZONE_OPTIONS.map(tz => (
-                    <button
-                      key={tz.value}
-                      onClick={() => handleTimezoneChange(tz.value)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
-                    >
-                      <img src={`https://flagcdn.com/24x18/${tz.code}.png`} alt="flag" className="w-6 h-4 object-cover rounded-sm shadow-sm" />
-                      <span className="text-sm font-medium">{tz.label}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* Dropdown using createPortal - renders to document.body */}
+              {isTimezoneDropdownOpen && createPortal(
+                <>
+                  {/* Backdrop */}
+                  <div className="fixed inset-0 z-[999998]" onClick={() => setIsTimezoneDropdownOpen(false)} />
+                  {/* Dropdown */}
+                  <div 
+                    className="fixed bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-[999999]"
+                    style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+                  >
+                    {TIMEZONE_OPTIONS.map(tz => (
+                      <button
+                        key={tz.value}
+                        onClick={() => handleTimezoneChange(tz.value)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors ${userTimezone === tz.value ? 'bg-yellow-500/20 text-yellow-300 font-bold' : 'text-white'}`}
+                      >
+                        <img 
+                          src={`https://flagcdn.com/24x18/${tz.code}.png`} 
+                          alt="flag" 
+                          className="w-6 h-4 object-cover rounded-sm shadow-sm"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        <span className="text-sm font-medium">{tz.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>,
+                document.body
               )}
             </div>
             
@@ -414,7 +467,13 @@ function SchedulerPanel({ keyData, instances }) {
                     </div>
                   </div>
                   
-                  <div>
+                  <div className="flex items-center gap-3">
+                    {/* Countdown timer - show when AUTO RUN is active and slot is not past */}
+                    {isRunning && !isPast(slot) && getCountdown(slot) && (
+                      <span className="font-mono text-sm text-gray-500">
+                        {formatCountdown(getCountdown(slot))}
+                      </span>
+                    )}
                     {isPast(slot) ? (
                       <CheckCircle className="w-5 h-5 text-white/30" />
                     ) : (
