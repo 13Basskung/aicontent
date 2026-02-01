@@ -272,6 +272,14 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.5.1': [
+    { title: 'Timezone Dropdown', desc: 'แสดงเหนือปุ่มเพื่อให้เห็นรายละเอียดชัดเจน' },
+  ],
+  '1.5.0': [
+    { title: 'Timezone Dropdown', desc: 'แสดง timezone ที่เลือกไว้บนสุดของรายการ' },
+    { title: 'Update Popup', desc: 'แสดงหัวข้อและคำอธิบายการแก้ไขจริง' },
+    { title: 'Flag Icons', desc: 'ธงชาติแบบ CSS แสดงได้ทุกเครื่อง' },
+  ],
   '1.4.9': [
     { title: 'Timezone Dropdown', desc: 'แสดง timezone ที่เลือกไว้บนสุดของรายการ' },
     { title: 'Update Popup', desc: 'แสดงรายละเอียดการแก้ไขจริงในแต่ละเวอร์ชัน' },
