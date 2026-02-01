@@ -5,22 +5,27 @@ import {
   CheckCircle, AlertCircle, Zap, Globe, ChevronDown
 } from 'lucide-react';
 
-// Inline SVG flags as data URIs (Windows doesn't support emoji flags, file paths don't work in Electron)
-const FLAG_SVGS = {
-  th: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect fill="#A51931" width="900" height="600"/><rect fill="#F4F5F8" y="100" width="900" height="400"/><rect fill="#2D2A4A" y="200" width="900" height="200"/></svg>')}`,
-  gb: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30"><clipPath id="s"><path d="M0,0 v30 h60 v-30 z"/></clipPath><clipPath id="t"><path d="M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z"/></clipPath><g clip-path="url(#s)"><path d="M0,0 v30 h60 v-30 z" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" clip-path="url(#t)" stroke="#C8102E" stroke-width="4"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></g></svg>')}`,
-  cn: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect fill="#DE2910" width="30" height="20"/><g fill="#FFDE00"><polygon points="6,4 6.9,6.8 4,5 8,5 5.1,6.8"/><polygon points="10,1 10.3,2 9,1.5 11,1.5 9.7,2"/><polygon points="12,3 12.3,4 11,3.5 13,3.5 11.7,4"/><polygon points="12,6 12.3,7 11,6.5 13,6.5 11.7,7"/><polygon points="10,8 10.3,9 9,8.5 11,8.5 9.7,9"/></g></svg>')}`,
-  kr: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect fill="#fff" width="900" height="600"/><circle fill="#C60C30" cx="450" cy="300" r="150"/><path fill="#003478" d="M450,300 a75,75 0 0,1 0,-150 a75,75 0 0,0 0,150"/><g stroke="#000" stroke-width="25"><path d="M225,175 l150,100 M225,225 l150,100 M225,275 l150,100"/><path d="M525,175 l150,100 M525,225 l150,100 M525,275 l150,100"/></g></svg>')}`,
-  tw: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect fill="#FE0000" width="900" height="600"/><rect fill="#000095" width="450" height="300"/><circle fill="#fff" cx="225" cy="150" r="75"/><circle fill="#000095" cx="225" cy="150" r="50"/></svg>')}`
+// Base64 encoded SVG flags (most reliable method for Electron)
+const FLAG_BASE64 = {
+  // Thailand flag
+  th: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjQTUxOTMxIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxyZWN0IGZpbGw9IiNGNEY1RjgiIHk9IjEwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI0MDAiLz48cmVjdCBmaWxsPSIjMkQyQTRBIiB5PSIyMDAiIHdpZHRoPSI5MDAiIGhlaWdodD0iMjAwIi8+PC9zdmc+',
+  // UK flag
+  gb: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCAzMCI+PHJlY3QgZmlsbD0iIzAxMjE2OSIgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIi8+PHBhdGggZD0iTTAsMCBMNjAsMzAgTTYwLDAgTDAsMzAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI2Ii8+PHBhdGggZD0iTTAsMCBMNjAsMzAgTTYwLDAgTDAsMzAiIHN0cm9rZT0iI0M4MTAyRSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTMwLDAgdjMwIE0wLDE1IGg2MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PHBhdGggZD0iTTMwLDAgdjMwIE0wLDE1IGg2MCIgc3Ryb2tlPSIjQzgxMDJFIiBzdHJva2Utd2lkdGg9IjYiLz48L3N2Zz4=',
+  // China flag
+  cn: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMCAyMCI+PHJlY3QgZmlsbD0iI0RFMjkxMCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjIwIi8+PGcgZmlsbD0iI0ZGREUwMCI+PHBvbHlnb24gcG9pbnRzPSI2LDQgNi45LDYuOCA0LDUgOCw1IDUuMSw2LjgiLz48cG9seWdvbiBwb2ludHM9IjEwLDEgMTAuMywyIDksMS41IDExLDEuNSA5LjcsMiIvPjxwb2x5Z29uIHBvaW50cz0iMTIsMyAxMi4zLDQgMTEsMy41IDEzLDMuNSAxMS43LDQiLz48cG9seWdvbiBwb2ludHM9IjEyLDYgMTIuMyw3IDExLDYuNSAxMyw2LjUgMTEuNyw3Ii8+PHBvbHlnb24gcG9pbnRzPSIxMCw4IDEwLjMsOSA5LDguNSAxMSw4LjUgOS43LDkiLz48L2c+PC9zdmc+',
+  // South Korea flag
+  kr: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjZmZmIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxjaXJjbGUgZmlsbD0iI0M2MEMzMCIgY3g9IjQ1MCIgY3k9IjMwMCIgcj0iMTUwIi8+PHBhdGggZmlsbD0iIzAwMzQ3OCIgZD0iTTQ1MCwzMDAgYTc1LDc1IDAgMCwxIDAsLTE1MCBhNzUsNzUgMCAwLDAgMCwxNTAiLz48L3N2Zz4=',
+  // Taiwan flag
+  tw: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNjAwIj48cmVjdCBmaWxsPSIjRkUwMDAwIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjYwMCIvPjxyZWN0IGZpbGw9IiMwMDAwOTUiIHdpZHRoPSI0NTAiIGhlaWdodD0iMzAwIi8+PGNpcmNsZSBmaWxsPSIjZmZmIiBjeD0iMjI1IiBjeT0iMTUwIiByPSI3NSIvPjxjaXJjbGUgZmlsbD0iIzAwMDA5NSIgY3g9IjIyNSIgY3k9IjE1MCIgcj0iNTAiLz48L3N2Zz4='
 };
 
-// Timezone options with inline SVG data URIs
+// Timezone options with base64 SVG flags
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Bangkok', flag: FLAG_SVGS.th, label: 'Thailand (GMT+7)' },
-  { value: 'Europe/London', flag: FLAG_SVGS.gb, label: 'United Kingdom (GMT+0)' },
-  { value: 'Asia/Shanghai', flag: FLAG_SVGS.cn, label: 'China (GMT+8)' },
-  { value: 'Asia/Seoul', flag: FLAG_SVGS.kr, label: 'South Korea (GMT+9)' },
-  { value: 'Asia/Taipei', flag: FLAG_SVGS.tw, label: 'Taiwan (GMT+8)' },
+  { value: 'Asia/Bangkok', flag: FLAG_BASE64.th, label: 'Thailand (GMT+7)' },
+  { value: 'Europe/London', flag: FLAG_BASE64.gb, label: 'United Kingdom (GMT+0)' },
+  { value: 'Asia/Shanghai', flag: FLAG_BASE64.cn, label: 'China (GMT+8)' },
+  { value: 'Asia/Seoul', flag: FLAG_BASE64.kr, label: 'South Korea (GMT+9)' },
+  { value: 'Asia/Taipei', flag: FLAG_BASE64.tw, label: 'Taiwan (GMT+8)' },
 ];
 
 // Day names in Thai
@@ -305,7 +310,7 @@ function SchedulerPanel({ keyData, instances }) {
                 className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 text-sm text-yellow-400 font-bold cursor-pointer w-56 border border-yellow-500/20 hover:border-yellow-500/40 transition-colors"
               >
                 <img 
-                  src={TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || FLAG_SVGS.th}
+                  src={TIMEZONE_OPTIONS.find(t => t.value === userTimezone)?.flag || FLAG_BASE64.th}
                   alt="flag"
                   className="w-6 h-4 object-cover rounded-sm"
                 />
