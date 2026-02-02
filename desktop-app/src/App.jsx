@@ -272,6 +272,11 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.2': [
+    { title: 'แก้ไข Steps', desc: 'กดปุ่มแก้ไขบน Block แล้วโหลด Steps ไปยังกล่อง Step เพื่อแก้ไขได้' },
+    { title: 'URL Dropdown', desc: 'URL เริ่มต้นเป็น dropdown พร้อมเพิ่ม/ลบ URL ได้' },
+    { title: 'ปุ่ม Hover', desc: 'ปุ่มทดสอบ/แก้ไข/ลบ แสดงเมื่อ hover (เหมือน v1.6.0)' },
+  ],
   '1.6.1': [
     { title: 'ปุ่มแสดงตลอด', desc: 'ปุ่มทดสอบ/แก้ไข/ลบ แสดงตลอดเวลา ไม่ต้อง hover' },
     { title: 'VDO Blocks', desc: 'เปลี่ยนชื่อ "สร้างวีดีโอ" เป็น "VDO Blocks"' },

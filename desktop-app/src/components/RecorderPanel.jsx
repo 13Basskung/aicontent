@@ -23,7 +23,7 @@ const ACTION_ICONS = {
   goto: Play
 };
 
-function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect }) {
+function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, blockToEdit, onBlockEditComplete }) {
   const [isRecording, setIsRecording] = useState(false);
   const [steps, setSteps] = useState([]);
   const [startUrl, setStartUrl] = useState('https://www.google.com');
@@ -35,6 +35,28 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect })
       onInstanceSelect(selectedInstance);
     }
   }, [selectedInstance, onInstanceSelect]);
+  
+  // Load block for editing when blockToEdit changes
+  useEffect(() => {
+    if (blockToEdit) {
+      console.log('📝 Loading block for editing:', blockToEdit.name);
+      setBlockName(blockToEdit.name || '');
+      setBlockDescription(blockToEdit.description || '');
+      setBlockType(blockToEdit.type || 'video');
+      setBlockPlatform(blockToEdit.platform || null);
+      setStartUrl(blockToEdit.startUrl || 'https://www.google.com');
+      setEditingBlock(blockToEdit);
+      
+      // Load steps (skip first 'goto' step if it's the startUrl)
+      const blockSteps = blockToEdit.steps || [];
+      if (blockSteps.length > 0 && blockSteps[0].action === 'goto') {
+        setSteps(blockSteps.slice(1).map((s, i) => ({ ...s, id: Date.now() + i })));
+      } else {
+        setSteps(blockSteps.map((s, i) => ({ ...s, id: Date.now() + i })));
+      }
+    }
+  }, [blockToEdit]);
+  
   const [editingStep, setEditingStep] = useState(null);
   const [blockName, setBlockName] = useState('');
   const [blockDescription, setBlockDescription] = useState('');
@@ -45,6 +67,35 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect })
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [editingBlock, setEditingBlock] = useState(null);
   const [showEditModePopup, setShowEditModePopup] = useState(false);
+  
+  // Saved URLs for dropdown
+  const [savedUrls, setSavedUrls] = useState(() => {
+    const saved = localStorage.getItem('recorder_saved_urls');
+    return saved ? JSON.parse(saved) : ['https://www.google.com', 'https://studio.youtube.com'];
+  });
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [newUrl, setNewUrl] = useState('');
+  
+  // Save URLs to localStorage
+  useEffect(() => {
+    localStorage.setItem('recorder_saved_urls', JSON.stringify(savedUrls));
+  }, [savedUrls]);
+  
+  function handleAddUrl() {
+    if (newUrl.trim() && !savedUrls.includes(newUrl.trim())) {
+      setSavedUrls(prev => [...prev, newUrl.trim()]);
+      setStartUrl(newUrl.trim());
+      setNewUrl('');
+      setShowUrlInput(false);
+    }
+  }
+  
+  function handleRemoveUrl(url) {
+    setSavedUrls(prev => prev.filter(u => u !== url));
+    if (startUrl === url) {
+      setStartUrl(savedUrls[0] || '');
+    }
+  }
 
   // Listen for recorder events
   useEffect(() => {
@@ -200,6 +251,11 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect })
     setSteps([]);
     setEditingBlock(null);
     setSaveSuccess(false);
+    
+    // Notify parent that editing is complete
+    if (onBlockEditComplete) {
+      onBlockEditComplete();
+    }
   }
   
   function handleLoadBlockForEdit(block) {
@@ -296,13 +352,60 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect })
             </div>
             <div>
               <label className="block text-white/70 text-sm mb-1">URL เริ่มต้น</label>
-              <input
-                type="text"
-                value={startUrl}
-                onChange={(e) => setStartUrl(e.target.value)}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="https://..."
-              />
+              <div className="flex gap-2">
+                <select
+                  value={startUrl}
+                  onChange={(e) => setStartUrl(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  {savedUrls.map(url => (
+                    <option key={url} value={url}>{url}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setShowUrlInput(true)}
+                  className="p-2 bg-green-500/80 hover:bg-green-500 rounded-lg transition"
+                  title="เพิ่ม URL"
+                >
+                  <Plus className="w-4 h-4 text-white" />
+                </button>
+                {savedUrls.length > 1 && (
+                  <button
+                    onClick={() => handleRemoveUrl(startUrl)}
+                    className="p-2 bg-red-500/80 hover:bg-red-500 rounded-lg transition"
+                    title="ลบ URL นี้"
+                  >
+                    <Trash2 className="w-4 h-4 text-white" />
+                  </button>
+                )}
+              </div>
+              
+              {/* Add URL Input */}
+              {showUrlInput && (
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="text"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
+                    className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="https://..."
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddUrl}
+                    className="px-3 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white transition"
+                  >
+                    เพิ่ม
+                  </button>
+                  <button
+                    onClick={() => { setShowUrlInput(false); setNewUrl(''); }}
+                    className="px-3 py-2 bg-gray-500 hover:bg-gray-600 rounded-lg text-white transition"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
