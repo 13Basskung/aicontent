@@ -535,44 +535,12 @@ async function executeStep(page, step, variables = {}) {
 }
 
 /**
- * Execute step with Pre-Actions and Post-Actions (Modifiers)
+ * Execute step with Post-Actions (Options)
+ * Post-Actions: retry_on_fail, wait_progress, wait_after
  */
 async function executeStepWithModifiers(page, step, variables = {}, context = {}) {
   const { modifiers } = step;
-  const preActions = modifiers?.preActions || [];
   const postActions = modifiers?.postActions || [];
-  
-  // Context สำหรับเก็บข้อมูลระหว่าง Pre/Post Actions
-  let stepContext = { ...context };
-  
-  // ============================================
-  // PRE-ACTIONS: ทำก่อน Step หลัก
-  // ============================================
-  for (const preAction of preActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
-    try {
-      switch (preAction.type) {
-        case 'count_scenes':
-          // นับจำนวน Scene ก่อน (สำหรับเปรียบเทียบทีหลัง)
-          const sceneSelector = preAction.selector || '[role="listitem"]';
-          stepContext.sceneCountBefore = await page.locator(sceneSelector).count();
-          console.log(`🔢 Pre-Action: Scene count before = ${stepContext.sceneCountBefore}`);
-          break;
-          
-        case 'inject_prompt':
-          // ดึง Prompt จาก variables และใส่ลงใน step.value
-          if (variables.prompt) {
-            step.value = variables.prompt;
-            console.log(`📝 Pre-Action: Injected prompt = "${variables.prompt.substring(0, 50)}..."`);
-          }
-          break;
-          
-        default:
-          console.warn(`⚠️ Unknown pre-action: ${preAction.type}`);
-      }
-    } catch (preErr) {
-      console.error(`❌ Pre-action ${preAction.type} failed:`, preErr.message);
-    }
-  }
   
   // ============================================
   // MAIN STEP: ทำ Step หลัก
@@ -586,30 +554,12 @@ async function executeStepWithModifiers(page, step, variables = {}, context = {}
   for (const postAction of postActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
     try {
       switch (postAction.type) {
-        case 'validate_scene':
-          // ตรวจสอบว่า Scene เพิ่มขึ้นหรือไม่
-          const validateSelector = postAction.selector || '[role="listitem"]';
-          await page.waitForTimeout(1000); // รอให้ DOM update
-          const sceneCountAfter = await page.locator(validateSelector).count();
-          const countBefore = stepContext.sceneCountBefore || 0;
-          
-          if (sceneCountAfter > countBefore) {
-            console.log(`✅ Post-Action: Scene increased ${countBefore} → ${sceneCountAfter}`);
-            result.sceneValidated = true;
-          } else {
-            console.log(`⚠️ Post-Action: Scene NOT increased (${countBefore} → ${sceneCountAfter})`);
-            result.sceneValidated = false;
-            result.success = false;
-            result.error = 'Scene ไม่เพิ่มขึ้น';
-          }
-          break;
-          
         case 'retry_on_fail':
           // ลองใหม่ถ้าล้มเหลว
           const maxRetries = postAction.maxRetries || 3;
           while (!result.success && retryCount < maxRetries) {
             retryCount++;
-            console.log(`🔄 Post-Action: Retry ${retryCount}/${maxRetries}...`);
+            console.log(`🔄 Option: Retry ${retryCount}/${maxRetries}...`);
             await page.waitForTimeout(1000);
             result = await executeStep(page, step, variables);
           }
@@ -621,27 +571,27 @@ async function executeStepWithModifiers(page, step, variables = {}, context = {}
         case 'wait_progress':
           // รอ Progress Bar หายไป
           const progressSelector = postAction.selector || '[role="progressbar"]';
-          console.log(`📊 Post-Action: Waiting for progress to complete...`);
+          console.log(`📊 Option: Waiting for progress (${progressSelector}) to complete...`);
           try {
             await page.waitForSelector(progressSelector, { state: 'hidden', timeout: 600000 });
-            console.log(`✅ Post-Action: Progress completed`);
+            console.log(`✅ Option: Progress completed`);
           } catch (e) {
-            console.log(`⚠️ Post-Action: Progress timeout or not found`);
+            console.log(`⚠️ Option: Progress timeout or not found`);
           }
           break;
           
         case 'wait_after':
           // รอหลังทำ
           const waitMs = postAction.duration || 2000;
-          console.log(`⏰ Post-Action: Waiting ${waitMs}ms...`);
+          console.log(`⏰ Option: Waiting ${waitMs}ms...`);
           await page.waitForTimeout(waitMs);
           break;
           
         default:
-          console.warn(`⚠️ Unknown post-action: ${postAction.type}`);
+          console.warn(`⚠️ Unknown option: ${postAction.type}`);
       }
     } catch (postErr) {
-      console.error(`❌ Post-action ${postAction.type} failed:`, postErr.message);
+      console.error(`❌ Option ${postAction.type} failed:`, postErr.message);
     }
   }
   

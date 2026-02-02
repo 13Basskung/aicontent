@@ -860,78 +860,12 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
               <p className="text-white font-medium">Step {showModifiersModal + 1}: {steps[showModifiersModal]?.action}</p>
             </div>
             
-            {/* Pre-Actions */}
-            <div className="mb-4">
-              <h4 className="text-white font-medium mb-2 flex items-center gap-2">
-                <span className="text-blue-400">▶️</span> ก่อนทำ (Pre-Actions)
-              </h4>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'count_scenes') || false}
-                    onChange={(e) => {
-                      const newSteps = [...steps];
-                      const step = newSteps[showModifiersModal];
-                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
-                      if (e.target.checked) {
-                        step.modifiers.preActions = [...(step.modifiers.preActions || []), { type: 'count_scenes', order: 1 }];
-                      } else {
-                        step.modifiers.preActions = (step.modifiers.preActions || []).filter(a => a.type !== 'count_scenes');
-                      }
-                      setSteps(newSteps);
-                    }}
-                    className="rounded"
-                  />
-                  <span className="text-white/80">🔢 นับจำนวน Scene ก่อน</span>
-                </label>
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'inject_prompt') || false}
-                    onChange={(e) => {
-                      const newSteps = [...steps];
-                      const step = newSteps[showModifiersModal];
-                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
-                      if (e.target.checked) {
-                        step.modifiers.preActions = [...(step.modifiers.preActions || []), { type: 'inject_prompt', order: 2 }];
-                      } else {
-                        step.modifiers.preActions = (step.modifiers.preActions || []).filter(a => a.type !== 'inject_prompt');
-                      }
-                      setSteps(newSteps);
-                    }}
-                    className="rounded"
-                  />
-                  <span className="text-white/80">📝 ดึง Prompt จาก Firebase</span>
-                </label>
-              </div>
-            </div>
-            
             {/* Post-Actions */}
             <div className="mb-4">
               <h4 className="text-white font-medium mb-2 flex items-center gap-2">
-                <span className="text-green-400">✅</span> หลังทำ (Post-Actions)
+                <span className="text-green-400">✅</span> ตัวเลือกเสริม (Options)
               </h4>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'validate_scene') || false}
-                    onChange={(e) => {
-                      const newSteps = [...steps];
-                      const step = newSteps[showModifiersModal];
-                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
-                      if (e.target.checked) {
-                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'validate_scene', order: 1 }];
-                      } else {
-                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'validate_scene');
-                      }
-                      setSteps(newSteps);
-                    }}
-                    className="rounded"
-                  />
-                  <span className="text-white/80">✔️ ตรวจสอบว่า Scene เพิ่มขึ้น</span>
-                </label>
                 <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -951,7 +885,7 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                   />
                   <span className="text-white/80">🔄 ลองใหม่ถ้าล้มเหลว (3 รอบ)</span>
                 </label>
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                <div className="flex items-center gap-2 p-2 rounded bg-white/5">
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'wait_progress') || false}
@@ -960,7 +894,7 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                       const step = newSteps[showModifiersModal];
                       if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
                       if (e.target.checked) {
-                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'wait_progress', order: 3 }];
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'wait_progress', selector: '[role="progressbar"]', order: 3 }];
                       } else {
                         step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'wait_progress');
                       }
@@ -969,7 +903,22 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                     className="rounded"
                   />
                   <span className="text-white/80">📊 รอ Progress Bar</span>
-                </label>
+                  <input 
+                    type="text"
+                    value={steps[showModifiersModal]?.modifiers?.postActions?.find(a => a.type === 'wait_progress')?.selector || '[role="progressbar"]'}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      const progressAction = step.modifiers?.postActions?.find(a => a.type === 'wait_progress');
+                      if (progressAction) {
+                        progressAction.selector = e.target.value;
+                        setSteps(newSteps);
+                      }
+                    }}
+                    className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
+                    placeholder="selector"
+                  />
+                </div>
                 <div className="flex items-center gap-2 p-2 rounded bg-white/5">
                   <input 
                     type="checkbox" 
