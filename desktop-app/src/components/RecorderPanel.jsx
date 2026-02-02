@@ -542,9 +542,9 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                         {!['loop_start', 'loop_end', 'inject_prompt'].includes(step.action) && (
                           <input
                             type="text"
-                            value={step.selector || step.value || ''}
+                            value={['wait', 'goto', 'wait_for_progress_complete', 'click_text'].includes(step.action) ? (step.value || '') : (step.selector || '')}
                             onChange={(e) => {
-                              const field = ['wait', 'goto', 'wait_for_progress_complete'].includes(step.action) ? 'value' : 'selector';
+                              const field = ['wait', 'goto', 'wait_for_progress_complete', 'click_text'].includes(step.action) ? 'value' : 'selector';
                               handleEditStep(index, { [field]: e.target.value });
                             }}
                             className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm min-w-[150px]"
@@ -552,6 +552,7 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                               step.action === 'wait' ? 'เวลา (ms)' : 
                               step.action === 'goto' ? 'URL' : 
                               step.action === 'wait_for_progress_complete' ? 'Timeout (ms)' :
+                              step.action === 'click_text' ? 'ข้อความที่ต้องการคลิก' :
                               'Selector'
                             }
                           />
