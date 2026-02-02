@@ -272,10 +272,6 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
-  '1.6.13': [
-    { title: 'goto Action', desc: 'เพิ่ม action ไปที่ URL ที่ใช้งานได้จริง' },
-    { title: 'Modifiers ทำงานจริง', desc: 'Pre/Post Actions (นับ Scene, Retry, รอ Progress) ทำงานได้แล้ว' },
-  ],
   '1.6.12': [
     { title: 'Loop ตาม Prompts', desc: 'Loop วนตามจำนวน Prompts จาก Firebase โดยอัตโนมัติ' },
     { title: 'Fetch Prompts', desc: 'ดึง prompts จาก readyPrompts collection' },
