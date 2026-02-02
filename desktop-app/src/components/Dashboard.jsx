@@ -68,6 +68,17 @@ function Dashboard({ keyData }) {
   // Block to edit in RecorderPanel
   const [blockToEdit, setBlockToEdit] = useState(null);
   
+  // Block execution result modal
+  const [blockResultModal, setBlockResultModal] = useState({
+    open: false,
+    success: false,
+    blockName: '',
+    totalSteps: 0,
+    completedSteps: 0,
+    error: null,
+    results: []
+  });
+  
   // Show toast helper
   function showToast(message, type = 'success') {
     setToast({ show: true, message, type });
@@ -375,6 +386,8 @@ function Dashboard({ keyData }) {
     const instance = instances.find(i => i.id === instanceId);
     if (!instance) return;
 
+    const totalSteps = block.steps?.length || 0;
+
     // Update status to executing (disables Play button)
     setInstances(prev => prev.map(i => 
       i.id === instanceId ? { ...i, status: 'executing' } : i
@@ -411,7 +424,15 @@ function Dashboard({ keyData }) {
           // Try running the block again
           result = await window.electronAPI.playwright.runBlock(instanceId, block, variables);
         } else {
-          alert(`❌ ไม่สามารถเปิด Chrome ใหม่ได้: ${launchResult.error}`);
+          setBlockResultModal({
+            open: true,
+            success: false,
+            blockName: block.name,
+            totalSteps,
+            completedSteps: 0,
+            error: `ไม่สามารถเปิด Chrome ใหม่ได้: ${launchResult.error}`,
+            results: []
+          });
           setInstances(prev => prev.map(i => 
             i.id === instanceId ? { ...i, status: 'idle' } : i
           ));
@@ -419,13 +440,27 @@ function Dashboard({ keyData }) {
         }
       }
       
-      if (result.success) {
-        alert(`✅ Block "${block.name}" รันสำเร็จ!`);
-      } else {
-        alert(`❌ Block "${block.name}" ล้มเหลว: ${result.error}`);
-      }
+      const completedSteps = result.results?.filter(r => r.success).length || 0;
+      
+      setBlockResultModal({
+        open: true,
+        success: result.success,
+        blockName: block.name,
+        totalSteps,
+        completedSteps,
+        error: result.error || null,
+        results: result.results || []
+      });
     } catch (error) {
-      alert(`❌ Error: ${error.message}`);
+      setBlockResultModal({
+        open: true,
+        success: false,
+        blockName: block.name,
+        totalSteps,
+        completedSteps: 0,
+        error: error.message,
+        results: []
+      });
     }
 
     // Reset status
@@ -1454,6 +1489,102 @@ function Dashboard({ keyData }) {
                 ลบ Block
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Block Result Modal */}
+      {blockResultModal.open && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass rounded-2xl p-6 max-w-lg w-full mx-4 border border-white/20">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                blockResultModal.success 
+                  ? 'bg-green-500/20' 
+                  : 'bg-red-500/20'
+              }`}>
+                {blockResultModal.success ? (
+                  <CheckCircle className="w-7 h-7 text-green-400" />
+                ) : (
+                  <AlertCircle className="w-7 h-7 text-red-400" />
+                )}
+              </div>
+              <div>
+                <h3 className={`text-xl font-bold ${blockResultModal.success ? 'text-green-400' : 'text-red-400'}`}>
+                  {blockResultModal.success ? '✅ รันสำเร็จ!' : '❌ รันไม่สำเร็จ'}
+                </h3>
+                <p className="text-white/70">Block: <span className="text-white font-medium">{blockResultModal.blockName}</span></p>
+              </div>
+            </div>
+            
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <p className="text-white/50 text-sm mb-1">Steps ทั้งหมด</p>
+                <p className="text-2xl font-bold text-white">{blockResultModal.totalSteps}</p>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <p className="text-white/50 text-sm mb-1">สำเร็จ</p>
+                <p className={`text-2xl font-bold ${
+                  blockResultModal.completedSteps === blockResultModal.totalSteps 
+                    ? 'text-green-400' 
+                    : 'text-yellow-400'
+                }`}>
+                  {blockResultModal.completedSteps}/{blockResultModal.totalSteps}
+                </p>
+              </div>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    blockResultModal.success ? 'bg-green-500' : 'bg-red-500'
+                  }`}
+                  style={{ width: `${blockResultModal.totalSteps > 0 ? (blockResultModal.completedSteps / blockResultModal.totalSteps) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Error Message */}
+            {blockResultModal.error && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <p className="text-red-400 text-sm font-medium mb-1">❌ Error:</p>
+                <p className="text-white/70 text-sm">{blockResultModal.error}</p>
+              </div>
+            )}
+            
+            {/* Step Results */}
+            {blockResultModal.results.length > 0 && (
+              <div className="mb-6 max-h-40 overflow-y-auto">
+                <p className="text-white/50 text-sm mb-2">รายละเอียด Steps:</p>
+                <div className="space-y-1">
+                  {blockResultModal.results.map((r, i) => (
+                    <div key={i} className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg ${
+                      r.success ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                    }`}>
+                      <span>{r.success ? '✓' : '✗'}</span>
+                      <span>Step {i + 1}: {r.action}</span>
+                      {r.error && <span className="text-red-300 text-xs ml-auto">({r.error})</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Close Button */}
+            <button
+              onClick={() => setBlockResultModal({ open: false, success: false, blockName: '', totalSteps: 0, completedSteps: 0, error: null, results: [] })}
+              className={`w-full py-3 rounded-xl font-medium transition ${
+                blockResultModal.success 
+                  ? 'bg-green-600 hover:bg-green-500 text-white' 
+                  : 'bg-red-600 hover:bg-red-500 text-white'
+              }`}
+            >
+              ปิด
+            </button>
           </div>
         </div>
       )}

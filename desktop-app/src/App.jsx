@@ -272,6 +272,10 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.6': [
+    { title: 'Highlight Element', desc: 'แสดงกรอบสีเหลืองบน Element ก่อนคลิก เพื่อดูว่าโปรแกรมกดที่ไหน' },
+    { title: 'Result Modal', desc: 'ป็อบอัพแสดงผลลัพธ์สวยงาม พร้อมแสดง Steps สำเร็จ/ล้มเหลว' },
+  ],
   '1.6.5': [
     { title: 'Test Block Fix', desc: 'แก้ไขปุ่มทดสอบ Block ให้เปิดหน้าเว็บและรัน Steps จริง' },
   ],

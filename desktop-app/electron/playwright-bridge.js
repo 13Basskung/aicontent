@@ -195,6 +195,34 @@ function initPlaywrightBridge(mainWindow) {
 }
 
 /**
+ * Highlight element with yellow border before action
+ */
+async function highlightElement(page, selector, duration = 1500) {
+  try {
+    await page.evaluate(({ sel, dur }) => {
+      const el = document.querySelector(sel);
+      if (el) {
+        const originalOutline = el.style.outline;
+        const originalBackground = el.style.backgroundColor;
+        const originalTransition = el.style.transition;
+        
+        el.style.transition = 'all 0.2s ease';
+        el.style.outline = '3px solid #FFD700';
+        el.style.backgroundColor = 'rgba(255, 215, 0, 0.2)';
+        
+        setTimeout(() => {
+          el.style.outline = originalOutline;
+          el.style.backgroundColor = originalBackground;
+          el.style.transition = originalTransition;
+        }, dur);
+      }
+    }, { sel: selector, dur: duration });
+  } catch (e) {
+    // Ignore highlight errors
+  }
+}
+
+/**
  * Execute a single step
  */
 async function executeStep(page, step, variables = {}) {
@@ -210,12 +238,19 @@ async function executeStep(page, step, variables = {}) {
       });
     }
 
+    // Highlight element before action (for click, fill, hover actions)
+    if (selector && ['click', 'fill', 'type', 'input', 'hover', 'wait_for_element_and_click', 'inject_prompt'].includes(action)) {
+      await highlightElement(page, selector);
+      await page.waitForTimeout(300); // Brief pause to see highlight
+    }
+
     // Handle different actions
     switch (action) {
       case 'click':
         await page.click(selector, { timeout: 15000 });
         break;
 
+      case 'fill':
       case 'type':
       case 'input':
         await page.fill(selector, processedValue, { timeout: 15000 });
