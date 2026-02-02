@@ -152,7 +152,7 @@ function initPlaywrightBridge(mainWindow) {
             totalSteps: steps.length,
             stepAction: step.action
           });
-          const result = await executeStep(page, step, variables);
+          const result = await executeStepWithModifiers(page, step, variables);
           results.push(result);
           if (!result.success) {
             console.error(`❌ Pre-loop Step ${i + 1} failed: ${result.error}`);
@@ -186,7 +186,7 @@ function initPlaywrightBridge(mainWindow) {
               totalIterations: prompts.length
             });
             
-            const result = await executeStep(page, step, loopVariables);
+            const result = await executeStepWithModifiers(page, step, loopVariables);
             results.push({ ...result, loopIteration: promptIndex + 1 });
             
             if (!result.success) {
@@ -209,7 +209,7 @@ function initPlaywrightBridge(mainWindow) {
             totalSteps: steps.length,
             stepAction: step.action
           });
-          const result = await executeStep(page, step, variables);
+          const result = await executeStepWithModifiers(page, step, variables);
           results.push(result);
           if (!result.success) {
             console.error(`❌ Post-loop Step ${i + 1} failed: ${result.error}`);
@@ -237,7 +237,7 @@ function initPlaywrightBridge(mainWindow) {
             stepAction: step.action
           });
 
-          const result = await executeStep(page, step, variables);
+          const result = await executeStepWithModifiers(page, step, variables);
           results.push(result);
 
           if (!result.success) {
@@ -359,6 +359,15 @@ async function executeStep(page, step, variables = {}) {
       case 'wait':
         const duration = parseInt(value) || 1000;
         await page.waitForTimeout(duration);
+        break;
+
+      case 'goto':
+        // Navigate to URL
+        const targetUrl = processedValue || selector;
+        if (targetUrl) {
+          console.log(`🌐 Navigating to: ${targetUrl}`);
+          await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
         break;
 
       case 'wait_for_element':
@@ -523,6 +532,120 @@ async function executeStep(page, step, variables = {}) {
   } catch (error) {
     return { success: false, error: error.message, action: step.action };
   }
+}
+
+/**
+ * Execute step with Pre-Actions and Post-Actions (Modifiers)
+ */
+async function executeStepWithModifiers(page, step, variables = {}, context = {}) {
+  const { modifiers } = step;
+  const preActions = modifiers?.preActions || [];
+  const postActions = modifiers?.postActions || [];
+  
+  // Context สำหรับเก็บข้อมูลระหว่าง Pre/Post Actions
+  let stepContext = { ...context };
+  
+  // ============================================
+  // PRE-ACTIONS: ทำก่อน Step หลัก
+  // ============================================
+  for (const preAction of preActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
+    try {
+      switch (preAction.type) {
+        case 'count_scenes':
+          // นับจำนวน Scene ก่อน (สำหรับเปรียบเทียบทีหลัง)
+          const sceneSelector = preAction.selector || '[role="listitem"]';
+          stepContext.sceneCountBefore = await page.locator(sceneSelector).count();
+          console.log(`🔢 Pre-Action: Scene count before = ${stepContext.sceneCountBefore}`);
+          break;
+          
+        case 'inject_prompt':
+          // ดึง Prompt จาก variables และใส่ลงใน step.value
+          if (variables.prompt) {
+            step.value = variables.prompt;
+            console.log(`📝 Pre-Action: Injected prompt = "${variables.prompt.substring(0, 50)}..."`);
+          }
+          break;
+          
+        default:
+          console.warn(`⚠️ Unknown pre-action: ${preAction.type}`);
+      }
+    } catch (preErr) {
+      console.error(`❌ Pre-action ${preAction.type} failed:`, preErr.message);
+    }
+  }
+  
+  // ============================================
+  // MAIN STEP: ทำ Step หลัก
+  // ============================================
+  let result = await executeStep(page, step, variables);
+  let retryCount = 0;
+  
+  // ============================================
+  // POST-ACTIONS: ทำหลัง Step หลัก
+  // ============================================
+  for (const postAction of postActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
+    try {
+      switch (postAction.type) {
+        case 'validate_scene':
+          // ตรวจสอบว่า Scene เพิ่มขึ้นหรือไม่
+          const validateSelector = postAction.selector || '[role="listitem"]';
+          await page.waitForTimeout(1000); // รอให้ DOM update
+          const sceneCountAfter = await page.locator(validateSelector).count();
+          const countBefore = stepContext.sceneCountBefore || 0;
+          
+          if (sceneCountAfter > countBefore) {
+            console.log(`✅ Post-Action: Scene increased ${countBefore} → ${sceneCountAfter}`);
+            result.sceneValidated = true;
+          } else {
+            console.log(`⚠️ Post-Action: Scene NOT increased (${countBefore} → ${sceneCountAfter})`);
+            result.sceneValidated = false;
+            result.success = false;
+            result.error = 'Scene ไม่เพิ่มขึ้น';
+          }
+          break;
+          
+        case 'retry_on_fail':
+          // ลองใหม่ถ้าล้มเหลว
+          const maxRetries = postAction.maxRetries || 3;
+          while (!result.success && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`🔄 Post-Action: Retry ${retryCount}/${maxRetries}...`);
+            await page.waitForTimeout(1000);
+            result = await executeStep(page, step, variables);
+          }
+          if (retryCount > 0) {
+            result.retryCount = retryCount;
+          }
+          break;
+          
+        case 'wait_progress':
+          // รอ Progress Bar หายไป
+          const progressSelector = postAction.selector || '[role="progressbar"]';
+          console.log(`📊 Post-Action: Waiting for progress to complete...`);
+          try {
+            await page.waitForSelector(progressSelector, { state: 'hidden', timeout: 600000 });
+            console.log(`✅ Post-Action: Progress completed`);
+          } catch (e) {
+            console.log(`⚠️ Post-Action: Progress timeout or not found`);
+          }
+          break;
+          
+        case 'wait_after':
+          // รอหลังทำ
+          const waitMs = postAction.duration || 2000;
+          console.log(`⏰ Post-Action: Waiting ${waitMs}ms...`);
+          await page.waitForTimeout(waitMs);
+          break;
+          
+        default:
+          console.warn(`⚠️ Unknown post-action: ${postAction.type}`);
+      }
+    } catch (postErr) {
+      console.error(`❌ Post-action ${postAction.type} failed:`, postErr.message);
+    }
+  }
+  
+  return result;
 }
 
 /**
