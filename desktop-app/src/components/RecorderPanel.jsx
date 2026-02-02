@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Circle, Square, Play, Trash2, Save, 
   MousePointer, Type, ChevronDown, Plus, 
-  Edit3, X, Clock, AlertCircle, CheckCircle
+  Edit3, X, Clock, AlertCircle, CheckCircle, GripVertical
 } from 'lucide-react';
 import { createBlock, updateBlock } from '../lib/firebase';
 
@@ -67,6 +67,30 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [editingBlock, setEditingBlock] = useState(null);
   const [showEditModePopup, setShowEditModePopup] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  
+  // Drag and drop handlers for reordering steps
+  function handleDragStart(e, index) {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  
+  function handleDragOver(e, index) {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    // Reorder steps
+    const newSteps = [...steps];
+    const draggedStep = newSteps[draggedIndex];
+    newSteps.splice(draggedIndex, 1);
+    newSteps.splice(index, 0, draggedStep);
+    setSteps(newSteps);
+    setDraggedIndex(index);
+  }
+  
+  function handleDragEnd() {
+    setDraggedIndex(null);
+  }
   
   // Saved URLs for dropdown
   const [savedUrls, setSavedUrls] = useState(() => {
@@ -224,6 +248,9 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
       if (result.success) {
         console.log('✅ Block saved successfully:', result.blockId);
         setSaveSuccess(true);
+        
+        // Clear steps immediately after save
+        setSteps([]);
         
         if (onBlockCreated) {
           onBlockCreated();
@@ -458,7 +485,11 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
               return (
                 <div 
                   key={step.id || index}
-                  className="p-3 rounded-lg bg-white/5 border border-white/10 group"
+                  className={`p-3 rounded-lg bg-white/5 border border-white/10 group ${draggedIndex === index ? 'opacity-50 border-purple-500' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
                 >
                   {editingStep === index ? (
                     // Edit mode
@@ -469,10 +500,10 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                           onChange={(e) => handleEditStep(index, { action: e.target.value })}
                           className="px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
                         >
-                          <option value="click">Click</option>
-                          <option value="fill">Fill</option>
-                          <option value="wait">Wait</option>
-                          <option value="goto">Go to URL</option>
+                          <option value="click">คลิก</option>
+                          <option value="fill">พิมพ์</option>
+                          <option value="wait">รอ</option>
+                          <option value="goto">ไปที่ URL</option>
                         </select>
                         <input
                           type="text"
@@ -495,12 +526,15 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                     // View mode
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
+                        <GripVertical className="w-4 h-4 text-white/30 cursor-grab active:cursor-grabbing" />
                         <span className="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs text-white/50">
                           {index + 1}
                         </span>
                         <ActionIcon className="w-4 h-4 text-purple-400" />
                         <div>
-                          <span className="text-white font-medium capitalize">{step.action}</span>
+                          <span className="text-white font-medium capitalize">
+                            {step.action === 'click' ? 'คลิก' : step.action === 'fill' ? 'พิมพ์' : step.action === 'wait' ? 'รอ' : step.action === 'goto' ? 'ไปที่ URL' : step.action}
+                          </span>
                           {step.selector && (
                             <span className="text-white/50 text-sm ml-2 font-mono">
                               {step.selector.substring(0, 40)}...

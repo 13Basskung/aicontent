@@ -272,6 +272,11 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.3': [
+    { title: 'Clear Steps', desc: 'Steps หายไปทันทีหลังบันทึกสำเร็จ' },
+    { title: 'Drag & Drop', desc: 'ลาก Step ไปวางตำแหน่งอื่นได้' },
+    { title: 'ภาษาไทย', desc: 'เปลี่ยน dropdown action เป็นภาษาไทย (คลิก, พิมพ์, รอ, ไปที่ URL)' },
+  ],
   '1.6.2': [
     { title: 'แก้ไข Steps', desc: 'กดปุ่มแก้ไขบน Block แล้วโหลด Steps ไปยังกล่อง Step เพื่อแก้ไขได้' },
     { title: 'URL Dropdown', desc: 'URL เริ่มต้นเป็น dropdown พร้อมเพิ่ม/ลบ URL ได้' },
