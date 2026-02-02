@@ -272,6 +272,13 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.0': [
+    { title: 'Block Types', desc: 'แยก Block เป็น 2 ประเภท: สร้างวีดีโอ + Platform Blocks' },
+    { title: '2-Column Layout', desc: 'Admin เห็น Available Blocks แยก 2 ฝั่ง (ซ้าย=วีดีโอ, ขวา=Platform)' },
+    { title: 'Platform Colors', desc: 'สี Block ตาม Platform (YT=แดง, TT=ดำ, FB=ฟ้า, IG=ม่วง-ชมพู)' },
+    { title: 'Edit Block', desc: 'แก้ไข Block พร้อมเลือก อัปเดตทับ หรือ สร้างใหม่' },
+    { title: 'Test Block', desc: 'ปุ่มทดสอบ Block (รันจริง)' },
+  ],
   '1.5.7': [
     { title: 'Recorder Save', desc: 'บันทึก Block ไป Firestore และแสดงใน Available Blocks ทันที' },
   ],
