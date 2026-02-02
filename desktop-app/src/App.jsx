@@ -272,6 +272,9 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.5': [
+    { title: 'Test Block Fix', desc: 'แก้ไขปุ่มทดสอบ Block ให้เปิดหน้าเว็บและรัน Steps จริง' },
+  ],
   '1.6.4': [
     { title: 'Action Types', desc: 'เพิ่ม Action Types ใหม่: รอให้ปรากฏ, รอให้หายไป, รอ Progress, Loop, ดึง Prompt' },
     { title: 'Modifiers', desc: 'เพิ่มปุ่ม ⚙️ ตั้งค่าออฟชั่นเสริม (นับ Scene, Validate, Retry, รอหลังทำ)' },

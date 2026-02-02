@@ -452,10 +452,13 @@ function Dashboard({ keyData }) {
       return;
     }
     
-    console.log('🧪 Test block:', block.name, 'on instance:', recorderSelectedInstance.customName || recorderSelectedInstance.projectName);
+    const instanceName = recorderSelectedInstance.customName || recorderSelectedInstance.projectName;
+    console.log('🧪 Test block:', block.name, 'on instance:', instanceName);
     
-    // TODO: Connect to automation engine to run block
-    showToast(`เริ่มทดสอบ Block: ${block.name} บน ${recorderSelectedInstance.customName || recorderSelectedInstance.projectName}`, 'success');
+    showToast(`เริ่มทดสอบ Block: ${block.name} บน ${instanceName}`, 'info');
+    
+    // Run block on selected instance
+    await runBlock(recorderSelectedInstance.id, block);
   }
 
   async function saveBlockEdit() {
