@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FolderOpen, Play, Plus, Settings, 
   Chrome, Trash2, RefreshCw, AlertCircle,
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import SchedulerPanel from './SchedulerPanel';
 import RecorderPanel from './RecorderPanel';
+import ExecutionLogTable from './ExecutionLogTable';
+import { saveExecutionLog } from '../lib/firebase';
 
 // Platform definitions (FB, YT, TikTok, IG)
 const PLATFORMS = [
@@ -387,6 +389,7 @@ function Dashboard({ keyData }) {
     if (!instance) return;
 
     const totalSteps = block.steps?.length || 0;
+    const startTime = new Date();
 
     // Update status to executing (disables Play button)
     setInstances(prev => prev.map(i => 
@@ -439,6 +442,25 @@ function Dashboard({ keyData }) {
           // Try running the block again
           result = await window.electronAPI.playwright.runBlock(instanceId, block, variables);
         } else {
+          const endTime = new Date();
+          // Save failed log to Firebase
+          await saveExecutionLog(keyData?.userId, {
+            status: 'failed',
+            projectId: instance.projectId,
+            projectName: instance.projectName || '',
+            instanceId: instanceId,
+            instanceName: instance.name || instanceId,
+            blockId: block.id,
+            blockName: block.name,
+            startTime,
+            endTime,
+            duration: endTime - startTime,
+            currentStep: 0,
+            totalSteps,
+            failedStep: null,
+            error: `ไม่สามารถเปิด Chrome ใหม่ได้: ${launchResult.error}`
+          });
+          
           setBlockResultModal({
             open: true,
             success: false,
@@ -455,7 +477,27 @@ function Dashboard({ keyData }) {
         }
       }
       
+      const endTime = new Date();
       const completedSteps = result.results?.filter(r => r.success).length || 0;
+      const failedStepIndex = result.results?.findIndex(r => !r.success);
+      
+      // Save execution log to Firebase
+      await saveExecutionLog(keyData?.userId, {
+        status: result.success ? 'success' : 'failed',
+        projectId: instance.projectId,
+        projectName: instance.projectName || '',
+        instanceId: instanceId,
+        instanceName: instance.name || instanceId,
+        blockId: block.id,
+        blockName: block.name,
+        startTime,
+        endTime,
+        duration: endTime - startTime,
+        currentStep: completedSteps,
+        totalSteps,
+        failedStep: failedStepIndex >= 0 ? failedStepIndex + 1 : null,
+        error: result.error || null
+      });
       
       setBlockResultModal({
         open: true,
@@ -467,6 +509,26 @@ function Dashboard({ keyData }) {
         results: result.results || []
       });
     } catch (error) {
+      const endTime = new Date();
+      
+      // Save error log to Firebase
+      await saveExecutionLog(keyData?.userId, {
+        status: 'failed',
+        projectId: instance.projectId,
+        projectName: instance.projectName || '',
+        instanceId: instanceId,
+        instanceName: instance.name || instanceId,
+        blockId: block.id,
+        blockName: block.name,
+        startTime,
+        endTime,
+        duration: endTime - startTime,
+        currentStep: 0,
+        totalSteps,
+        failedStep: null,
+        error: error.message
+      });
+      
       setBlockResultModal({
         open: true,
         success: false,
@@ -1117,52 +1179,62 @@ function Dashboard({ keyData }) {
       </section>
       )}
 
-      {/* Available Blocks Section - Instances tab (View-only, Video blocks only) */}
+      {/* Available Blocks Section - Instances tab (2 Column Layout: Blocks + Log) */}
       {activeTab === 'instances' && (
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-white font-semibold flex items-center gap-2">
-            <Settings className="w-5 h-5 text-purple-400" />
-            🎬 สร้างวีดีโอ Blocks ({blocks.filter(b => b.type !== 'platform').length})
-          </h2>
-          {selectedBlock && (
-            <span className="text-sm text-purple-300 bg-purple-500/20 px-3 py-1 rounded-full">
-              Selected: {selectedBlock.name}
-            </span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          {blocks.filter(b => b.type !== 'platform').map(block => (
-            <div
-              key={block.id}
-              className="relative group"
-              onMouseEnter={() => setHoveredBlockId(block.id)}
-              onMouseLeave={() => setHoveredBlockId(null)}
-            >
-              <button
-                onClick={() => setSelectedBlock(block)}
-                className={`w-full rounded-lg p-3 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 ${
-                  selectedBlock?.id === block.id ? 'ring-2 ring-purple-500 bg-purple-500/30' : ''
-                }`}
-              >
-                <p className="text-white text-sm font-medium truncate">{block.name}</p>
-                <p className="text-purple-300/70 text-xs mt-1">{block.steps?.length || 0} steps</p>
-              </button>
-              
-              {/* Tooltip with description (View-only) */}
-              {hoveredBlockId === block.id && block.description && (
-                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
-                  {block.description}
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column: Video Blocks */}
+          <div className="glass rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white font-semibold flex items-center gap-2">
+                <Settings className="w-5 h-5 text-purple-400" />
+                🎬 สร้างวีดีโอ Blocks ({blocks.filter(b => b.type !== 'platform').length})
+              </h2>
+              {selectedBlock && (
+                <span className="text-sm text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full text-xs">
+                  {selectedBlock.name}
+                </span>
               )}
             </div>
-          ))}
-        </div>
-        {blocks.length === 0 && (
-          <div className="text-center py-4 text-white/30 glass rounded-xl">
-            ไม่พบ Blocks
+            <div className="grid grid-cols-2 gap-2">
+              {blocks.filter(b => b.type !== 'platform').map(block => (
+                <div
+                  key={block.id}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredBlockId(block.id)}
+                  onMouseLeave={() => setHoveredBlockId(null)}
+                >
+                  <button
+                    onClick={() => setSelectedBlock(block)}
+                    className={`w-full rounded-lg p-3 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 ${
+                      selectedBlock?.id === block.id ? 'ring-2 ring-purple-500 bg-purple-500/30' : ''
+                    }`}
+                  >
+                    <p className="text-white text-sm font-medium truncate">{block.name}</p>
+                    <p className="text-purple-300/70 text-xs mt-1">{block.steps?.length || 0} steps</p>
+                  </button>
+                  
+                  {/* Tooltip with description (View-only) */}
+                  {hoveredBlockId === block.id && block.description && (
+                    <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
+                      {block.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {blocks.length === 0 && (
+              <div className="text-center py-4 text-white/30">
+                ไม่พบ Blocks
+              </div>
+            )}
           </div>
-        )}
+          
+          {/* Right Column: Execution Log */}
+          <div className="glass rounded-xl p-4 h-[400px]">
+            <ExecutionLogTable userId={keyData?.userId} />
+          </div>
+        </div>
       </section>
       )}
 

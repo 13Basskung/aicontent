@@ -525,6 +525,135 @@ export async function updateBlock(blockId, blockData) {
   }
 }
 
+// ============================================
+// Execution Log Functions
+// ============================================
+
+/**
+ * Save execution log to Firebase
+ */
+export async function saveExecutionLog(userId, logData) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/executionLogs?key=${API_KEY}`;
+    
+    const fields = {
+      status: toFirestoreValue(logData.status), // 'success' | 'failed'
+      projectId: toFirestoreValue(logData.projectId || ''),
+      projectName: toFirestoreValue(logData.projectName || ''),
+      instanceId: toFirestoreValue(logData.instanceId || ''),
+      instanceName: toFirestoreValue(logData.instanceName || ''),
+      blockId: toFirestoreValue(logData.blockId || ''),
+      blockName: toFirestoreValue(logData.blockName || ''),
+      startTime: toFirestoreValue(logData.startTime || new Date()),
+      endTime: toFirestoreValue(logData.endTime || new Date()),
+      duration: toFirestoreValue(logData.duration || 0), // milliseconds
+      currentStep: toFirestoreValue(logData.currentStep || 0),
+      totalSteps: toFirestoreValue(logData.totalSteps || 0),
+      failedStep: toFirestoreValue(logData.failedStep || null),
+      error: toFirestoreValue(logData.error || null),
+      createdAt: toFirestoreValue(new Date())
+    };
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to save log');
+    }
+    
+    const result = await response.json();
+    const logId = result.name.split('/').pop();
+    console.log('✅ Execution log saved:', logId);
+    return { success: true, logId };
+  } catch (error) {
+    console.error('saveExecutionLog error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fetch execution logs for a user with optional date filter
+ */
+export async function fetchExecutionLogs(userId, filter = 'all') {
+  try {
+    // Calculate date range based on filter
+    const now = new Date();
+    let startDate = null;
+    
+    switch (filter) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = null; // all
+    }
+    
+    let url = `${FIRESTORE_BASE}/users/${userId}/executionLogs?key=${API_KEY}&orderBy=createdAt desc&pageSize=100`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    
+    let logs = (data.documents || []).map(parseDocument);
+    
+    // Filter by date if needed
+    if (startDate) {
+      logs = logs.filter(log => {
+        const logDate = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+        return logDate >= startDate;
+      });
+    }
+    
+    return logs;
+  } catch (error) {
+    console.error('fetchExecutionLogs error:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear all execution logs for a user
+ */
+export async function clearExecutionLogs(userId) {
+  try {
+    // First fetch all logs
+    const url = `${FIRESTORE_BASE}/users/${userId}/executionLogs?key=${API_KEY}&pageSize=500`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    
+    const docs = data.documents || [];
+    
+    // Delete each log
+    for (const doc of docs) {
+      const deleteUrl = `https://firestore.googleapis.com/v1/${doc.name}?key=${API_KEY}`;
+      await fetch(deleteUrl, { method: 'DELETE' });
+    }
+    
+    console.log(`✅ Cleared ${docs.length} execution logs`);
+    return { success: true, count: docs.length };
+  } catch (error) {
+    console.error('clearExecutionLogs error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export default {
   fetchProjects,
   fetchBlocks,
@@ -540,5 +669,8 @@ export default {
   saveInstanceSettings,
   fetchInstanceSettings,
   createBlock,
-  updateBlock
+  updateBlock,
+  saveExecutionLog,
+  fetchExecutionLogs,
+  clearExecutionLogs
 };
