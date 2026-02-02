@@ -314,6 +314,95 @@ async function executeStep(page, step, variables = {}) {
         // These are control flow markers, handled by the block runner
         break;
 
+      // ============================================
+      // NEW ACTION TYPES v1.6.7
+      // ============================================
+      
+      case 'click_dropdown':
+        // คลิกเปิดเมนู (combobox/dropdown)
+        await page.click(selector, { timeout: 15000 });
+        await page.waitForTimeout(500); // รอให้เมนูเปิด
+        break;
+
+      case 'wait_for_element_long':
+        // รอให้ปรากฏ (นาน) - timeout 10 นาที
+        await page.waitForSelector(selector, { timeout: 600000 });
+        break;
+
+      case 'wait_and_click_long':
+        // รอให้ปรากฏแล้วคลิก (นาน) - timeout 10 นาที
+        await page.waitForSelector(selector, { timeout: 600000 });
+        await highlightElement(page, selector);
+        await page.waitForTimeout(300);
+        await page.click(selector);
+        break;
+
+      case 'wait_progress_complete':
+        // รอโหลดเสร็จ (ตรวจซีนต์เพิ่ม)
+        // selector = progress bar selector
+        // value = scene list selector (for counting)
+        const sceneSelector = processedValue || '[role="listitem"]';
+        const maxWaitTime = 600000; // 10 นาที
+        const checkInterval = 2000; // ตรวจทุก 2 วินาที
+        const maxRetries = 3;
+        
+        // นับ Scene ก่อน
+        const countBefore = await page.locator(sceneSelector).count();
+        console.log(`📊 Scene count before: ${countBefore}`);
+        
+        let progressCompleted = false;
+        let retryCount = 0;
+        const startTime = Date.now();
+        
+        while (!progressCompleted && (Date.now() - startTime) < maxWaitTime) {
+          try {
+            // ตรวจสอบว่า progress bar ยังมีอยู่ไหม
+            const progressExists = await page.locator(selector).count() > 0;
+            
+            if (!progressExists) {
+              // Progress หายไป - ตรวจสอบ Scene เพิ่มหรือไม่
+              await page.waitForTimeout(1000); // รอให้ DOM update
+              const countAfter = await page.locator(sceneSelector).count();
+              console.log(`📊 Scene count after: ${countAfter}`);
+              
+              if (countAfter > countBefore) {
+                // Scene เพิ่ม = สำเร็จ
+                console.log(`✅ Progress complete! Scene increased: ${countBefore} → ${countAfter}`);
+                progressCompleted = true;
+              } else {
+                // Scene ไม่เพิ่ม = Error
+                retryCount++;
+                console.log(`⚠️ Scene not increased. Retry ${retryCount}/${maxRetries}`);
+                
+                if (retryCount >= maxRetries) {
+                  console.log(`❌ Max retries reached. Moving to next step.`);
+                  return { success: false, error: `Scene ไม่เพิ่มหลัง ${maxRetries} ครั้ง`, action, retryCount };
+                }
+                
+                // รอแล้วตรวจใหม่
+                await page.waitForTimeout(checkInterval);
+              }
+            } else {
+              // Progress ยังทำงานอยู่ - อ่าน % (ถ้ามี)
+              try {
+                const progressText = await page.locator(selector).textContent();
+                console.log(`⏳ Progress: ${progressText}`);
+              } catch (e) {
+                // ไม่สามารถอ่าน text ได้
+              }
+              await page.waitForTimeout(checkInterval);
+            }
+          } catch (e) {
+            // Element หายไประหว่างตรวจสอบ
+            await page.waitForTimeout(checkInterval);
+          }
+        }
+        
+        if (!progressCompleted) {
+          return { success: false, error: 'Timeout: รอโหลดเกิน 10 นาที', action };
+        }
+        break;
+
       default:
         console.warn(`⚠️ Unknown action: ${action}`);
     }

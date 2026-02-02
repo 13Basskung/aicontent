@@ -272,6 +272,12 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.7': [
+    { title: 'คลิกเปิดเมนู', desc: 'Action ใหม่สำหรับคลิก dropdown/combobox' },
+    { title: 'รอให้ปรากฏ (นาน)', desc: 'รอ element ได้นานถึง 10 นาที' },
+    { title: 'รอให้ปรากฏแล้วคลิก (นาน)', desc: 'รอ element แล้วคลิก (timeout 10 นาที)' },
+    { title: 'รอโหลดเสร็จ (ตรวจซีนต์)', desc: 'รอ Progress หายไป + ตรวจสอบ Scene เพิ่ม (retry 3 ครั้ง)' },
+  ],
   '1.6.6': [
     { title: 'Highlight Element', desc: 'แสดงกรอบสีเหลืองบน Element ก่อนคลิก เพื่อดูว่าโปรแกรมกดที่ไหน' },
     { title: 'Result Modal', desc: 'ป็อบอัพแสดงผลลัพธ์สวยงาม พร้อมแสดง Steps สำเร็จ/ล้มเหลว' },
