@@ -324,6 +324,14 @@ async function executeStep(page, step, variables = {}) {
         await page.waitForTimeout(500); // รอให้เมนูเปิด
         break;
 
+      case 'click_text':
+        // คลิกจากข้อความ - ไม่ต้องหา selector!
+        // value = ข้อความที่เห็นบนปุ่ม เช่น "Text to Video"
+        const textToClick = processedValue;
+        console.log(`🔍 หาและคลิกข้อความ: "${textToClick}"`);
+        await page.getByText(textToClick, { exact: false }).click({ timeout: 15000 });
+        break;
+
       case 'wait_for_element_long':
         // รอให้ปรากฏ (นาน) - timeout 10 นาที
         await page.waitForSelector(selector, { timeout: 600000 });

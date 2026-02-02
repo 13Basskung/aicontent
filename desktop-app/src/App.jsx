@@ -272,6 +272,9 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.8': [
+    { title: 'คลิกจากข้อความ', desc: 'คลิก element โดยพิมพ์แค่ข้อความที่เห็น ไม่ต้องหา selector!' },
+  ],
   '1.6.7': [
     { title: 'คลิกเปิดเมนู', desc: 'Action ใหม่สำหรับคลิก dropdown/combobox' },
     { title: 'รอให้ปรากฏ (นาน)', desc: 'รอ element ได้นานถึง 10 นาที' },
