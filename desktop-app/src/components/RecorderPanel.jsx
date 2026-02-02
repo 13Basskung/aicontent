@@ -207,7 +207,8 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
     setSteps(prev => prev.map((step, i) => 
       i === index ? { ...step, ...updates } : step
     ));
-    setEditingStep(null);
+    // ไม่ต้อง setEditingStep(null) เพื่อให้พิมพ์ต่อได้
+    // จะออก Edit Mode เมื่อกด Save Block หรือคลิกที่อื่น
   }
 
   function handleAddCustomStep() {
@@ -574,12 +575,6 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                           title="ตั้งค่าออฟชั่นเสริม"
                         >
                           <Settings className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setEditingStep(null)}
-                          className="p-1 text-green-400"
-                        >
-                          <Save className="w-4 h-4" />
                         </button>
                       </div>
                       {/* Modifiers display */}
