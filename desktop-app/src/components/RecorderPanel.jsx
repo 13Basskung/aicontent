@@ -576,6 +576,13 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                         >
                           <Settings className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => setEditingStep(null)}
+                          className="p-1 text-green-400 hover:text-green-300"
+                          title="บันทึก Step"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
                       </div>
                       {/* Modifiers display */}
                       {step.modifiers && (

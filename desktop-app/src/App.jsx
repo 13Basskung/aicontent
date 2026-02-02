@@ -272,6 +272,9 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.11': [
+    { title: 'ปุ่ม Save Step', desc: 'เพิ่มปุ่มบันทึก Step ข้างหลังปุ่มฟันเฟือง' },
+  ],
   '1.6.10': [
     { title: 'แก้บั๊ก Input Field', desc: 'พิมพ์/วางข้อความได้ต่อเนื่อง ไม่ต้องคลิกใหม่ทุกครั้ง' },
   ],
