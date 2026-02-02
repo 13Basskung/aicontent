@@ -272,6 +272,11 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.1': [
+    { title: 'ปุ่มแสดงตลอด', desc: 'ปุ่มทดสอบ/แก้ไข/ลบ แสดงตลอดเวลา ไม่ต้อง hover' },
+    { title: 'VDO Blocks', desc: 'เปลี่ยนชื่อ "สร้างวีดีโอ" เป็น "VDO Blocks"' },
+    { title: 'Instance Link', desc: 'เชื่อม Instance ที่เลือกกับปุ่มทดสอบ Block' },
+  ],
   '1.6.0': [
     { title: 'Block Types', desc: 'แยก Block เป็น 2 ประเภท: สร้างวีดีโอ + Platform Blocks' },
     { title: '2-Column Layout', desc: 'Admin เห็น Available Blocks แยก 2 ฝั่ง (ซ้าย=วีดีโอ, ขวา=Platform)' },

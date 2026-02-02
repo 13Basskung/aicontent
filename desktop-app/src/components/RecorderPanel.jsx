@@ -23,11 +23,18 @@ const ACTION_ICONS = {
   goto: Play
 };
 
-function RecorderPanel({ keyData, instances, onBlockCreated }) {
+function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect }) {
   const [isRecording, setIsRecording] = useState(false);
   const [steps, setSteps] = useState([]);
   const [startUrl, setStartUrl] = useState('https://www.google.com');
   const [selectedInstance, setSelectedInstance] = useState(null);
+  
+  // Notify parent when instance changes
+  useEffect(() => {
+    if (onInstanceSelect) {
+      onInstanceSelect(selectedInstance);
+    }
+  }, [selectedInstance, onInstanceSelect]);
   const [editingStep, setEditingStep] = useState(null);
   const [blockName, setBlockName] = useState('');
   const [blockDescription, setBlockDescription] = useState('');

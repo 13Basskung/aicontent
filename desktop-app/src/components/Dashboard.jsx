@@ -62,6 +62,9 @@ function Dashboard({ keyData }) {
     blockDescription: ''
   });
   
+  // Selected instance from RecorderPanel (for testing blocks)
+  const [recorderSelectedInstance, setRecorderSelectedInstance] = useState(null);
+  
   // Show toast helper
   function showToast(message, type = 'success') {
     setToast({ show: true, message, type });
@@ -439,10 +442,15 @@ function Dashboard({ keyData }) {
   
   // Test block - Run full execution (video + platform blocks)
   async function handleTestBlock(block) {
-    // Check if instance is selected in RecorderPanel
-    // For now, show alert - this will be connected to RecorderPanel later
-    alert(`ทดสอบ Block: ${block.name}\n\nกรุณาเลือก Instance ในส่วน Recorder แล้วกดทดสอบอีกครั้ง`);
-    console.log('🧪 Test block requested:', block);
+    if (!recorderSelectedInstance) {
+      alert(`ทดสอบ Block: ${block.name}\n\nกรุณาเลือก Instance ในส่วน Recorder แล้วกดทดสอบอีกครั้ง`);
+      return;
+    }
+    
+    console.log('🧪 Test block:', block.name, 'on instance:', recorderSelectedInstance.customName || recorderSelectedInstance.projectName);
+    
+    // TODO: Connect to automation engine to run block
+    showToast(`เริ่มทดสอบ Block: ${block.name} บน ${recorderSelectedInstance.customName || recorderSelectedInstance.projectName}`, 'success');
   }
 
   async function saveBlockEdit() {
@@ -627,7 +635,7 @@ function Dashboard({ keyData }) {
 
       {/* Tab Content: Recorder (Admin only) */}
       {activeTab === 'recorder' && keyData?.isAdmin && (
-        <RecorderPanel keyData={keyData} instances={instances} onBlockCreated={loadData} />
+        <RecorderPanel keyData={keyData} instances={instances} onBlockCreated={loadData} onInstanceSelect={setRecorderSelectedInstance} />
       )}
 
       {/* Projects Section - Only show on Instances tab */}
@@ -1101,17 +1109,17 @@ function Dashboard({ keyData }) {
           <div className="glass rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xl">🎬</span>
-              <h3 className="text-white font-semibold">สร้างวีดีโอ ({blocks.filter(b => b.type !== 'platform').length})</h3>
+              <h3 className="text-white font-semibold">VDO Blocks ({blocks.filter(b => b.type !== 'platform').length})</h3>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {blocks.filter(b => b.type !== 'platform').map(block => (
                 <div
                   key={block.id}
-                  className="relative group"
+                  className="relative"
                   onMouseEnter={() => setHoveredBlockId(block.id)}
                   onMouseLeave={() => setHoveredBlockId(null)}
                 >
-                  <div className="w-full rounded-lg p-3 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30">
+                  <div className="w-full rounded-lg p-3 pb-10 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30">
                     <p className="text-white text-sm font-medium truncate">{block.name}</p>
                     <p className="text-purple-300/70 text-xs mt-1">{block.steps?.length || 0} steps</p>
                   </div>
@@ -1122,36 +1130,35 @@ function Dashboard({ keyData }) {
                     </div>
                   )}
                   
-                  {hoveredBlockId === block.id && (
-                    <div className="absolute top-1 right-1 flex gap-1 z-10">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
-                        className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
-                        title="ทดสอบ"
-                      >
-                        <Play className="w-3 h-3 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
-                        className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
-                        title="แก้ไข"
-                      >
-                        <Edit3 className="w-3 h-3 text-white" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
-                        className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
-                        title="ลบ"
-                      >
-                        <Trash2 className="w-3 h-3 text-white" />
-                      </button>
-                    </div>
-                  )}
+                  {/* ปุ่มแสดงตลอดเวลา */}
+                  <div className="absolute bottom-2 right-2 flex gap-1 z-10">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
+                      className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
+                      title="ทดสอบ"
+                    >
+                      <Play className="w-3 h-3 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
+                      className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
+                      title="แก้ไข"
+                    >
+                      <Edit3 className="w-3 h-3 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
+                      className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
+                      title="ลบ"
+                    >
+                      <Trash2 className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
             {blocks.filter(b => b.type !== 'platform').length === 0 && (
-              <div className="text-center py-4 text-white/30">ไม่พบ Blocks สร้างวีดีโอ</div>
+              <div className="text-center py-4 text-white/30">ไม่พบ VDO Blocks</div>
             )}
           </div>
           
@@ -1176,11 +1183,11 @@ function Dashboard({ keyData }) {
                 return (
                   <div
                     key={block.id}
-                    className="relative group"
+                    className="relative"
                     onMouseEnter={() => setHoveredBlockId(block.id)}
                     onMouseLeave={() => setHoveredBlockId(null)}
                   >
-                    <div className={`w-full rounded-lg p-3 text-left transition border ${colorClass}`}>
+                    <div className={`w-full rounded-lg p-3 pb-10 text-left transition border ${colorClass}`}>
                       <div className="flex items-center gap-2">
                         <span>{icon}</span>
                         <p className="text-white text-sm font-medium truncate">{block.name}</p>
@@ -1194,31 +1201,30 @@ function Dashboard({ keyData }) {
                       </div>
                     )}
                     
-                    {hoveredBlockId === block.id && (
-                      <div className="absolute top-1 right-1 flex gap-1 z-10">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
-                          className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
-                          title="ทดสอบ"
-                        >
-                          <Play className="w-3 h-3 text-white" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
-                          className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
-                          title="แก้ไข"
-                        >
-                          <Edit3 className="w-3 h-3 text-white" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
-                          className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
-                          title="ลบ"
-                        >
-                          <Trash2 className="w-3 h-3 text-white" />
-                        </button>
-                      </div>
-                    )}
+                    {/* ปุ่มแสดงตลอดเวลา */}
+                    <div className="absolute bottom-2 right-2 flex gap-1 z-10">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
+                        className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
+                        title="ทดสอบ"
+                      >
+                        <Play className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
+                        className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
+                        title="แก้ไข"
+                      >
+                        <Edit3 className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
+                        className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
+                        title="ลบ"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
