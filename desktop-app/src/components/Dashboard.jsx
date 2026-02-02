@@ -15,7 +15,7 @@ const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', short: 'TikTok', color: 'bg-black', icon: '🎵' },
   { id: 'instagram', name: 'Instagram', short: 'IG', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📷' }
 ];
-import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock, saveInstanceSettings, fetchInstanceSettings } from '../lib/firebase';
+import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock, saveInstanceSettings, fetchInstanceSettings, fetchReadyPrompts } from '../lib/firebase';
 
 function Dashboard({ keyData }) {
   const [projects, setProjects] = useState([]);
@@ -394,9 +394,24 @@ function Dashboard({ keyData }) {
     ));
 
     try {
-      // Fetch prompts/variables for this project
-      const prompts = []; // TODO: fetch from Firebase
+      // Fetch prompts from Firebase readyPrompts collection
+      let prompts = [];
+      try {
+        const readyPromptsData = await fetchReadyPrompts(keyData?.userId, instance.projectId);
+        // readyPromptsData เป็น array ของ documents, แต่ละตัวมี prompts array
+        if (readyPromptsData && readyPromptsData.length > 0) {
+          // ใช้ readyPrompt ล่าสุด (status = 'ready')
+          const latestReady = readyPromptsData.find(rp => rp.status === 'ready') || readyPromptsData[0];
+          prompts = latestReady.prompts || [];
+          console.log(`📝 Fetched ${prompts.length} prompts from Firebase`);
+        }
+      } catch (fetchErr) {
+        console.warn('⚠️ Could not fetch prompts:', fetchErr.message);
+      }
+
+      // ส่ง prompts array ไปยัง playwright-bridge.js
       const variables = {
+        prompts: prompts,  // Array of prompts for loop
         prompt: prompts[0] || '',
         sceneIndex: 0
       };

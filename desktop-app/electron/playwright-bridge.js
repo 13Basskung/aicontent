@@ -126,24 +126,124 @@ function initPlaywrightBridge(mainWindow) {
         await page.waitForTimeout(2000);
       }
 
-      // Execute steps
+      // ตรวจสอบว่ามี Loop หรือไม่
+      const steps = block.steps || [];
+      const hasLoop = steps.some(s => ['loop_start', 'loop_end'].includes(s.action));
+      const prompts = variables.prompts || [];
+      
       const results = [];
-      for (let i = 0; i < block.steps.length; i++) {
-        const step = block.steps[i];
-        console.log(`📍 Step ${i + 1}/${block.steps.length}: ${step.action}`);
+      
+      if (hasLoop && prompts.length > 0) {
+        // ============================================
+        // LOOP MODE: วนตาม prompts.length
+        // ============================================
+        console.log(`🔄 Loop mode: ${prompts.length} prompts to process`);
         
-        sendStatusUpdate(mainWindow, instanceId, 'running', {
-          currentStep: i + 1,
-          totalSteps: block.steps.length,
-          stepAction: step.action
-        });
+        // หา index ของ loop_start และ loop_end
+        const loopStartIndex = steps.findIndex(s => s.action === 'loop_start');
+        const loopEndIndex = steps.findIndex(s => s.action === 'loop_end');
+        
+        // Execute steps BEFORE loop_start (once)
+        for (let i = 0; i < loopStartIndex; i++) {
+          const step = steps[i];
+          console.log(`📍 Pre-loop Step ${i + 1}: ${step.action}`);
+          sendStatusUpdate(mainWindow, instanceId, 'running', {
+            currentStep: i + 1,
+            totalSteps: steps.length,
+            stepAction: step.action
+          });
+          const result = await executeStep(page, step, variables);
+          results.push(result);
+          if (!result.success) {
+            console.error(`❌ Pre-loop Step ${i + 1} failed: ${result.error}`);
+            sendStatusUpdate(mainWindow, instanceId, 'idle');
+            return { success: false, results, error: result.error };
+          }
+        }
+        
+        // Execute LOOP steps for each prompt
+        for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+          console.log(`🔄 Loop iteration ${promptIndex + 1}/${prompts.length}`);
+          
+          // อัปเดต variables สำหรับ iteration นี้
+          const loopVariables = {
+            ...variables,
+            prompt: prompts[promptIndex],
+            sceneIndex: promptIndex + 1,
+            currentPromptIndex: promptIndex,
+            totalPrompts: prompts.length
+          };
+          
+          // Execute steps INSIDE loop (between loop_start and loop_end)
+          for (let i = loopStartIndex + 1; i < loopEndIndex; i++) {
+            const step = steps[i];
+            console.log(`📍 Loop[${promptIndex + 1}] Step ${i + 1}: ${step.action}`);
+            sendStatusUpdate(mainWindow, instanceId, 'running', {
+              currentStep: i + 1,
+              totalSteps: steps.length,
+              stepAction: step.action,
+              loopIteration: promptIndex + 1,
+              totalIterations: prompts.length
+            });
+            
+            const result = await executeStep(page, step, loopVariables);
+            results.push({ ...result, loopIteration: promptIndex + 1 });
+            
+            if (!result.success) {
+              console.error(`❌ Loop[${promptIndex + 1}] Step ${i + 1} failed: ${result.error}`);
+              // ถ้า error ใน loop ให้ข้ามไป prompt ถัดไป (ไม่หยุดทั้งหมด)
+              console.log(`⏭️ Skipping to next prompt...`);
+              break;
+            }
+          }
+          
+          console.log(`✅ Completed prompt ${promptIndex + 1}/${prompts.length}`);
+        }
+        
+        // Execute steps AFTER loop_end (once)
+        for (let i = loopEndIndex + 1; i < steps.length; i++) {
+          const step = steps[i];
+          console.log(`📍 Post-loop Step ${i + 1}: ${step.action}`);
+          sendStatusUpdate(mainWindow, instanceId, 'running', {
+            currentStep: i + 1,
+            totalSteps: steps.length,
+            stepAction: step.action
+          });
+          const result = await executeStep(page, step, variables);
+          results.push(result);
+          if (!result.success) {
+            console.error(`❌ Post-loop Step ${i + 1} failed: ${result.error}`);
+            break;
+          }
+        }
+        
+      } else {
+        // ============================================
+        // NORMAL MODE: Execute all steps once
+        // ============================================
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          
+          // Skip loop markers in normal mode
+          if (['loop_start', 'loop_end'].includes(step.action)) {
+            results.push({ success: true, action: step.action, skipped: true });
+            continue;
+          }
+          
+          console.log(`📍 Step ${i + 1}/${steps.length}: ${step.action}`);
+          sendStatusUpdate(mainWindow, instanceId, 'running', {
+            currentStep: i + 1,
+            totalSteps: steps.length,
+            stepAction: step.action
+          });
 
-        const result = await executeStep(page, step, variables);
-        results.push(result);
+          const result = await executeStep(page, step, variables);
+          results.push(result);
 
-        if (!result.success) {
-          console.error(`❌ Step ${i + 1} failed: ${result.error}`);
-          break;
+          if (!result.success) {
+            console.error(`❌ Step ${i + 1} failed: ${result.error}`);
+            break;
+          }
         }
       }
 

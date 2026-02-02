@@ -558,16 +558,11 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                             }
                           />
                         )}
-                        {/* Loop count for loop_start */}
+                        {/* Loop info for loop_start */}
                         {step.action === 'loop_start' && (
-                          <input
-                            type="number"
-                            value={step.loopCount || 1}
-                            onChange={(e) => handleEditStep(index, { loopCount: parseInt(e.target.value) || 1 })}
-                            className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
-                            placeholder="รอบ"
-                            min="1"
-                          />
+                          <span className="px-2 py-1 bg-cyan-500/20 border border-cyan-500/30 rounded text-cyan-400 text-xs">
+                            🔄 วนตามจำนวน Prompts
+                          </span>
                         )}
                         <button
                           onClick={() => setShowModifiersModal(index)}
@@ -614,9 +609,9 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                               "{step.value}"
                             </span>
                           )}
-                          {step.loopCount && (
-                            <span className="text-cyan-400 text-sm">
-                              ({step.loopCount} รอบ)
+                          {step.action === 'loop_start' && (
+                            <span className="text-cyan-400 text-xs">
+                              (ตาม Prompts)
                             </span>
                           )}
                           {step.modifiers && (

@@ -272,6 +272,10 @@ function UpdateBadge({ status, onInstall }) {
 
 // Version changelog - ข้อมูลที่แก้ไขจริงในแต่ละเวอร์ชัน
 const VERSION_CHANGELOG = {
+  '1.6.12': [
+    { title: 'Loop ตาม Prompts', desc: 'Loop วนตามจำนวน Prompts จาก Firebase โดยอัตโนมัติ' },
+    { title: 'Fetch Prompts', desc: 'ดึง prompts จาก readyPrompts collection' },
+  ],
   '1.6.11': [
     { title: 'ปุ่ม Save Step', desc: 'เพิ่มปุ่มบันทึก Step ข้างหลังปุ่มฟันเฟือง' },
   ],
