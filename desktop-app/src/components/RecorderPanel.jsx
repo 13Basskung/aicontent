@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Circle, Square, Play, Trash2, Save, 
   MousePointer, Type, ChevronDown, Plus, 
-  Edit3, X, Clock, AlertCircle, CheckCircle, GripVertical
+  Edit3, X, Clock, AlertCircle, CheckCircle, GripVertical,
+  Settings, RotateCcw, Eye, EyeOff, FileText, RefreshCw
 } from 'lucide-react';
 import { createBlock, updateBlock } from '../lib/firebase';
 
@@ -14,13 +15,35 @@ const BLOCK_PLATFORMS = [
   { id: 'instagram', name: 'Instagram', color: 'bg-gradient-to-r from-purple-600 to-pink-600', borderColor: 'border-pink-500', icon: '📷' }
 ];
 
+// Step action types with Thai labels
+const ACTION_TYPES = [
+  { value: 'click', label: 'คลิก', icon: '👆' },
+  { value: 'fill', label: 'พิมพ์', icon: '⌨️' },
+  { value: 'wait', label: 'รอ (ms)', icon: '⏱️' },
+  { value: 'goto', label: 'ไปที่ URL', icon: '🔗' },
+  { value: 'wait_for_element', label: 'รอให้ปรากฏ', icon: '👁️' },
+  { value: 'wait_for_disappear', label: 'รอให้หายไป', icon: '🙈' },
+  { value: 'wait_for_element_and_click', label: 'รอแล้วคลิก', icon: '👁️👆' },
+  { value: 'wait_for_progress_complete', label: 'รอ Progress 100%', icon: '📊' },
+  { value: 'inject_prompt', label: 'ดึง Prompt', icon: '📝' },
+  { value: 'loop_start', label: '🔄 เริ่ม Loop', icon: '🔄' },
+  { value: 'loop_end', label: '🏁 จบ Loop', icon: '🏁' },
+];
+
 // Step action icons
 const ACTION_ICONS = {
   click: MousePointer,
   fill: Type,
   select: ChevronDown,
   wait: Clock,
-  goto: Play
+  goto: Play,
+  wait_for_element: Eye,
+  wait_for_disappear: EyeOff,
+  wait_for_element_and_click: Eye,
+  wait_for_progress_complete: RefreshCw,
+  inject_prompt: FileText,
+  loop_start: RotateCcw,
+  loop_end: Square
 };
 
 function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, blockToEdit, onBlockEditComplete }) {
@@ -68,6 +91,7 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
   const [editingBlock, setEditingBlock] = useState(null);
   const [showEditModePopup, setShowEditModePopup] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [showModifiersModal, setShowModifiersModal] = useState(null); // index of step being configured
   
   // Drag and drop handlers for reordering steps
   function handleDragStart(e, index) {
@@ -494,26 +518,54 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                   {editingStep === index ? (
                     // Edit mode
                     <div className="space-y-2">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <select
                           value={step.action}
                           onChange={(e) => handleEditStep(index, { action: e.target.value })}
-                          className="px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
+                          className="px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm min-w-[140px]"
                         >
-                          <option value="click">คลิก</option>
-                          <option value="fill">พิมพ์</option>
-                          <option value="wait">รอ</option>
-                          <option value="goto">ไปที่ URL</option>
+                          {ACTION_TYPES.map(type => (
+                            <option key={type.value} value={type.value}>
+                              {type.icon} {type.label}
+                            </option>
+                          ))}
                         </select>
-                        <input
-                          type="text"
-                          value={step.selector || step.value || ''}
-                          onChange={(e) => handleEditStep(index, { 
-                            [step.action === 'wait' || step.action === 'goto' ? 'value' : 'selector']: e.target.value 
-                          })}
-                          className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
-                          placeholder={step.action === 'wait' ? 'ms' : step.action === 'goto' ? 'URL' : 'Selector'}
-                        />
+                        {/* Input field based on action type */}
+                        {!['loop_start', 'loop_end', 'inject_prompt'].includes(step.action) && (
+                          <input
+                            type="text"
+                            value={step.selector || step.value || ''}
+                            onChange={(e) => {
+                              const field = ['wait', 'goto', 'wait_for_progress_complete'].includes(step.action) ? 'value' : 'selector';
+                              handleEditStep(index, { [field]: e.target.value });
+                            }}
+                            className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm min-w-[150px]"
+                            placeholder={
+                              step.action === 'wait' ? 'เวลา (ms)' : 
+                              step.action === 'goto' ? 'URL' : 
+                              step.action === 'wait_for_progress_complete' ? 'Timeout (ms)' :
+                              'Selector'
+                            }
+                          />
+                        )}
+                        {/* Loop count for loop_start */}
+                        {step.action === 'loop_start' && (
+                          <input
+                            type="number"
+                            value={step.loopCount || 1}
+                            onChange={(e) => handleEditStep(index, { loopCount: parseInt(e.target.value) || 1 })}
+                            className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
+                            placeholder="รอบ"
+                            min="1"
+                          />
+                        )}
+                        <button
+                          onClick={() => setShowModifiersModal(index)}
+                          className="p-1 text-yellow-400 hover:text-yellow-300"
+                          title="ตั้งค่าออฟชั่นเสริม"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => setEditingStep(null)}
                           className="p-1 text-green-400"
@@ -521,6 +573,12 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                           <Save className="w-4 h-4" />
                         </button>
                       </div>
+                      {/* Modifiers display */}
+                      {step.modifiers && (
+                        <div className="text-xs text-yellow-400/70 mt-1">
+                          ⚙️ {step.modifiers.preActions?.length || 0} pre-actions, {step.modifiers.postActions?.length || 0} post-actions
+                        </div>
+                      )}
                     </div>
                   ) : (
                     // View mode
@@ -531,19 +589,27 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
                           {index + 1}
                         </span>
                         <ActionIcon className="w-4 h-4 text-purple-400" />
-                        <div>
-                          <span className="text-white font-medium capitalize">
-                            {step.action === 'click' ? 'คลิก' : step.action === 'fill' ? 'พิมพ์' : step.action === 'wait' ? 'รอ' : step.action === 'goto' ? 'ไปที่ URL' : step.action}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-white font-medium ${step.action === 'loop_start' ? 'text-cyan-400' : step.action === 'loop_end' ? 'text-cyan-400' : ''}`}>
+                            {ACTION_TYPES.find(t => t.value === step.action)?.label || step.action}
                           </span>
                           {step.selector && (
-                            <span className="text-white/50 text-sm ml-2 font-mono">
-                              {step.selector.substring(0, 40)}...
+                            <span className="text-white/50 text-sm font-mono">
+                              {step.selector.length > 35 ? step.selector.substring(0, 35) + '...' : step.selector}
                             </span>
                           )}
                           {step.value && (
-                            <span className="text-green-400 text-sm ml-2">
+                            <span className="text-green-400 text-sm">
                               "{step.value}"
                             </span>
+                          )}
+                          {step.loopCount && (
+                            <span className="text-cyan-400 text-sm">
+                              ({step.loopCount} รอบ)
+                            </span>
+                          )}
+                          {step.modifiers && (
+                            <span className="text-yellow-400 text-xs">⚙️</span>
                           )}
                         </div>
                       </div>
@@ -768,6 +834,179 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
               className="w-full mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 transition"
             >
               ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Modifiers Modal */}
+      {showModifiersModal !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="glass rounded-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">⚙️ ตั้งค่าออฟชั่นเสริม</h3>
+              <button onClick={() => setShowModifiersModal(null)} className="text-white/50 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+              <p className="text-white font-medium">Step {showModifiersModal + 1}: {steps[showModifiersModal]?.action}</p>
+            </div>
+            
+            {/* Pre-Actions */}
+            <div className="mb-4">
+              <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                <span className="text-blue-400">▶️</span> ก่อนทำ (Pre-Actions)
+              </h4>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'count_scenes') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.preActions = [...(step.modifiers.preActions || []), { type: 'count_scenes', order: 1 }];
+                      } else {
+                        step.modifiers.preActions = (step.modifiers.preActions || []).filter(a => a.type !== 'count_scenes');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">🔢 นับจำนวน Scene ก่อน</span>
+                </label>
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'inject_prompt') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.preActions = [...(step.modifiers.preActions || []), { type: 'inject_prompt', order: 2 }];
+                      } else {
+                        step.modifiers.preActions = (step.modifiers.preActions || []).filter(a => a.type !== 'inject_prompt');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">📝 ดึง Prompt จาก Firebase</span>
+                </label>
+              </div>
+            </div>
+            
+            {/* Post-Actions */}
+            <div className="mb-4">
+              <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                <span className="text-green-400">✅</span> หลังทำ (Post-Actions)
+              </h4>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'validate_scene') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'validate_scene', order: 1 }];
+                      } else {
+                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'validate_scene');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">✔️ ตรวจสอบว่า Scene เพิ่มขึ้น</span>
+                </label>
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'retry_on_fail') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'retry_on_fail', maxRetries: 3, order: 2 }];
+                      } else {
+                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'retry_on_fail');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">🔄 ลองใหม่ถ้าล้มเหลว (3 รอบ)</span>
+                </label>
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'wait_progress') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'wait_progress', order: 3 }];
+                      } else {
+                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'wait_progress');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">📊 รอ Progress Bar</span>
+                </label>
+                <div className="flex items-center gap-2 p-2 rounded bg-white/5">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'wait_after') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'wait_after', duration: 2000, order: 4 }];
+                      } else {
+                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'wait_after');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">⏱️ รอหลังทำ</span>
+                  <input 
+                    type="number"
+                    value={steps[showModifiersModal]?.modifiers?.postActions?.find(a => a.type === 'wait_after')?.duration || 2000}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      const waitAction = step.modifiers?.postActions?.find(a => a.type === 'wait_after');
+                      if (waitAction) {
+                        waitAction.duration = parseInt(e.target.value) || 2000;
+                        setSteps(newSteps);
+                      }
+                    }}
+                    className="w-20 px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm"
+                    placeholder="ms"
+                  />
+                  <span className="text-white/50 text-sm">ms</span>
+                </div>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowModifiersModal(null)}
+              className="w-full px-4 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-300 transition"
+            >
+              ✅ บันทึก
             </button>
           </div>
         </div>
