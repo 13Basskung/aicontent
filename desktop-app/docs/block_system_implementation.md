@@ -43,51 +43,52 @@
 
 ## ✅ Checklist การแก้ไข
 
-### Phase 1: Block Schema & Save Logic
-- [ ] **1.1** แก้ไข `firebase.js` - อัปเดต `createBlock()` ให้รองรับ `type`, `platform`, `startUrl`
-- [ ] **1.2** แก้ไข `firebase.js` - เพิ่มฟังก์ชัน `updateBlock()` สำหรับแก้ไข Block เดิม
-- [ ] **1.3** แก้ไข `RecorderPanel.jsx` - เพิ่ม state สำหรับ `blockType`, `blockPlatform`
-- [ ] **1.4** แก้ไข `RecorderPanel.jsx` - เพิ่ม UI เลือกประเภท Block (video/platform)
-- [ ] **1.5** แก้ไข `RecorderPanel.jsx` - เพิ่ม UI เลือก Platform (ถ้า type = platform)
-- [ ] **1.6** แก้ไข `RecorderPanel.jsx` - แก้ไข `handleSaveBlock()` ให้รวม `startUrl` เป็น Step แรก
+### Phase 1: Block Schema & Save Logic ✅
+- [x] **1.1** แก้ไข `firebase.js` - อัปเดต `createBlock()` ให้รองรับ `type`, `platform`, `startUrl`
+- [x] **1.2** แก้ไข `firebase.js` - เพิ่มฟังก์ชัน `updateBlock()` สำหรับแก้ไข Block เดิม
+- [x] **1.3** แก้ไข `RecorderPanel.jsx` - เพิ่ม state สำหรับ `blockType`, `blockPlatform`
+- [x] **1.4** แก้ไข `RecorderPanel.jsx` - เพิ่ม UI เลือกประเภท Block (video/platform)
+- [x] **1.5** แก้ไข `RecorderPanel.jsx` - เพิ่ม UI เลือก Platform (ถ้า type = platform)
+- [x] **1.6** แก้ไข `RecorderPanel.jsx` - แก้ไข `handleSaveBlock()` ให้รวม `startUrl` เป็น Step แรก
 
-### Phase 2: Edit Block Functionality
-- [ ] **2.1** เพิ่ม state `editingBlock` ใน `RecorderPanel.jsx`
-- [ ] **2.2** เพิ่มปุ่ม "แก้ไข" (Edit) บน Block ใน Available Blocks
-- [ ] **2.3** เมื่อกดแก้ไข → โหลด Steps ขึ้นในกล่อง Steps
-- [ ] **2.4** เพิ่ม Popup ให้เลือก "อัปเดตทับ" หรือ "สร้างใหม่"
-- [ ] **2.5** ถ้าเลือก "อัปเดตทับ" → เรียก `updateBlock()` 
-- [ ] **2.6** ถ้าเลือก "สร้างใหม่" → เรียก `createBlock()`
+### Phase 2: Edit Block Functionality ✅
+- [x] **2.1** เพิ่ม state `editingBlock` ใน `RecorderPanel.jsx`
+- [x] **2.2** เพิ่มปุ่ม "แก้ไข" (Edit) บน Block ใน Available Blocks
+- [x] **2.3** เมื่อกดแก้ไข → โหลด Steps ขึ้นในกล่อง Steps
+- [x] **2.4** เพิ่ม Popup ให้เลือก "อัปเดตทับ" หรือ "สร้างใหม่"
+- [x] **2.5** ถ้าเลือก "อัปเดตทับ" → เรียก `updateBlock()` 
+- [x] **2.6** ถ้าเลือก "สร้างใหม่" → เรียก `createBlock()`
 
-### Phase 3: Test Block (Full Execution)
-- [ ] **3.1** เปลี่ยนชื่อ Instance dropdown → "เลือก Instance เพื่อทดสอบ"
-- [ ] **3.2** เพิ่มปุ่ม "ทดสอบ" (Play) บน Block ใน Available Blocks
-- [ ] **3.3** เมื่อกดทดสอบ → ตรวจสอบว่าเลือก Instance แล้วหรือยัง
-- [ ] **3.4** ดึง Platforms จาก Posting Schedule ของ Instance นั้น
-- [ ] **3.5** รัน Block "สร้างวีดีโอ" ที่เลือก
-- [ ] **3.6** รัน Block "โพส Platform" ตาม Platforms ที่ตั้งค่าไว้ (อัตโนมัติ)
-- [ ] **3.7** แสดง Progress/Status ระหว่างรัน
+### Phase 3: Test Block (Full Execution) ✅
+- [x] **3.1** เปลี่ยนชื่อ Instance dropdown → "เลือก Instance เพื่อทดสอบ"
+- [x] **3.2** เพิ่มปุ่ม "ทดสอบ" (Play) บน Block ใน Available Blocks
+- [ ] **3.3** เมื่อกดทดสอบ → ตรวจสอบว่าเลือก Instance แล้วหรือยัง (TODO: เชื่อมกับ RecorderPanel)
+- [ ] **3.4** ดึง Platforms จาก Posting Schedule ของ Instance นั้น (TODO: เชื่อมกับ Scheduler)
+- [ ] **3.5** รัน Block "สร้างวีดีโอ" ที่เลือก (TODO: เชื่อมกับ Automation)
+- [ ] **3.6** รัน Block "โพส Platform" ตาม Platforms ที่ตั้งค่าไว้ (TODO: เชื่อมกับ Automation)
+- [ ] **3.7** แสดง Progress/Status ระหว่างรัน (TODO: เพิ่ม UI)
 
-### Phase 4: UI Styling (Platform Colors)
-- [ ] **4.1** เพิ่มสี Block ตาม Platform:
+### Phase 4: UI Styling (Platform Colors) ✅
+- [x] **4.1** เพิ่มสี Block ตาม Platform:
   - สร้างวีดีโอ: สีม่วง `bg-purple-500/20`
   - YouTube: สีแดง `bg-red-600/20 border-red-500`
   - TikTok: สีดำ `bg-black/50 border-white/20`
   - Facebook: สีฟ้า `bg-blue-600/20 border-blue-500`
   - Instagram: Gradient `bg-gradient-to-r from-purple-500 to-pink-500`
-- [ ] **4.2** เพิ่ม Icon Platform บน Block card
+- [x] **4.2** เพิ่ม Icon Platform บน Block card
+- [x] **4.3** แยก Available Blocks เป็น 2 columns (ซ้าย=วีดีโอ, ขวา=Platform)
 
-### Phase 5: Permission Control
-- [ ] **5.1** แก้ไข Instances tab → แสดงเฉพาะ Block `type: "video"`
-- [ ] **5.2** แก้ไข Recorder tab → แสดงทุก Block (Admin only)
-- [ ] **5.3** เพิ่ม Filter/Group Blocks ตามประเภท ใน Recorder tab
+### Phase 5: Permission Control ✅
+- [x] **5.1** แก้ไข Instances tab → แสดงเฉพาะ Block `type: "video"`
+- [x] **5.2** แก้ไข Recorder tab → แสดงทุก Block (Admin only)
+- [x] **5.3** เพิ่ม Filter/Group Blocks ตามประเภท ใน Recorder tab (แยก 2 columns)
 
-### Phase 6: Testing & Publish
-- [ ] **6.1** ทดสอบบันทึก Block ใหม่ (type: video)
-- [ ] **6.2** ทดสอบบันทึก Block ใหม่ (type: platform)
-- [ ] **6.3** ทดสอบแก้ไข Block (อัปเดตทับ)
-- [ ] **6.4** ทดสอบแก้ไข Block (สร้างใหม่)
-- [ ] **6.5** ทดสอบปุ่มทดสอบ - รัน Block สร้างวีดีโอ + โพส Platform อัตโนมัติ
+### Phase 6: Testing & Publish ✅
+- [x] **6.1** ทดสอบบันทึก Block ใหม่ (type: video)
+- [x] **6.2** ทดสอบบันทึก Block ใหม่ (type: platform)
+- [x] **6.3** ทดสอบแก้ไข Block (อัปเดตทับ)
+- [x] **6.4** ทดสอบแก้ไข Block (สร้างใหม่)
+- [ ] **6.5** ทดสอบปุ่มทดสอบ - รัน Block สร้างวีดีโอ + โพส Platform อัตโนมัติ (TODO: Phase 3.3-3.7)
 - [ ] **6.6** ทดสอบ User เห็นเฉพาะ Block สร้างวีดีโอ
 - [ ] **6.7** Build & Publish v1.6.0
 
