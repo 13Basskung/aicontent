@@ -436,6 +436,14 @@ function Dashboard({ keyData }) {
   async function handleDeleteBlock(block) {
     setBlockDeleteModal({ open: true, block });
   }
+  
+  // Test block - Run full execution (video + platform blocks)
+  async function handleTestBlock(block) {
+    // Check if instance is selected in RecorderPanel
+    // For now, show alert - this will be connected to RecorderPanel later
+    alert(`ทดสอบ Block: ${block.name}\n\nกรุณาเลือก Instance ในส่วน Recorder แล้วกดทดสอบอีกครั้ง`);
+    console.log('🧪 Test block requested:', block);
+  }
 
   async function saveBlockEdit() {
     const { block } = blockEditModal;
@@ -1036,13 +1044,13 @@ function Dashboard({ keyData }) {
       </section>
       )}
 
-      {/* Available Blocks Section - Instances tab (View-only, no Edit/Delete) */}
+      {/* Available Blocks Section - Instances tab (View-only, Video blocks only) */}
       {activeTab === 'instances' && (
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-white font-semibold flex items-center gap-2">
             <Settings className="w-5 h-5 text-purple-400" />
-            Available Blocks ({blocks.length})
+            🎬 สร้างวีดีโอ Blocks ({blocks.filter(b => b.type !== 'platform').length})
           </h2>
           {selectedBlock && (
             <span className="text-sm text-purple-300 bg-purple-500/20 px-3 py-1 rounded-full">
@@ -1051,7 +1059,7 @@ function Dashboard({ keyData }) {
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          {blocks.map(block => (
+          {blocks.filter(b => b.type !== 'platform').map(block => (
             <div
               key={block.id}
               className="relative group"
@@ -1060,12 +1068,12 @@ function Dashboard({ keyData }) {
             >
               <button
                 onClick={() => setSelectedBlock(block)}
-                className={`w-full glass rounded-lg p-3 text-left transition hover:bg-white/20 ${
-                  selectedBlock?.id === block.id ? 'ring-2 ring-purple-500 bg-purple-500/10' : ''
+                className={`w-full rounded-lg p-3 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 ${
+                  selectedBlock?.id === block.id ? 'ring-2 ring-purple-500 bg-purple-500/30' : ''
                 }`}
               >
                 <p className="text-white text-sm font-medium truncate">{block.name}</p>
-                <p className="text-white/50 text-xs mt-1">{block.steps?.length || 0} steps</p>
+                <p className="text-purple-300/70 text-xs mt-1">{block.steps?.length || 0} steps</p>
               </button>
               
               {/* Tooltip with description (View-only) */}
@@ -1074,7 +1082,6 @@ function Dashboard({ keyData }) {
                   {block.description}
                 </div>
               )}
-              {/* No Edit/Delete buttons for User - View only */}
             </div>
           ))}
         </div>
@@ -1086,64 +1093,141 @@ function Dashboard({ keyData }) {
       </section>
       )}
 
-      {/* Available Blocks Section - Recorder tab (Admin with Edit/Delete) */}
+      {/* Available Blocks Section - Recorder tab (Admin with Edit/Delete) - 2 Column Layout */}
       {activeTab === 'recorder' && keyData?.isAdmin && (
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-white font-semibold flex items-center gap-2">
-            <Settings className="w-5 h-5 text-purple-400" />
-            Available Blocks ({blocks.length})
-          </h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          {blocks.map(block => (
-            <div
-              key={block.id}
-              className="relative group"
-              onMouseEnter={() => setHoveredBlockId(block.id)}
-              onMouseLeave={() => setHoveredBlockId(null)}
-            >
-              <div
-                className="w-full glass rounded-lg p-3 text-left transition hover:bg-white/20"
-              >
-                <p className="text-white text-sm font-medium truncate">{block.name}</p>
-                <p className="text-white/50 text-xs mt-1">{block.steps?.length || 0} steps</p>
-              </div>
-              
-              {/* Tooltip with description */}
-              {hoveredBlockId === block.id && block.description && (
-                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
-                  {block.description}
-                </div>
-              )}
-              
-              {/* Admin buttons (Edit/Delete) - Only in Recorder tab */}
-              {hoveredBlockId === block.id && (
-                <div className="absolute top-1 right-1 flex gap-1 z-10">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
-                    className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
-                    title="แก้ไข"
-                  >
-                    <Edit3 className="w-3 h-3 text-white" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
-                    className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
-                    title="ลบ"
-                  >
-                    <Trash2 className="w-3 h-3 text-white" />
-                  </button>
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left Column: Video Blocks */}
+          <div className="glass rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">🎬</span>
+              <h3 className="text-white font-semibold">สร้างวีดีโอ ({blocks.filter(b => b.type !== 'platform').length})</h3>
             </div>
-          ))}
-        </div>
-        {blocks.length === 0 && (
-          <div className="text-center py-4 text-white/30 glass rounded-xl">
-            ไม่พบ Blocks
+            <div className="grid grid-cols-2 gap-2">
+              {blocks.filter(b => b.type !== 'platform').map(block => (
+                <div
+                  key={block.id}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredBlockId(block.id)}
+                  onMouseLeave={() => setHoveredBlockId(null)}
+                >
+                  <div className="w-full rounded-lg p-3 text-left transition bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30">
+                    <p className="text-white text-sm font-medium truncate">{block.name}</p>
+                    <p className="text-purple-300/70 text-xs mt-1">{block.steps?.length || 0} steps</p>
+                  </div>
+                  
+                  {hoveredBlockId === block.id && block.description && (
+                    <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
+                      {block.description}
+                    </div>
+                  )}
+                  
+                  {hoveredBlockId === block.id && (
+                    <div className="absolute top-1 right-1 flex gap-1 z-10">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
+                        className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
+                        title="ทดสอบ"
+                      >
+                        <Play className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
+                        className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
+                        title="แก้ไข"
+                      >
+                        <Edit3 className="w-3 h-3 text-white" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
+                        className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
+                        title="ลบ"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {blocks.filter(b => b.type !== 'platform').length === 0 && (
+              <div className="text-center py-4 text-white/30">ไม่พบ Blocks สร้างวีดีโอ</div>
+            )}
           </div>
-        )}
+          
+          {/* Right Column: Platform Blocks */}
+          <div className="glass rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">📤</span>
+              <h3 className="text-white font-semibold">Platform Blocks ({blocks.filter(b => b.type === 'platform').length})</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {blocks.filter(b => b.type === 'platform').map(block => {
+                const platformColors = {
+                  youtube: 'bg-red-600/20 border-red-500/50 hover:bg-red-600/30',
+                  tiktok: 'bg-black/50 border-white/20 hover:bg-black/70',
+                  facebook: 'bg-blue-600/20 border-blue-500/50 hover:bg-blue-600/30',
+                  instagram: 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-pink-500/50 hover:from-purple-600/30 hover:to-pink-600/30'
+                };
+                const platformIcons = { youtube: '▶️', tiktok: '🎵', facebook: '📘', instagram: '📷' };
+                const colorClass = platformColors[block.platform] || 'bg-white/10 border-white/20';
+                const icon = platformIcons[block.platform] || '📤';
+                
+                return (
+                  <div
+                    key={block.id}
+                    className="relative group"
+                    onMouseEnter={() => setHoveredBlockId(block.id)}
+                    onMouseLeave={() => setHoveredBlockId(null)}
+                  >
+                    <div className={`w-full rounded-lg p-3 text-left transition border ${colorClass}`}>
+                      <div className="flex items-center gap-2">
+                        <span>{icon}</span>
+                        <p className="text-white text-sm font-medium truncate">{block.name}</p>
+                      </div>
+                      <p className="text-white/50 text-xs mt-1">{block.steps?.length || 0} steps</p>
+                    </div>
+                    
+                    {hoveredBlockId === block.id && block.description && (
+                      <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-50 text-xs text-white/80">
+                        {block.description}
+                      </div>
+                    )}
+                    
+                    {hoveredBlockId === block.id && (
+                      <div className="absolute top-1 right-1 flex gap-1 z-10">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleTestBlock(block); }}
+                          className="p-1.5 bg-green-500/80 hover:bg-green-500 rounded-md transition"
+                          title="ทดสอบ"
+                        >
+                          <Play className="w-3 h-3 text-white" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEditBlock(block); }}
+                          className="p-1.5 bg-blue-500/80 hover:bg-blue-500 rounded-md transition"
+                          title="แก้ไข"
+                        >
+                          <Edit3 className="w-3 h-3 text-white" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block); }}
+                          className="p-1.5 bg-red-500/80 hover:bg-red-500 rounded-md transition"
+                          title="ลบ"
+                        >
+                          <Trash2 className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {blocks.filter(b => b.type === 'platform').length === 0 && (
+              <div className="text-center py-4 text-white/30">ไม่พบ Platform Blocks</div>
+            )}
+          </div>
+        </div>
       </section>
       )}
 

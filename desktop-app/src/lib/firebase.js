@@ -449,6 +449,7 @@ export async function fetchInstanceSettings(userId) {
 
 /**
  * Create a new block in global_recipe_blocks
+ * @param {Object} blockData - Block data with name, description, steps, type, platform, startUrl
  */
 export async function createBlock(blockData) {
   try {
@@ -460,6 +461,9 @@ export async function createBlock(blockData) {
       name: toFirestoreValue(blockData.name),
       description: toFirestoreValue(blockData.description || ''),
       steps: toFirestoreValue(blockData.steps || []),
+      type: toFirestoreValue(blockData.type || 'video'),
+      platform: toFirestoreValue(blockData.platform || null),
+      startUrl: toFirestoreValue(blockData.startUrl || ''),
       createdAt: toFirestoreValue(new Date()),
       createdBy: toFirestoreValue(blockData.createdBy || 'admin')
     };
@@ -483,6 +487,44 @@ export async function createBlock(blockData) {
   }
 }
 
+/**
+ * Update an existing block in global_recipe_blocks
+ * @param {string} blockId - The ID of the block to update
+ * @param {Object} blockData - Updated block data
+ */
+export async function updateBlock(blockId, blockData) {
+  try {
+    const url = `${FIRESTORE_BASE}/global_recipe_blocks/${blockId}?key=${API_KEY}`;
+    
+    const fields = {
+      name: toFirestoreValue(blockData.name),
+      description: toFirestoreValue(blockData.description || ''),
+      steps: toFirestoreValue(blockData.steps || []),
+      type: toFirestoreValue(blockData.type || 'video'),
+      platform: toFirestoreValue(blockData.platform || null),
+      startUrl: toFirestoreValue(blockData.startUrl || ''),
+      updatedAt: toFirestoreValue(new Date())
+    };
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to update block');
+    }
+    
+    console.log('✅ Block updated:', blockId);
+    return { success: true, blockId };
+  } catch (error) {
+    console.error('updateBlock error:', error);
+    throw error;
+  }
+}
+
 export default {
   fetchProjects,
   fetchBlocks,
@@ -497,5 +539,6 @@ export default {
   deleteUserBlock,
   saveInstanceSettings,
   fetchInstanceSettings,
-  createBlock
+  createBlock,
+  updateBlock
 };
