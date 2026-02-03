@@ -6,6 +6,9 @@ const fs = require('fs');
 // Store active browser instances
 const instances = new Map();
 
+// Store debug selector context (to close before opening new one)
+let debugContext = null;
+
 // Profile directory
 const PROFILES_DIR = path.join(process.cwd(), 'profiles');
 
@@ -301,18 +304,29 @@ function initPlaywrightBridge(mainWindow) {
       return { success: false, error: 'URL จำเป็นต้องระบุ' };
     }
 
+    // Close existing debug context if open (to avoid profile lock)
+    if (debugContext) {
+      try {
+        await debugContext.close();
+        console.log('🔄 Closed previous debug context');
+      } catch (e) {
+        console.log('⚠️ Previous context already closed');
+      }
+      debugContext = null;
+    }
+
     // Use persistent context to remember login state
     const profilePath = path.join(process.cwd(), 'profiles', 'debug-selector');
     
     try {
       // Launch with persistent context (remembers cookies, login, etc.)
-      const context = await chromium.launchPersistentContext(profilePath, {
+      debugContext = await chromium.launchPersistentContext(profilePath, {
         headless: false,
         args: ['--start-maximized'],
         viewport: null
       });
       
-      const page = context.pages()[0] || await context.newPage();
+      const page = debugContext.pages()[0] || await debugContext.newPage();
       
       // Navigate to URL
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
