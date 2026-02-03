@@ -291,6 +291,102 @@ function initPlaywrightBridge(mainWindow) {
     }
   });
 
+  // ============================================
+  // Debug Selector - Human Simulation
+  // ============================================
+  ipcMain.handle('playwright:debug-selector', async (event, { instanceId, selector, action, text }) => {
+    console.log(`🔍 Debug Selector: ${action} on "${selector}" (instance: ${instanceId})`);
+    
+    const instance = instances.get(instanceId);
+    if (!instance) {
+      return { success: false, error: 'Instance not found' };
+    }
+
+    const page = instance.page;
+
+    try {
+      // Check if element exists
+      const elementHandle = await page.$(selector);
+      if (!elementHandle) {
+        return { success: false, error: `Element not found: ${selector}` };
+      }
+
+      // Get element info
+      const elementInfo = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        return {
+          tagName: el.tagName.toLowerCase(),
+          id: el.id || null,
+          className: el.className || null,
+          innerText: el.innerText?.substring(0, 100) || null
+        };
+      }, selector);
+
+      // Highlight element
+      await highlightElement(page, selector, 2000);
+
+      switch (action) {
+        case 'hover':
+          // Human-like hover: move mouse to element with realistic movement
+          await page.hover(selector);
+          await page.waitForTimeout(300);
+          // Trigger additional mouse events
+          await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (el) {
+              el.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+              el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+              el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+            }
+          }, selector);
+          break;
+
+        case 'click':
+          // Human-like click: hover first, then click with proper events
+          await page.hover(selector);
+          await page.waitForTimeout(100 + Math.random() * 200);
+          await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (el) {
+              el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+              el.focus();
+              el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+              el.click();
+            }
+          }, selector);
+          break;
+
+        case 'type':
+          // Human-like typing: click first, then type character by character
+          await page.click(selector);
+          await page.waitForTimeout(100);
+          
+          if (text) {
+            for (const char of text) {
+              await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
+            }
+            // Trigger input/change events
+            await page.evaluate((sel) => {
+              const el = document.querySelector(sel);
+              if (el) {
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }, selector);
+          }
+          break;
+
+        default:
+          return { success: false, error: `Unknown action: ${action}` };
+      }
+
+      return { success: true, action, elementInfo };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
   console.log('✅ Playwright Bridge initialized');
 }
 

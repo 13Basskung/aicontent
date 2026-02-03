@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     closeInstance: (instanceId) => ipcRenderer.invoke('playwright:close', instanceId),
     runBlock: (instanceId, block, variables) => ipcRenderer.invoke('playwright:run-block', { instanceId, block, variables }),
     getInstances: () => ipcRenderer.invoke('playwright:get-instances'),
+    debugSelector: (params) => ipcRenderer.invoke('playwright:debug-selector', params),
     onInstanceStatus: (callback) => {
       ipcRenderer.on('playwright:status', (event, data) => callback(data));
     }

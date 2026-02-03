@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { 
   Circle, Square, Play, Trash2, Save, 
   MousePointer, Type, ChevronDown, Plus, 
@@ -54,11 +54,33 @@ const ACTION_ICONS = {
   loop_end: Square
 };
 
-function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, blockToEdit, onBlockEditComplete }) {
+const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, blockToEdit, onBlockEditComplete }, ref) {
   const [isRecording, setIsRecording] = useState(false);
   const [steps, setSteps] = useState([]);
   const [startUrl, setStartUrl] = useState('https://www.google.com');
   const [selectedInstance, setSelectedInstance] = useState(null);
+  
+  // State for Debug Selector shoot
+  const [shootedOptionSelector, setShootedOptionSelector] = useState(null);
+  
+  // Expose functions to parent via ref (for Debug Selector)
+  useImperativeHandle(ref, () => ({
+    addStepFromDebug: (step) => {
+      const newStep = {
+        id: Date.now(),
+        action: step.action,
+        selector: step.selector || '',
+        value: step.value || '',
+        modifiers: step.modifiers || { preActions: [], postActions: [] }
+      };
+      setSteps(prev => [...prev, newStep]);
+      console.log('🎯 Step added from Debug:', newStep);
+    },
+    setOptionSelector: (selector) => {
+      setShootedOptionSelector(selector);
+      console.log('🎯 Option selector set:', selector);
+    }
+  }));
   
   // Notify parent when instance changes
   useEffect(() => {
@@ -100,6 +122,27 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
   const [showEditModePopup, setShowEditModePopup] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [showModifiersModal, setShowModifiersModal] = useState(null); // index of step being configured
+  
+  // Apply shooted selector to wait_progress option when set
+  useEffect(() => {
+    if (shootedOptionSelector && showModifiersModal !== null) {
+      const newSteps = [...steps];
+      const step = newSteps[showModifiersModal];
+      if (step) {
+        if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+        let progressAction = step.modifiers.postActions?.find(a => a.type === 'wait_progress');
+        if (!progressAction) {
+          progressAction = { type: 'wait_progress', selector: shootedOptionSelector, order: 3 };
+          step.modifiers.postActions = [...(step.modifiers.postActions || []), progressAction];
+        } else {
+          progressAction.selector = shootedOptionSelector;
+        }
+        setSteps(newSteps);
+        console.log('🎯 Applied shooted selector to wait_progress:', shootedOptionSelector);
+      }
+      setShootedOptionSelector(null);
+    }
+  }, [shootedOptionSelector, showModifiersModal]);
   
   // Drag and drop handlers for reordering steps
   function handleDragStart(e, index) {
@@ -968,6 +1011,6 @@ function RecorderPanel({ keyData, instances, onBlockCreated, onInstanceSelect, b
       )}
     </div>
   );
-}
+});
 
 export default RecorderPanel;

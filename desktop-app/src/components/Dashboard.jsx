@@ -8,6 +8,7 @@ import {
 import SchedulerPanel from './SchedulerPanel';
 import RecorderPanel from './RecorderPanel';
 import ExecutionLogTable from './ExecutionLogTable';
+import DebugSelectorPanel from './DebugSelectorPanel';
 import { saveExecutionLog } from '../lib/firebase';
 
 // Platform definitions (FB, YT, TikTok, IG)
@@ -69,6 +70,9 @@ function Dashboard({ keyData }) {
   
   // Block to edit in RecorderPanel
   const [blockToEdit, setBlockToEdit] = useState(null);
+  
+  // Ref to RecorderPanel for Debug Selector shoot
+  const recorderPanelRef = useRef(null);
   
   // Block execution result modal
   const [blockResultModal, setBlockResultModal] = useState({
@@ -746,6 +750,19 @@ function Dashboard({ keyData }) {
             Recorder
           </button>
         )}
+        {keyData?.isAdmin && (
+          <button
+            onClick={() => setActiveTab('debug')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
+              activeTab === 'debug' 
+                ? 'bg-white/10 text-white' 
+                : 'text-white/50 hover:text-white/70'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            Debug
+          </button>
+        )}
       </div>
 
       {/* Tab Content: Scheduler */}
@@ -762,6 +779,30 @@ function Dashboard({ keyData }) {
           onInstanceSelect={setRecorderSelectedInstance}
           blockToEdit={blockToEdit}
           onBlockEditComplete={() => setBlockToEdit(null)}
+          ref={recorderPanelRef}
+        />
+      )}
+
+      {/* Tab Content: Debug Selector (Admin only) */}
+      {activeTab === 'debug' && keyData?.isAdmin && (
+        <DebugSelectorPanel 
+          instances={instances}
+          onShootToAction={(step) => {
+            // Switch to Recorder tab and add step
+            if (recorderPanelRef.current?.addStepFromDebug) {
+              recorderPanelRef.current.addStepFromDebug(step);
+            }
+            setActiveTab('recorder');
+            showToast(`เพิ่ม Step "${step.action}" สำเร็จ!`, 'success');
+          }}
+          onShootToOption={(selector) => {
+            // Switch to Recorder tab and set option selector
+            if (recorderPanelRef.current?.setOptionSelector) {
+              recorderPanelRef.current.setOptionSelector(selector);
+            }
+            setActiveTab('recorder');
+            showToast(`Shoot selector to Option สำเร็จ!`, 'success');
+          }}
         />
       )}
 
