@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
@@ -56,6 +56,11 @@ function createWindow() {
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    
+    // ✅ Register F12 shortcut to open DevTools (works in production too)
+    globalShortcut.register('F12', () => {
+      mainWindow.webContents.toggleDevTools();
+    });
     
     // Initialize Playwright Bridge
     initPlaywrightBridge(mainWindow);
