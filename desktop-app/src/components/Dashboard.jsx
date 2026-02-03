@@ -163,14 +163,26 @@ function Dashboard({ keyData }) {
     const project = projects.find(p => p.id === projectId);
     const expander = expanderCache[projectId];
     
+    console.log(`🔍 getScenesInfo for "${project?.name}":`, {
+      expanderId: project?.expanderId,
+      hasExpander: !!expander,
+      expanderScenes: expander?.scenesCount,
+      slotsCount: slots?.length,
+      firstSlot: slots?.[0]
+    });
+    
     // ✅ Priority 1: Expander cache (source of truth)
     if (expander?.scenesCount) {
       const sceneDuration = slots?.[0]?.sceneDuration || 8;
+      console.log(`✅ Using Expander: scenes=${expander.scenesCount}, duration=${sceneDuration}`);
       return { scenes: expander.scenesCount, sceneDuration };
     }
     
     // ✅ Priority 2: Fallback to slots if no expander
-    if (!slots || slots.length === 0) return { scenes: 0, sceneDuration: 0 };
+    if (!slots || slots.length === 0) {
+      console.log(`⚠️ No slots found`);
+      return { scenes: 0, sceneDuration: 0 };
+    }
     
     let maxScenes = 0;
     let sceneDuration = 0;
@@ -180,6 +192,7 @@ function Dashboard({ keyData }) {
       if (!sceneDuration && slot.sceneDuration) sceneDuration = slot.sceneDuration;
     });
     
+    console.log(`📊 Using slots: scenes=${maxScenes}, duration=${sceneDuration}`);
     return { scenes: maxScenes, sceneDuration: sceneDuration || 8 };
   }
   
