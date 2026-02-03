@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Check, X, Target, Zap, ChevronDown, ChevronUp, ExternalLink,
-  Play, Layers, Settings2, Save
+  Play, Layers, Settings2, Save, MousePointer, Hand
 } from 'lucide-react';
 
 const EMOJI_OPTIONS = [
@@ -46,6 +46,7 @@ function DebugSelectorPanel({
   
   // Test Result
   const [result, setResult] = useState(null);
+  const [testing, setTesting] = useState(false);
 
   // Save URLs to localStorage when changed
   useEffect(() => {
@@ -98,6 +99,41 @@ function DebugSelectorPanel({
     const newSavedUrls = savedUrls.filter(u => u !== urlToDelete);
     setSavedUrls(newSavedUrls);
     localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(newSavedUrls));
+  };
+
+  // Test Selector (Hover or Click) - uses URL to open browser and test
+  const handleTest = async (testType) => {
+    if (!selector.trim()) {
+      setResult({ success: false, error: 'กรุณาใส่ Selector' });
+      return;
+    }
+    if (!testUrl || testUrl === 'https://') {
+      setResult({ success: false, error: 'กรุณาใส่ URL' });
+      return;
+    }
+
+    setTesting(true);
+    setResult(null);
+
+    try {
+      const response = await window.electronAPI.playwright.debugSelector({
+        url: testUrl,
+        selector: selector.trim(),
+        action: testType,
+        text: value
+      });
+
+      setResult({
+        success: response.success,
+        message: response.success 
+          ? `${testType === 'hover' ? 'Hover' : 'Human Click'} สำเร็จ! ${response.elementInfo ? `(${response.elementInfo.tagName})` : ''}` 
+          : response.error
+      });
+    } catch (error) {
+      setResult({ success: false, error: error.message });
+    }
+
+    setTesting(false);
   };
 
   // Build step object
@@ -256,6 +292,26 @@ function DebugSelectorPanel({
             SAVE
           </button>
         </div>
+      </div>
+
+      {/* Test Buttons: Hover & Human Click */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => handleTest('hover')}
+          disabled={testing || !selector.trim() || !testUrl || testUrl === 'https://'}
+          className="flex-1 px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <MousePointer className="w-5 h-5" />
+          {testing ? 'กำลังทดสอบ...' : 'Hover'}
+        </button>
+        <button
+          onClick={() => handleTest('click')}
+          disabled={testing || !selector.trim() || !testUrl || testUrl === 'https://'}
+          className="flex-1 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-green-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <Hand className="w-5 h-5" />
+          {testing ? 'กำลังทดสอบ...' : 'Human Click'}
+        </button>
       </div>
 
       {/* Action Name + Emoji */}

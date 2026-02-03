@@ -292,22 +292,34 @@ function initPlaywrightBridge(mainWindow) {
   });
 
   // ============================================
-  // Debug Selector - Human Simulation
+  // Debug Selector - Human Simulation (uses URL, not Instance)
   // ============================================
-  ipcMain.handle('playwright:debug-selector', async (event, { instanceId, selector, action, text }) => {
-    console.log(`🔍 Debug Selector: ${action} on "${selector}" (instance: ${instanceId})`);
+  ipcMain.handle('playwright:debug-selector', async (event, { url, selector, action, text }) => {
+    console.log(`🔍 Debug Selector: ${action} on "${selector}" (URL: ${url})`);
     
-    const instance = instances.get(instanceId);
-    if (!instance) {
-      return { success: false, error: 'Instance not found' };
+    if (!url || !selector) {
+      return { success: false, error: 'URL และ Selector จำเป็นต้องระบุ' };
     }
 
-    const page = instance.page;
-
+    let browser = null;
+    let page = null;
+    
     try {
+      // Launch temporary browser for testing
+      browser = await chromium.launch({ 
+        headless: false,
+        args: ['--start-maximized']
+      });
+      const context = await browser.newContext({ viewport: null });
+      page = await context.newPage();
+      
+      // Navigate to URL
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
       // Check if element exists
       const elementHandle = await page.$(selector);
       if (!elementHandle) {
+        await browser.close();
         return { success: false, error: `Element not found: ${selector}` };
       }
 
@@ -328,10 +340,9 @@ function initPlaywrightBridge(mainWindow) {
 
       switch (action) {
         case 'hover':
-          // Human-like hover: move mouse to element with realistic movement
+          // Human-like hover
           await page.hover(selector);
-          await page.waitForTimeout(300);
-          // Trigger additional mouse events
+          await page.waitForTimeout(500);
           await page.evaluate((sel) => {
             const el = document.querySelector(sel);
             if (el) {
@@ -343,7 +354,7 @@ function initPlaywrightBridge(mainWindow) {
           break;
 
         case 'click':
-          // Human-like click: hover first, then click with proper events
+          // Human-like click
           await page.hover(selector);
           await page.waitForTimeout(100 + Math.random() * 200);
           await page.evaluate((sel) => {
@@ -357,32 +368,18 @@ function initPlaywrightBridge(mainWindow) {
           }, selector);
           break;
 
-        case 'type':
-          // Human-like typing: click first, then type character by character
-          await page.click(selector);
-          await page.waitForTimeout(100);
-          
-          if (text) {
-            for (const char of text) {
-              await page.keyboard.type(char, { delay: 50 + Math.random() * 100 });
-            }
-            // Trigger input/change events
-            await page.evaluate((sel) => {
-              const el = document.querySelector(sel);
-              if (el) {
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }, selector);
-          }
-          break;
-
         default:
+          await browser.close();
           return { success: false, error: `Unknown action: ${action}` };
       }
 
+      // Wait a bit to show result, then close browser
+      await page.waitForTimeout(2000);
+      await browser.close();
+
       return { success: true, action, elementInfo };
     } catch (error) {
+      if (browser) await browser.close();
       return { success: false, error: error.message };
     }
   });
