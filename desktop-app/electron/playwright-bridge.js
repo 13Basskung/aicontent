@@ -292,92 +292,86 @@ function initPlaywrightBridge(mainWindow) {
   });
 
   // ============================================
-  // Debug Selector - Human Simulation (uses URL, not Instance)
+  // Debug Selector - Uses Persistent Context to remember login
   // ============================================
   ipcMain.handle('playwright:debug-selector', async (event, { url, selector, action, text }) => {
     console.log(`🔍 Debug Selector: ${action} on "${selector}" (URL: ${url})`);
     
-    if (!url || !selector) {
-      return { success: false, error: 'URL และ Selector จำเป็นต้องระบุ' };
+    if (!url) {
+      return { success: false, error: 'URL จำเป็นต้องระบุ' };
     }
 
-    let browser = null;
-    let page = null;
+    // Use persistent context to remember login state
+    const profilePath = path.join(process.cwd(), 'profiles', 'debug-selector');
     
     try {
-      // Launch temporary browser for testing
-      browser = await chromium.launch({ 
+      // Launch with persistent context (remembers cookies, login, etc.)
+      const context = await chromium.launchPersistentContext(profilePath, {
         headless: false,
-        args: ['--start-maximized']
+        args: ['--start-maximized'],
+        viewport: null
       });
-      const context = await browser.newContext({ viewport: null });
-      page = await context.newPage();
       
-      // Navigate to URL and wait for page to fully load
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+      const page = context.pages()[0] || await context.newPage();
+      
+      // Navigate to URL
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-      // Wait for element to appear (with timeout)
+      // If no selector provided, just open browser for user to explore
+      if (!selector || !selector.trim()) {
+        return { success: true, message: 'Browser เปิดแล้ว - Login และหา Selector ได้เลย (จะจำ Login ไว้ใช้ครั้งหน้า)' };
+      }
+
+      // Wait for element to appear
       try {
-        await page.waitForSelector(selector, { timeout: 15000 });
+        await page.waitForSelector(selector, { timeout: 10000 });
       } catch (e) {
-        // Don't close browser - let user login or interact manually
-        return { success: false, error: `Element not found: ${selector} (รอ 15 วินาทีแล้ว - Browser ยังเปิดอยู่ให้ Login หรือทดสอบเอง)` };
+        return { success: false, error: `Element not found: ${selector} (Browser ยังเปิดอยู่ - ลอง Login หรือหา Selector ใหม่)` };
       }
 
       // Get element info
       const elementInfo = await page.evaluate((sel) => {
         const el = document.querySelector(sel);
         if (!el) return null;
+        const rect = el.getBoundingClientRect();
         return {
           tagName: el.tagName.toLowerCase(),
           id: el.id || null,
           className: el.className || null,
-          innerText: el.innerText?.substring(0, 100) || null
+          innerText: el.innerText?.substring(0, 50) || null,
+          size: `${Math.round(rect.width)} x ${Math.round(rect.height)}`
         };
       }, selector);
 
       // Highlight element
       await highlightElement(page, selector, 3000);
 
-      switch (action) {
-        case 'hover':
-          // Human-like hover
-          await page.hover(selector);
-          await page.waitForTimeout(500);
-          await page.evaluate((sel) => {
-            const el = document.querySelector(sel);
-            if (el) {
-              el.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-              el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-              el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-            }
-          }, selector);
-          break;
-
-        case 'click':
-          // Human-like click
-          await page.hover(selector);
-          await page.waitForTimeout(100 + Math.random() * 200);
-          await page.evaluate((sel) => {
-            const el = document.querySelector(sel);
-            if (el) {
-              el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-              el.focus();
-              el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-              el.click();
-            }
-          }, selector);
-          break;
-
-        default:
-          return { success: false, error: `Unknown action: ${action}` };
+      if (action === 'hover') {
+        // Hover = just highlight and show info (user can inspect with DevTools)
+        await page.hover(selector);
+        return { 
+          success: true, 
+          action: 'hover',
+          elementInfo, 
+          message: `พบ Element: <${elementInfo?.tagName}> ${elementInfo?.size} - Browser ยังเปิดอยู่` 
+        };
       }
 
-      // DON'T close browser - let user interact manually
-      // User will close it when done
-      return { success: true, action, elementInfo, message: 'Browser ยังเปิดอยู่ - ปิดเองเมื่อเสร็จแล้ว' };
+      if (action === 'click') {
+        // Human Click = actually click the element
+        await page.hover(selector);
+        await page.waitForTimeout(100 + Math.random() * 150);
+        await page.click(selector);
+        return { 
+          success: true, 
+          action: 'click',
+          elementInfo, 
+          message: `คลิก <${elementInfo?.tagName}> แล้ว - Browser ยังเปิดอยู่` 
+        };
+      }
+
+      return { success: true, elementInfo, message: 'Browser ยังเปิดอยู่' };
     } catch (error) {
-      // DON'T close browser on error - let user debug
       return { success: false, error: error.message };
     }
   });
