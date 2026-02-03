@@ -17,6 +17,12 @@ service firebase.storage {
       allow read, write: if isOwner(userId);
     }
     
+    // Expander thumbnails - user can upload their own, anyone can read
+    match /expanders/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+    
     // Error screenshots (admin can read)
     match /errors/{allPaths=**} {
       allow read: if isAuthenticated();

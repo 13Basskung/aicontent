@@ -168,7 +168,9 @@ const ExpanderCreator = () => {
     const [testing, setTesting] = useState(false);
     const [testPrompt, setTestPrompt] = useState('บาสและออยลี่นั่งคุยกันที่ร้านกาแฟ');
     const [testResult, setTestResult] = useState('');
+    const [structuredResult, setStructuredResult] = useState(null); // Structured prompts from API
     const [copied, setCopied] = useState(false);
+    const [copiedIndex, setCopiedIndex] = useState(null); // Track which prompt was copied
     const [savedExpanders, setSavedExpanders] = useState([]);
     const [editingExpander, setEditingExpander] = useState(null);
     
@@ -935,16 +937,19 @@ const ExpanderCreator = () => {
                 // เพิ่ม source: 'created' เพื่อแยกจาก Expander ที่ซื้อมา
                 expanderData.source = 'created';
                 
-                // Create new expander first to get ID
-                docRef = await addDoc(collection(db, 'users', user.uid, 'expanders'), expanderData);
+                // Generate unique ID for thumbnail upload
+                const tempId = `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 
-                // Upload thumbnail if selected
+                // Upload thumbnail FIRST if selected
                 if (thumbnailFile) {
-                    const thumbnailUrl = await uploadThumbnail(docRef.id);
+                    const thumbnailUrl = await uploadThumbnail(tempId);
                     if (thumbnailUrl) {
-                        await updateDoc(docRef, { thumbnail: thumbnailUrl });
+                        expanderData.thumbnail = thumbnailUrl;
                     }
                 }
+                
+                // Create new expander with thumbnail URL included
+                docRef = await addDoc(collection(db, 'users', user.uid, 'expanders'), expanderData);
             }
             
             await loadExpanders();
@@ -981,18 +986,21 @@ const ExpanderCreator = () => {
         
         setTesting(true);
         setTestResult('');
+        setStructuredResult(null);
         
         try {
             const expandPrompt = httpsCallable(functions, 'expandPromptWithInstructions');
             const result = await expandPrompt({
-                userInput: testPrompt,
+                simplePrompt: testPrompt,
                 instructions: expanderInstructions
             });
             
             setTestResult(result.data.expandedPrompt);
+            setStructuredResult(result.data.structured || null);
         } catch (error) {
             console.error('Error testing expander:', error);
             setTestResult('เกิดข้อผิดพลาด: ' + error.message);
+            setStructuredResult(null);
         } finally {
             setTesting(false);
         }
@@ -1311,6 +1319,36 @@ const ExpanderCreator = () => {
             setTimeout(() => setCopied(false), 2000);
         } catch (error) {
             console.error('Copy failed:', error);
+        }
+    };
+    
+    // Copy individual prompt from structured result
+    const handleCopyIndividualPrompt = async (promptData, index) => {
+        let textToCopy = '';
+        if (promptData.type === 'image') {
+            textToCopy = promptData.prompt;
+        } else if (promptData.type === 'video') {
+            textToCopy = `Action: ${promptData.action}\nScript: "${promptData.script}"\nTechnical: ${promptData.technical}\nAudio: ${promptData.audio}`;
+        } else if (promptData.type === 'social') {
+            textToCopy = `${promptData.description}\n\n${promptData.hashtags?.join(' ') || ''}`;
+        }
+        
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            setCopiedIndex(index);
+            setTimeout(() => setCopiedIndex(null), 2000);
+        } catch (error) {
+            console.error('Copy failed:', error);
+        }
+    };
+    
+    // Get icon and color for prompt type
+    const getPromptTypeStyle = (type) => {
+        switch (type) {
+            case 'image': return { icon: '🖼️', color: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/30' };
+            case 'video': return { icon: '🎬', color: 'from-purple-500/20 to-pink-500/20', border: 'border-purple-500/30' };
+            case 'social': return { icon: '#️⃣', color: 'from-green-500/20 to-emerald-500/20', border: 'border-green-500/30' };
+            default: return { icon: '📝', color: 'from-slate-500/20 to-slate-600/20', border: 'border-slate-500/30' };
         }
     };
     
@@ -1856,7 +1894,82 @@ Output: ให้แสดงผล 5 Prompts...
                                         className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-sm"
                                     />
                                 </div>
-                                {testResult && (
+                                {/* Structured Result Display */}
+                                {structuredResult?.prompts && structuredResult.prompts.length > 0 ? (
+                                    <div className="space-y-2 max-h-80 overflow-y-auto">
+                                        {/* Copy All Button */}
+                                        <div className="flex justify-end mb-2">
+                                            <button
+                                                onClick={handleCopyPrompt}
+                                                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-white text-xs font-bold flex items-center gap-1.5"
+                                            >
+                                                {copied ? <Check size={12} /> : <Copy size={12} />}
+                                                {copied ? 'Copied!' : 'Copy All'}
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Individual Prompt Cards */}
+                                        {structuredResult.prompts.map((p, idx) => {
+                                            const style = getPromptTypeStyle(p.type);
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`bg-gradient-to-br ${style.color} border ${style.border} rounded-xl p-3 relative group`}
+                                                >
+                                                    {/* Header */}
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-lg">{style.icon}</span>
+                                                            <span className="text-white font-semibold text-sm">
+                                                                {p.type === 'social' ? 'Social' : `Prompt ${p.index}`}: {p.title}
+                                                            </span>
+                                                            {p.duration && (
+                                                                <span className="bg-white/10 px-2 py-0.5 rounded text-xs text-slate-300">
+                                                                    {p.duration}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleCopyIndividualPrompt(p, idx)}
+                                                            className="opacity-0 group-hover:opacity-100 p-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-opacity"
+                                                            title="Copy this prompt"
+                                                        >
+                                                            {copiedIndex === idx ? <Check size={12} /> : <Copy size={12} />}
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    {/* Content based on type */}
+                                                    {p.type === 'image' && (
+                                                        <p className="text-slate-200 text-xs leading-relaxed">{p.prompt}</p>
+                                                    )}
+                                                    
+                                                    {p.type === 'video' && (
+                                                        <div className="space-y-1.5 text-xs">
+                                                            <p className="text-slate-300"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
+                                                            <p className="text-slate-300"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
+                                                            <p className="text-slate-300"><span className="text-purple-400 font-medium">Technical:</span> {p.technical}</p>
+                                                            <p className="text-slate-300"><span className="text-pink-400 font-medium">Audio:</span> {p.audio}</p>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {p.type === 'social' && (
+                                                        <div className="space-y-2 text-xs">
+                                                            <p className="text-slate-200">{p.description}</p>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {p.hashtags?.map((tag, i) => (
+                                                                    <span key={i} className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-xs">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : testResult && (
+                                    /* Fallback: Plain text display */
                                     <div className="bg-black/30 border border-white/10 rounded-lg p-3 relative max-h-40 overflow-y-auto">
                                         <button
                                             onClick={handleCopyPrompt}

@@ -2323,8 +2323,9 @@ Return ONLY the expanded prompt, no explanations.`;
   });
 
 // Function: Expand Prompt with Custom Instructions (Gemini Gems Style)
+// Returns structured JSON with separate prompts for image, video scenes, and social
 exports.expandPromptWithInstructions = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60 })
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 120 })
   .https.onCall(async (data, context) => {
     const { simplePrompt, instructions } = data;
 
@@ -2337,7 +2338,7 @@ exports.expandPromptWithInstructions = functions
 
       const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
 
-Your job is to expand a simple prompt into a detailed, cinematic prompt.
+Your job is to expand a simple prompt into detailed, cinematic prompts.
 
 === CUSTOM INSTRUCTIONS (User-defined rules for this Expander) ===
 ${instructions}
@@ -2347,25 +2348,89 @@ ${instructions}
 2. For Thai names, include original in parentheses: "Bas (บาส)"
 3. Include: character descriptions, emotions, lighting, camera angles, ambient sounds
 4. Be cinematic and detailed
-5. Keep it under 500 words
-6. Follow ALL the custom instructions above strictly
+5. Follow ALL the custom instructions above strictly
 
-=== FORMAT ===
-Return ONLY the expanded prompt, no explanations.`;
+=== CRITICAL: OUTPUT FORMAT (MUST BE VALID JSON) ===
+You MUST return a valid JSON object with this exact structure:
+
+{
+  "prompts": [
+    {
+      "index": 1,
+      "type": "image",
+      "title": "Master Image (ภาพนิ่ง)",
+      "prompt": "Full detailed prompt for generating the master image..."
+    },
+    {
+      "index": 2,
+      "type": "video",
+      "title": "Scene title here",
+      "duration": "8 seconds",
+      "action": "What happens in this scene",
+      "script": "Character dialogue/narration",
+      "technical": "Camera angles, effects",
+      "audio": "Voice style, sound effects"
+    },
+    ... more video scenes as needed based on instructions ...
+    {
+      "index": "last",
+      "type": "social",
+      "title": "Social Media",
+      "description": "Post description",
+      "hashtags": ["#hashtag1", "#hashtag2", ...]
+    }
+  ]
+}
+
+RULES:
+- First prompt (index 1) is ALWAYS type "image"
+- Last prompt is ALWAYS type "social" with hashtags
+- Middle prompts are type "video" (number of scenes depends on instructions)
+- Return ONLY valid JSON, no markdown, no explanations, no code blocks`;
 
       const response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Expand this prompt: "${simplePrompt}"` }
+          { role: 'user', content: `Expand this prompt into structured JSON: "${simplePrompt}"` }
         ],
         temperature: 0.8,
-        max_tokens: 1000
+        max_tokens: 3000,
+        response_format: { type: 'json_object' }
       });
 
-      const expandedPrompt = response.choices[0].message.content.trim();
+      const rawContent = response.choices[0].message.content.trim();
+      
+      // Parse JSON response
+      let structuredPrompts;
+      try {
+        structuredPrompts = JSON.parse(rawContent);
+      } catch (parseError) {
+        console.error('Failed to parse JSON:', rawContent);
+        // Fallback: return as plain text
+        return { 
+          expandedPrompt: rawContent,
+          structured: null,
+          error: 'Failed to parse structured response'
+        };
+      }
 
-      return { expandedPrompt };
+      // Also return plain text version for backward compatibility
+      const plainText = structuredPrompts.prompts?.map((p, i) => {
+        if (p.type === 'image') {
+          return `[Prompt ${p.index}: ${p.title}]\n${p.prompt}`;
+        } else if (p.type === 'video') {
+          return `[Prompt ${p.index}: ${p.title} (${p.duration})]\nAction: ${p.action}\nScript: "${p.script}"\nTechnical: ${p.technical}\nAudio: ${p.audio}`;
+        } else if (p.type === 'social') {
+          return `[Prompt: ${p.title}]\nDescription: ${p.description}\nHashtags: ${p.hashtags?.join(' ') || ''}`;
+        }
+        return '';
+      }).join('\n\n') || rawContent;
+
+      return { 
+        expandedPrompt: plainText,
+        structured: structuredPrompts
+      };
     } catch (error) {
       console.error('Error expanding prompt with instructions:', error);
       throw new functions.https.HttpsError('internal', error.message);
