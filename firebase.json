@@ -17,7 +17,7 @@
   ],
   "hosting": {
     "site": "aicreators-vip",
-    "public": "build",
+    "public": "frontend/dist",
     "ignore": [
       "firebase.json",
       "**/.*",

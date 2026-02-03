@@ -1884,9 +1884,11 @@ Output: ให้แสดงผล 5 Prompts...
                                             )}
                                             
                                             {p.type === 'video' && (
-                                                <div className="space-y-1 text-xs">
+                                                <div className="space-y-2 text-xs">
                                                     <p className="text-slate-300"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
                                                     <p className="text-slate-300"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
+                                                    {p.technical && <p className="text-slate-300"><span className="text-purple-400 font-medium">Technical:</span> {p.technical}</p>}
+                                                    {p.audio && <p className="text-slate-300"><span className="text-green-400 font-medium">Audio:</span> {p.audio}</p>}
                                                 </div>
                                             )}
                                             

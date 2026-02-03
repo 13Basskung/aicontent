@@ -260,7 +260,14 @@ async function fetchUserSchedule(userId) {
     for (const doc of projectsData.documents || []) {
       const projectId = doc.name.split('/').pop();
       const projectName = parseFirestoreValue(doc.fields?.name);
+      const projectStatus = parseFirestoreValue(doc.fields?.status);
       const projectTimezone = parseFirestoreValue(doc.fields?.timezone);
+      
+      // ✅ Skip projects that are not running
+      if (projectStatus !== 'running') {
+        console.log(`⏸️ Skipping ${projectName} (status: ${projectStatus || 'idle'})`);
+        continue;
+      }
       
       // Update global timezone if project has one
       if (projectTimezone) {
@@ -330,14 +337,17 @@ function startScheduler(userId, instances) {
       const schedules = await fetchUserSchedule(userId);
       const now = new Date();
       
-      for (const slot of schedules) {
-        if (shouldRunNow(slot)) {
-          console.log(`⏰ Time to run: ${slot.projectName} at ${slot.start}`);
+      // Collect all slots that should run now
+      const slotsToRun = schedules.filter(slot => shouldRunNow(slot));
+      
+      if (slotsToRun.length > 0) {
+        console.log(`⏰ ${slotsToRun.length} slot(s) ready to run`);
+        
+        // Run all slots in parallel (each has its own browser instance)
+        const runPromises = slotsToRun.map(async (slot) => {
+          console.log(`🚀 Starting: ${slot.projectName} at ${slot.start}`);
           
-          // Find instance for this project
-          const instance = instances.find(i => i.projectId === slot.projectId);
-          
-          // Notify UI first
+          // Notify UI
           if (mainWindow) {
             mainWindow.webContents.send('scheduler:trigger', {
               projectName: slot.projectName,
@@ -347,9 +357,12 @@ function startScheduler(userId, instances) {
             });
           }
           
-          // Auto-run: Launch Chrome and execute block
-          await executeScheduledRun(slot, instances);
-        }
+          // Execute in parallel
+          return executeScheduledRun(slot, instances);
+        });
+        
+        // Wait for all to complete (but they run in parallel)
+        await Promise.allSettled(runPromises);
       }
     } catch (error) {
       console.error('Scheduler check error:', error);

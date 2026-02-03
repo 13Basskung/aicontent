@@ -1415,23 +1415,53 @@ export default function Projects() {
                                                         <FileText size={14} /> Generated Prompts
                                                     </h4>
                                                     <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                                                        {testResult.prompts?.map((prompt, idx) => (
+                                                        {testResult.prompts?.map((prompt, idx) => {
+                                                            const typeColors = {
+                                                                image: 'bg-amber-500/20 text-amber-300',
+                                                                video: 'bg-purple-500/20 text-purple-300',
+                                                                social: 'bg-green-500/20 text-green-300'
+                                                            };
+                                                            const typeLabel = prompt.type === 'image' ? '🖼️ Image' : 
+                                                                              prompt.type === 'social' ? '📱 Social' : 
+                                                                              `🎬 Scene ${prompt.index || idx + 1}`;
+                                                            const promptText = prompt.englishPrompt || prompt.prompt || 
+                                                                              (prompt.action ? `Action: ${prompt.action}\nScript: ${prompt.script}` : prompt.title);
+                                                            return (
                                                             <div key={idx} className="group bg-black/40 border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-all">
                                                                 <div className="flex items-start justify-between gap-4">
                                                                     <div className="flex-1">
                                                                         <div className="flex items-center gap-2 mb-2">
-                                                                            <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs font-bold rounded">Scene {idx + 1}</span>
-                                                                            {prompt.audioDescription && (
-                                                                                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">🔊 Audio</span>
-                                                                            )}
+                                                                            <span className={`px-2 py-0.5 ${typeColors[prompt.type] || typeColors.video} text-xs font-bold rounded`}>{typeLabel}</span>
+                                                                            {prompt.title && <span className="text-white/50 text-xs">{prompt.title}</span>}
+                                                                            {prompt.duration && <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded">{prompt.duration}</span>}
                                                                         </div>
-                                                                        <p className="text-white/80 text-sm leading-relaxed">{prompt.englishPrompt}</p>
-                                                                        {prompt.audioDescription && (
-                                                                            <p className="text-blue-300/60 text-xs mt-2">🎵 {prompt.audioDescription}</p>
+                                                                        {prompt.type === 'image' && (
+                                                                            <p className="text-white/80 text-sm leading-relaxed">{prompt.prompt}</p>
+                                                                        )}
+                                                                        {prompt.type === 'video' && (
+                                                                            <div className="space-y-1 text-sm">
+                                                                                <p className="text-white/80"><span className="text-cyan-400">Action:</span> {prompt.action}</p>
+                                                                                <p className="text-white/80"><span className="text-yellow-400">Script:</span> "{prompt.script}"</p>
+                                                                                {prompt.technical && <p className="text-white/60 text-xs"><span className="text-purple-400">Technical:</span> {prompt.technical}</p>}
+                                                                                {prompt.audio && <p className="text-white/60 text-xs"><span className="text-green-400">Audio:</span> {prompt.audio}</p>}
+                                                                            </div>
+                                                                        )}
+                                                                        {prompt.type === 'social' && (
+                                                                            <div className="space-y-2">
+                                                                                <p className="text-white/80 text-sm">{prompt.description}</p>
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    {prompt.hashtags?.map((tag, i) => (
+                                                                                        <span key={i} className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-xs">{tag}</span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        {!prompt.type && prompt.englishPrompt && (
+                                                                            <p className="text-white/80 text-sm leading-relaxed">{prompt.englishPrompt}</p>
                                                                         )}
                                                                     </div>
                                                                     <button
-                                                                        onClick={() => handleCopyPrompt(prompt.englishPrompt, idx)}
+                                                                        onClick={() => handleCopyPrompt(promptText, idx)}
                                                                         className="shrink-0 p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-purple-500/20 hover:border-purple-500/30 transition-all opacity-0 group-hover:opacity-100"
                                                                         title="Copy Prompt"
                                                                     >
@@ -1439,7 +1469,7 @@ export default function Projects() {
                                                                     </button>
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                        );})}
                                                     </div>
                                                 </div>
 

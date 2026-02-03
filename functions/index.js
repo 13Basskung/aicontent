@@ -1224,7 +1224,7 @@ RULES:
           id: expanderId,
           name: expanderData.name,
           blockCount: expanderBlocks.length,
-          sceneCount: rawScenes.length
+          sceneCount: expanderScenesCount
         }
       };
 
