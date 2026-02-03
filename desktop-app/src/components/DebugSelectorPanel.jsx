@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Search, Check, X, Target, Zap, ChevronDown, ChevronUp, MousePointer, Hand,
-  Play, Layers, Settings2
+  Search, Check, X, Target, Zap, ChevronDown, ChevronUp, ExternalLink,
+  Play, Layers, Settings2, Save
 } from 'lucide-react';
 
 const EMOJI_OPTIONS = [
@@ -9,8 +9,10 @@ const EMOJI_OPTIONS = [
   '🎯', '🔥', '⚡', '🚀', '💡', '✨', '🎨', '🔧', '📦', '🎮', '🎬'
 ];
 
+// LocalStorage key for saved URLs
+const SAVED_URLS_KEY = 'debugSelector_savedUrls';
+
 function DebugSelectorPanel({ 
-  instances, 
   blocks,
   onShootToStep, 
   onShootToAction, 
@@ -24,9 +26,10 @@ function DebugSelectorPanel({
   const [selectedEmoji, setSelectedEmoji] = useState('🎯');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  // Instance State
-  const [selectedInstance, setSelectedInstance] = useState(null);
-  const [showInstanceDropdown, setShowInstanceDropdown] = useState(false);
+  // URL State (replaces Instance)
+  const [testUrl, setTestUrl] = useState('https://');
+  const [savedUrls, setSavedUrls] = useState([]);
+  const [showSavedUrls, setShowSavedUrls] = useState(false);
   
   // Shoot Dropdown State
   const [showShootDropdown, setShowShootDropdown] = useState(false);
@@ -36,48 +39,59 @@ function DebugSelectorPanel({
   
   // Test Result
   const [result, setResult] = useState(null);
-  const [testing, setTesting] = useState(false);
 
-  // Use all instances (same as RecorderPanel)
-  const runningInstances = instances || [];
+  // Load saved URLs from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SAVED_URLS_KEY);
+      if (saved) setSavedUrls(JSON.parse(saved));
+    } catch (e) {
+      console.error('Failed to load saved URLs:', e);
+    }
+  }, []);
 
   // Filter blocks by type
   const vdoBlocks = blocks?.filter(b => b.type === 'video') || [];
   const platformBlocks = blocks?.filter(b => b.type === 'platform') || [];
 
-  // Test Selector (Hover or Click)
-  const handleTest = async (testType) => {
-    if (!selector.trim()) {
-      setResult({ success: false, error: 'กรุณาใส่ Selector' });
+  // Open URL in default browser (Chrome)
+  const handleOpenUrl = () => {
+    if (!testUrl || testUrl === 'https://') {
+      setResult({ success: false, error: 'กรุณาใส่ URL' });
       return;
     }
-    if (!selectedInstance) {
-      setResult({ success: false, error: 'กรุณาเลือก Instance' });
+    // Open URL in default browser using Electron shell
+    if (window.electronAPI?.shell?.openExternal) {
+      window.electronAPI.shell.openExternal(testUrl);
+      setResult({ success: true, message: 'เปิด URL ใน Browser แล้ว' });
+    } else {
+      // Fallback: open in new tab
+      window.open(testUrl, '_blank');
+      setResult({ success: true, message: 'เปิด URL ใน Browser แล้ว' });
+    }
+  };
+
+  // Save current URL
+  const handleSaveUrl = () => {
+    if (!testUrl || testUrl === 'https://') {
+      setResult({ success: false, error: 'กรุณาใส่ URL' });
       return;
     }
-
-    setTesting(true);
-    setResult(null);
-
-    try {
-      const response = await window.electronAPI.playwright.debugSelector({
-        instanceId: selectedInstance.id,
-        selector: selector.trim(),
-        action: testType,
-        text: value
-      });
-
-      setResult({
-        success: response.success,
-        message: response.success 
-          ? `${testType === 'hover' ? 'Hover' : 'Human Click'} สำเร็จ!` 
-          : response.error
-      });
-    } catch (error) {
-      setResult({ success: false, error: error.message });
+    if (savedUrls.includes(testUrl)) {
+      setResult({ success: false, error: 'URL นี้บันทึกไว้แล้ว' });
+      return;
     }
+    const newSavedUrls = [...savedUrls, testUrl];
+    setSavedUrls(newSavedUrls);
+    localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(newSavedUrls));
+    setResult({ success: true, message: 'บันทึก URL สำเร็จ' });
+  };
 
-    setTesting(false);
+  // Delete saved URL
+  const handleDeleteUrl = (urlToDelete) => {
+    const newSavedUrls = savedUrls.filter(u => u !== urlToDelete);
+    setSavedUrls(newSavedUrls);
+    localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(newSavedUrls));
   };
 
   // Build step object
@@ -180,59 +194,60 @@ function DebugSelectorPanel({
         />
       </div>
 
-      {/* Instance Selector + Test Buttons */}
-      <div className="flex gap-3">
-        {/* Instance Dropdown */}
-        <div className="flex-1 relative">
-          <label className="block text-white/70 text-sm mb-2">Instance</label>
+      {/* URL Input + OPEN/SAVE Buttons */}
+      <div>
+        <label className="block text-white/70 text-sm mb-2">Test URL (เปิดใน Chrome เพื่อ Copy Selector)</label>
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={testUrl}
+              onChange={(e) => setTestUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50"
+            />
+            {savedUrls.length > 0 && (
+              <button
+                onClick={() => setShowSavedUrls(!showSavedUrls)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-white/60 text-xs"
+              >
+                📋 {savedUrls.length}
+              </button>
+            )}
+            {showSavedUrls && savedUrls.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-40 overflow-auto">
+                {savedUrls.map((url, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-white/10 text-sm">
+                    <button
+                      onClick={() => { setTestUrl(url); setShowSavedUrls(false); }}
+                      className="flex-1 text-left text-white/80 truncate"
+                    >
+                      {url}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUrl(url)}
+                      className="ml-2 text-red-400 hover:text-red-300"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <button
-            onClick={() => setShowInstanceDropdown(!showInstanceDropdown)}
-            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-left flex items-center justify-between"
+            onClick={handleOpenUrl}
+            className="px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-300 font-medium transition flex items-center gap-2"
           >
-            <span className="truncate">
-              {selectedInstance ? `${selectedInstance.name || selectedInstance.id}` : '-- เลือก Instance --'}
-            </span>
-            <ChevronDown className="w-4 h-4 flex-shrink-0" />
+            <ExternalLink className="w-4 h-4" />
+            OPEN
           </button>
-          {showInstanceDropdown && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-48 overflow-auto">
-              {runningInstances.length === 0 ? (
-                <div className="px-4 py-3 text-white/50 text-sm">ไม่มี Instance ที่พร้อมใช้งาน</div>
-              ) : (
-                runningInstances.map(inst => (
-                  <button
-                    key={inst.id}
-                    onClick={() => {
-                      setSelectedInstance(inst);
-                      setShowInstanceDropdown(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-white/80 hover:bg-white/10 text-sm"
-                  >
-                    {inst.name || inst.id} ({inst.projectName})
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Test Buttons */}
-        <div className="flex gap-2 items-end">
           <button
-            onClick={() => handleTest('hover')}
-            disabled={testing || !selector.trim() || !selectedInstance}
-            className="px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            onClick={handleSaveUrl}
+            className="px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-green-300 font-medium transition flex items-center gap-2"
           >
-            <MousePointer className="w-4 h-4" />
-            Hover
-          </button>
-          <button
-            onClick={() => handleTest('click')}
-            disabled={testing || !selector.trim() || !selectedInstance}
-            className="px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-green-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Hand className="w-4 h-4" />
-            Human Click
+            <Save className="w-4 h-4" />
+            SAVE
           </button>
         </div>
       </div>

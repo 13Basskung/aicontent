@@ -786,7 +786,6 @@ function Dashboard({ keyData }) {
       {/* Tab Content: Debug Selector (Admin only) */}
       {activeTab === 'debug' && keyData?.isAdmin && (
         <DebugSelectorPanel 
-          instances={instances}
           blocks={blocks}
           onShootToStep={(step) => {
             // Switch to Recorder tab and add step (don't clear existing steps)

@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
+  // Shell operations (for Debug Selector)
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('open-external', url)
+  },
+
   // Playwright operations
   playwright: {
     launchInstance: (config) => ipcRenderer.invoke('playwright:launch', config),
