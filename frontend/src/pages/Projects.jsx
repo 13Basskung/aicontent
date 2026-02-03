@@ -270,6 +270,31 @@ export default function Projects() {
         return () => unsubscribeAuth();
     }, []); // Removed specific deps to ensure clean mounting logic
 
+    // ✅ AUTO-STOP: โปรเจคที่มี status='running' แต่ไม่มี expanderId จะถูก stop อัตโนมัติ
+    useEffect(() => {
+        if (!currentUser || projects.length === 0) return;
+        
+        const autoStopProjects = async () => {
+            for (const project of projects) {
+                // ถ้า running แต่ไม่มี Expander → auto stop
+                if (project.status === 'running' && !project.expanderId) {
+                    console.log(`🛑 Auto-stopping project "${project.name}" - no Expander selected`);
+                    try {
+                        const projectRef = doc(db, 'users', currentUser.uid, 'projects', project.id);
+                        await updateDoc(projectRef, {
+                            status: 'idle',
+                            lastUpdated: serverTimestamp()
+                        });
+                    } catch (err) {
+                        console.error('Auto-stop error:', err);
+                    }
+                }
+            }
+        };
+        
+        autoStopProjects();
+    }, [projects, currentUser]);
+
     const handleCreateProject = async () => {
         if (!newProjectName.trim() || !currentUser) return;
         

@@ -247,7 +247,8 @@ function hasScheduleChanged(newHash) {
 }
 
 /**
- * Fetch all slots for a user's projects
+ * Fetch all slots for a user's projects (ALL projects, not just running)
+ * The "running" filter is applied at execution time, not display time
  */
 async function fetchUserSchedule(userId) {
   try {
@@ -262,20 +263,14 @@ async function fetchUserSchedule(userId) {
       const projectName = parseFirestoreValue(doc.fields?.name);
       const projectStatus = parseFirestoreValue(doc.fields?.status);
       const projectTimezone = parseFirestoreValue(doc.fields?.timezone);
-      
-      // ✅ Skip projects that are not running
-      if (projectStatus !== 'running') {
-        console.log(`⏸️ Skipping ${projectName} (status: ${projectStatus || 'idle'})`);
-        continue;
-      }
+      const projectExpanderId = parseFirestoreValue(doc.fields?.expanderId);
       
       // Update global timezone if project has one
       if (projectTimezone) {
         userTimezone = projectTimezone;
-        console.log('🌍 Found project timezone:', projectTimezone);
       }
       
-      // Get slots for this project
+      // Get slots for this project (ALL projects for display)
       const slotsUrl = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}/projects/${projectId}/slots?key=${API_KEY}`;
       const slotsData = await fetchJSON(slotsUrl);
       
@@ -286,6 +281,8 @@ async function fetchUserSchedule(userId) {
         schedules.push({
           projectId,
           projectName,
+          projectStatus: projectStatus || 'idle',
+          projectExpanderId: projectExpanderId || null,
           slotId,
           day: parseFirestoreValue(fields.day),
           start: parseFirestoreValue(fields.start),
@@ -298,6 +295,7 @@ async function fetchUserSchedule(userId) {
       }
     }
     
+    console.log(`📅 Fetched ${schedules.length} slots from all projects`);
     return schedules;
   } catch (error) {
     console.error('❌ Failed to fetch schedule:', error);
@@ -307,18 +305,31 @@ async function fetchUserSchedule(userId) {
 
 /**
  * Check if a slot should run now
+ * Checks: day, time, project status, and expander
  */
 function shouldRunNow(slot) {
   const now = new Date();
   const currentDay = getDayCode(now);
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
-  // Check if it's the right day and time (within 1 minute window)
-  if (slot.day === currentDay && slot.start === currentTime) {
-    return true;
+  // Check if it's the right day and time
+  if (slot.day !== currentDay || slot.start !== currentTime) {
+    return false;
   }
   
-  return false;
+  // ✅ Check if project is running
+  if (slot.projectStatus !== 'running') {
+    console.log(`⏸️ Skipping ${slot.projectName} - status: ${slot.projectStatus}`);
+    return false;
+  }
+  
+  // ✅ Check if project has Expander
+  if (!slot.projectExpanderId) {
+    console.log(`⏸️ Skipping ${slot.projectName} - no Expander selected`);
+    return false;
+  }
+  
+  return true;
 }
 
 /**

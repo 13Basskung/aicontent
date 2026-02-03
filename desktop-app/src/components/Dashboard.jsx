@@ -162,9 +162,21 @@ function Dashboard({ keyData }) {
   function getScenesInfo(projectId, slots) {
     // First try to get from Expander cache (source of truth)
     const expander = expanderCache[projectId];
+    
+    // Debug log
+    const project = projects.find(p => p.id === projectId);
+    console.log(`🔍 getScenesInfo: ${project?.name || projectId}`, {
+      hasExpanderInCache: !!expander,
+      expanderScenesCount: expander?.scenesCount,
+      projectExpanderId: project?.expanderId,
+      slotsCount: slots?.length,
+      firstSlotScenes: slots?.[0]?.scenes
+    });
+    
     if (expander?.scenesCount) {
       // Get sceneDuration from first slot
       const sceneDuration = slots?.[0]?.sceneDuration || 8;
+      console.log(`✅ Using Expander scenesCount: ${expander.scenesCount}`);
       return { scenes: expander.scenesCount, sceneDuration };
     }
     
@@ -179,6 +191,7 @@ function Dashboard({ keyData }) {
       if (!sceneDuration && slot.sceneDuration) sceneDuration = slot.sceneDuration;
     });
     
+    console.log(`⚠️ Fallback to slots maxScenes: ${maxScenes}`);
     return { scenes: maxScenes, sceneDuration: sceneDuration || 8 };
   }
   
