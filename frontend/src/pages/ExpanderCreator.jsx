@@ -126,6 +126,7 @@ const ExpanderCreator = () => {
     // Expander State
     const [expanderName, setExpanderName] = useState('');
     const [expanderDescription, setExpanderDescription] = useState('');
+    const [expanderInstructions, setExpanderInstructions] = useState(''); // NEW: Instructions แบบ Gemini Gems
     const [selectedCategory, setSelectedCategory] = useState('Cinematic / Movie');
     const [selectedBlocks, setSelectedBlocks] = useState([]);
     const [customBlocks, setCustomBlocks] = useState([]);
@@ -865,25 +866,23 @@ const ExpanderCreator = () => {
             showAlert('✏️ กรุณาใส่ชื่อ Expander', '⚠️ แจ้งเตือน');
             return;
         }
-        if (selectedBlocks.length === 0) {
-            showAlert('📦 กรุณาเพิ่มอย่างน้อย 1 กล่อง', '⚠️ แจ้งเตือน');
+        if (!expanderInstructions.trim()) {
+            showAlert('📝 กรุณาใส่ Instructions (System Prompt)', '⚠️ แจ้งเตือน');
             return;
         }
         
         setSaving(true);
         try {
-            // ตรวจสอบว่า blocks หรือ ชื่อ/Category/คำอธิบาย เปลี่ยนแปลงหรือไม่ - ถ้าเปลี่ยน ลบ videoUrls
+            // ตรวจสอบว่า instructions หรือ ชื่อ/Category/คำอธิบาย เปลี่ยนแปลงหรือไม่ - ถ้าเปลี่ยน ลบ videoUrls
             let finalVideoUrls = videoUrls;
-            const blocksChanged = editingExpander && checkBlocksChanged(selectedBlocks);
             const nameChanged = editingExpander && expanderName !== originalName;
             const categoryChanged = editingExpander && selectedCategory !== originalCategory;
             const descriptionChanged = editingExpander && expanderDescription !== originalDescription;
             
-            if (blocksChanged || nameChanged || categoryChanged || descriptionChanged) {
+            if (nameChanged || categoryChanged || descriptionChanged) {
                 finalVideoUrls = []; // ลบ URL ทั้งหมดเมื่อมีการเปลี่ยนแปลง
                 setVideoUrls([]);
                 const changedFields = [];
-                if (blocksChanged) changedFields.push('Blocks');
                 if (nameChanged) changedFields.push('ชื่อ');
                 if (categoryChanged) changedFields.push('Category');
                 if (descriptionChanged) changedFields.push('คำอธิบาย');
@@ -893,10 +892,11 @@ const ExpanderCreator = () => {
             const expanderData = {
                 name: expanderName,
                 description: expanderDescription,
+                instructions: expanderInstructions, // NEW: Instructions แบบ Gemini Gems
                 categoryId: selectedCategory,
-                blocks: selectedBlocks,
+                blocks: selectedBlocks, // Keep for backward compatibility
                 customBlocks: customBlocks.filter(cb => selectedBlocks.find(sb => sb.id === cb.id)),
-                videoUrls: finalVideoUrls, // เพิ่ม videoUrls
+                videoUrls: finalVideoUrls,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
@@ -953,6 +953,7 @@ const ExpanderCreator = () => {
             // Reset form
             setExpanderName('');
             setExpanderDescription('');
+            setExpanderInstructions(''); // Reset instructions
             setSelectedBlocks([]);
             setEditingExpander(null);
             clearThumbnail();
@@ -969,8 +970,8 @@ const ExpanderCreator = () => {
     
     // === TEST EXPANDER ===
     const handleTest = async () => {
-        if (selectedBlocks.length === 0) {
-            showAlert('📦 กรุณาเพิ่มอย่างน้อย 1 กล่อง', '⚠️ แจ้งเตือน');
+        if (!expanderInstructions.trim()) {
+            showAlert('📝 กรุณาใส่ Instructions (System Prompt)', '⚠️ แจ้งเตือน');
             return;
         }
         if (!testPrompt.trim()) {
@@ -982,10 +983,10 @@ const ExpanderCreator = () => {
         setTestResult('');
         
         try {
-            const expandPrompt = httpsCallable(functions, 'expandPrompt');
+            const expandPrompt = httpsCallable(functions, 'expandPromptWithInstructions');
             const result = await expandPrompt({
-                simplePrompt: testPrompt,
-                blocks: selectedBlocks
+                userInput: testPrompt,
+                instructions: expanderInstructions
             });
             
             setTestResult(result.data.expandedPrompt);
@@ -1002,6 +1003,7 @@ const ExpanderCreator = () => {
         setEditingExpander(expander);
         setExpanderName(expander.name);
         setExpanderDescription(expander.description || '');
+        setExpanderInstructions(expander.instructions || ''); // Load instructions
         setSelectedCategory(expander.categoryId);
         setSelectedBlocks(expander.blocks || []);
         if (expander.customBlocks) {
@@ -1013,7 +1015,7 @@ const ExpanderCreator = () => {
         } else {
             clearThumbnail();
         }
-        // Load video URLs และเก็บ hash ของ blocks เดิม
+        // Load video URLs
         setVideoUrls(expander.videoUrls || []);
         setOriginalBlocksHash(generateBlocksHash(expander.blocks || []));
         // เก็บค่าเดิมของ ชื่อ/Category/คำอธิบาย
@@ -1415,6 +1417,7 @@ const ExpanderCreator = () => {
                                         setEditingExpander(null);
                                         setExpanderName('');
                                         setExpanderDescription('');
+                                        setExpanderInstructions(''); // Reset instructions
                                         setSelectedBlocks([]);
                                         setVideoUrls([]);
                                         setOriginalBlocksHash('');
@@ -1676,486 +1679,230 @@ const ExpanderCreator = () => {
                 {/* === CREATOR TAB === */}
                 {activeTab === 'creator' && (
                 <div className="grid grid-cols-12 gap-6">
-                    {/* Left Panel: Block Library (แยกหมวดหมู่) */}
-                    <div className="col-span-5">
-                        <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4" style={{ height: '720px' }}>
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-white font-bold flex items-center gap-2">
-                                    📦 กล่องที่มี
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="ค้นหา..."
-                                        value={blockSearchQuery}
-                                        onChange={(e) => setBlockSearchQuery(e.target.value)}
-                                        className="w-24 bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-orange-500"
-                                    />
-                                    <div className="glass-dropdown-wrapper w-[100px]">
-                                        <GlassDropdown
-                                            value={filterGroupId}
-                                            onChange={setFilterGroupId}
-                                            options={[
-                                                { value: 'all', label: 'ทุก Group' },
-                                                ...customGroups.map(g => ({ value: g.id, label: g.name }))
-                                            ]}
-                                            buttonClassName="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-white text-xs cursor-pointer hover:bg-black/60 transition-all truncate"
-                                            minWidth={120}
-                                        />
-                                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
-                                    </div>
-                                </div>
+                    {/* Left Panel: Name, Description, Instructions (แบบ Gemini Gems) */}
+                    <div className="col-span-7 space-y-4">
+                        {/* Name */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <label className="text-xs font-semibold text-red-400 mb-2 block uppercase tracking-wider">Name</label>
+                            <input
+                                type="text"
+                                value={expanderName}
+                                onChange={(e) => setExpanderName(e.target.value)}
+                                placeholder="เช่น ผู้กำกับผักปากจัด, Thai Drama Pro"
+                                className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 focus:shadow-lg focus:shadow-red-500/10 transition-all duration-300"
+                            />
+                        </div>
+                        
+                        {/* Description */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <label className="text-xs font-semibold text-red-400 mb-2 block uppercase tracking-wider">Description</label>
+                            <textarea
+                                value={expanderDescription}
+                                onChange={(e) => setExpanderDescription(e.target.value)}
+                                placeholder="เปลี่ยนชื่อผัก/ผลไม้ ให้กลายเป็นบทแอนิเมชัน Pixar ดุดัน 4 ฉาก (1 ภาพ 3 วิดีโอและแคปชั่นกวนๆ พร้อมแฮชแท็กเลยครับ)"
+                                rows={3}
+                                className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 resize-none transition-all duration-300"
+                            />
+                        </div>
+                        
+                        {/* Instructions (Main - แบบ Gemini Gems) */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                                    Instructions
+                                    <span className="text-slate-500 font-normal normal-case text-xs">(System Prompt สำหรับ AI)</span>
+                                </label>
                             </div>
-                            <div className="space-y-3 overflow-y-auto pr-1" style={{ height: '650px' }}>
-                                {/* All Groups (Default + Custom) - ทุก Block ลบ/ย้าย/ฟังเสียงได้ */}
-                                {customGroups
-                                    .filter(group => filterGroupId === 'all' || group.id === filterGroupId)
-                                    .map(group => (
-                                    <div key={group.id} className={`bg-white/5 backdrop-blur-sm border ${group.isDefault ? 'border-white/10' : 'border-red-500/20'} rounded-lg`}>
-                                        <button 
-                                            onClick={() => toggleCategory(group.id)}
-                                            className="w-full flex items-center justify-between px-3 py-2 text-white hover:bg-white/5"
-                                        >
-                                            <span className="font-medium text-sm flex items-center gap-2">
-                                                {group.name}
-                                            </span>
-                                            <div className="flex items-center gap-1">
-                                                {!group.isDefault && (
-                                                    <span 
-                                                        onClick={(e) => { e.stopPropagation(); deleteCustomGroup(group.id); }}
-                                                        className="p-1 hover:bg-red-500/20 rounded text-red-400"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </span>
-                                                )}
-                                                {expandedCategories[group.id] !== false ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            </div>
-                                        </button>
-                                        {expandedCategories[group.id] !== false && (
-                                            <div className="px-2 pb-2 space-y-1">
-                                                {(group.blocks || [])
-                                                    .filter(block => !blockSearchQuery || block.name.toLowerCase().includes(blockSearchQuery.toLowerCase()))
-                                                    .map((block) => (
-                                                    <div
-                                                        key={block.id}
-                                                        draggable
-                                                        onDragStart={(e) => handleDragStart(e, { ...block, type: 'custom', groupId: group.id })}
-                                                        className="bg-white/10 backdrop-blur-sm border border-white/10 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing flex items-center gap-2 text-white text-sm font-medium hover:bg-white/20 transition-all group/block relative"
-                                                    >
-                                                        <GripVertical size={14} className="opacity-50 shrink-0" />
-                                                        {block.flag ? (
-                                                            <img 
-                                                                src={`https://flagcdn.com/20x15/${block.flag}.png`} 
-                                                                alt={block.name}
-                                                                className="w-5 h-4 object-cover rounded-sm shrink-0"
-                                                            />
-                                                        ) : block.icon ? (
-                                                            <span className="text-base shrink-0">{block.icon}</span>
-                                                        ) : null}
-                                                        <span className="flex-1 truncate mr-1">{block.name}</span>
-                                                        {/* Edit Block Name Button */}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const newName = prompt('แก้ไขชื่อ Block:', block.name);
-                                                                if (newName && newName.trim() && newName !== block.name) {
-                                                                    handleEditBlockName(group.id, block.id, newName.trim());
-                                                                }
-                                                            }}
-                                                            className="p-1 hover:bg-white/20 rounded text-slate-400 hover:text-yellow-400 shrink-0"
-                                                            title="แก้ไขชื่อ"
-                                                        >
-                                                            <Edit3 size={12} />
-                                                        </button>
-                                                        {/* Dropdown Menu Button */}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (openDropdownId === block.id) {
-                                                                    setOpenDropdownId(null);
-                                                                } else {
-                                                                    const rect = e.currentTarget.getBoundingClientRect();
-                                                                    setDropdownPosition({ top: rect.bottom + 4, left: rect.right - 140 });
-                                                                    setOpenDropdownId(block.id);
-                                                                }
-                                                            }}
-                                                            className="p-1 hover:bg-white/20 rounded text-slate-400 hover:text-white shrink-0"
-                                                        >
-                                                            <MoreVertical size={14} />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {(!group.blocks || group.blocks.length === 0) && (
-                                                    <p className="text-slate-500 text-xs text-center py-2">ยังไม่มี Block</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                
-                                {/* Custom Blocks (ยังไม่จัด Group) */}
-                                {customBlocks.length > 0 && (
-                                    <div className="bg-white/5 backdrop-blur-sm border border-violet-500/20 rounded-lg overflow-hidden">
-                                        <div className="px-3 py-2 text-white font-medium text-sm">🤖 Custom Blocks</div>
-                                        <div className="px-2 pb-2 space-y-1">
-                                            {customBlocks.map(block => (
-                                                <div
-                                                    key={block.id}
-                                                    draggable
-                                                    onDragStart={(e) => handleDragStart(e, { ...block, type: 'custom' })}
-                                                    className="bg-white/10 backdrop-blur-sm border border-white/10 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing flex items-center gap-2 text-white text-sm font-medium hover:bg-white/20 transition-all group"
-                                                >
-                                                    <GripVertical size={14} className="opacity-50 shrink-0" />
-                                                    {block.flag ? (
-                                                        <img 
-                                                            src={`https://flagcdn.com/20x15/${block.flag}.png`} 
-                                                            alt={block.name}
-                                                            className="w-5 h-4 object-cover rounded-sm shrink-0"
-                                                        />
-                                                    ) : block.icon ? (
-                                                        <span className="text-base shrink-0">{block.icon}</span>
-                                                    ) : null}
-                                                    <span className="flex-1 truncate">{block.name}</span>
-                                                    <span className="text-xs bg-violet-500/30 px-1 rounded shrink-0">AI</span>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const newName = prompt('แก้ไขชื่อ Block:', block.name);
-                                                            if (newName && newName.trim() && newName !== block.name) {
-                                                                handleEditCustomBlockName(block.id, newName.trim());
-                                                            }
-                                                        }}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-yellow-500/30 rounded transition-opacity text-yellow-300"
-                                                        title="แก้ไขชื่อ"
-                                                    >
-                                                        <Edit3 size={12} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); openBlockDetail(block); }}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded transition-opacity"
-                                                        title="ดูรายละเอียด"
-                                                    >
-                                                        <Eye size={12} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); openMoveBlockModal({ ...block, isCustom: true }); }}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-500/30 rounded transition-opacity text-blue-300"
-                                                        title="ย้ายไป Group"
-                                                    >
-                                                        <MoveRight size={12} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); deleteCustomBlock(block.id); }}
-                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/30 rounded transition-opacity text-red-300"
-                                                        title="ลบ"
-                                                    >
-                                                        <Trash2 size={12} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* Add New Group Button */}
-                                <button
-                                    onClick={() => setShowAddGroupModal(true)}
-                                    className="w-full py-2 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 rounded-lg text-slate-400 hover:text-white text-sm flex items-center justify-center gap-2 transition-all"
-                                >
-                                    <FolderPlus size={14} /> เพิ่ม Group ใหม่
-                                </button>
-                            </div>
+                            <textarea
+                                value={expanderInstructions}
+                                onChange={(e) => setExpanderInstructions(e.target.value)}
+                                placeholder={`Role: คุณคือผู้เชี่ยวชาญด้านการเขียน Prompt สำหรับ Image และ Video AI สไตล์ Pixar...
+
+Input: ชื่อผัก หรือ ผลไม้ หรือ วัตถุดิบ
+
+Output: ให้แสดงผล 5 Prompts...
+
+⚙️ Rules & Constraints:
+- Timing Control: บทพูดต้องไม่เกิน 25-30 คำ
+- Visual Consistency: ใช้ตัวละครเดิม...
+
+📝 Prompt Template:
+[Prompt 1: Master Image]
+...`}
+                                rows={12}
+                                className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 resize-none transition-all duration-300 font-mono text-sm"
+                            />
+                            <p className="text-xs text-slate-500 mt-2">
+                                💡 ใส่ Role, Input, Output, Rules และ Template ที่ต้องการให้ AI ทำตาม
+                            </p>
                         </div>
                     </div>
                     
-                    {/* Center Panel: Expander Builder */}
-                    <div className="col-span-7 space-y-4">
-                        {/* Expander Info */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-                            <div className="grid grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-400 mb-2 block uppercase tracking-wider">ชื่อ Expander</label>
+                    {/* Right Panel: Thumbnail, Category, VDO ตัวอย่าง */}
+                    <div className="col-span-5 space-y-4">
+                        {/* Thumbnail */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <label className="text-xs font-semibold text-red-400 mb-3 block uppercase tracking-wider">Expander Thumbnail</label>
+                            <div className="flex items-start gap-4">
+                                <div 
+                                    onClick={() => thumbnailInputRef.current?.click()}
+                                    className="w-32 h-32 bg-black/30 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center cursor-pointer hover:border-red-500/50 transition-colors overflow-hidden"
+                                >
+                                    {thumbnailPreview ? (
+                                        <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="text-center">
+                                            <Camera className="text-slate-500 mx-auto mb-2" size={32} />
+                                            <span className="text-xs text-slate-500">คลิกเพื่อเลือก</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
                                     <input
-                                        type="text"
-                                        value={expanderName}
-                                        onChange={(e) => setExpanderName(e.target.value)}
-                                        placeholder="เช่น Thai Drama Pro"
-                                        className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 focus:shadow-lg focus:shadow-red-500/10 transition-all duration-300"
+                                        ref={thumbnailInputRef}
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        onChange={handleThumbnailChange}
+                                        className="hidden"
                                     />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-400 mb-2 block uppercase tracking-wider">Category</label>
-                                    <div className="glass-dropdown-wrapper w-full">
-                                        <GlassDropdown
-                                            value={selectedCategory}
-                                            onChange={setSelectedCategory}
-                                            options={CATEGORIES.map(cat => ({ value: cat, label: cat }))}
-                                            buttonClassName="glass-dropdown w-full"
-                                        />
-                                        <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-slate-400 mb-2 block uppercase tracking-wider">คำอธิบาย</label>
-                                <input
-                                    type="text"
-                                    value={expanderDescription}
-                                    onChange={(e) => setExpanderDescription(e.target.value)}
-                                    placeholder="อธิบายสั้นๆ ว่า Expander นี้ทำอะไร"
-                                    className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 focus:shadow-lg focus:shadow-red-500/10 transition-all duration-300"
-                                />
-                            </div>
-                            
-                            {/* Thumbnail Upload */}
-                            <div className="mt-4">
-                                <label className="text-slate-300 text-sm mb-2 block">Expander Thumbnail</label>
-                                <div className="flex items-start gap-4">
-                                    {/* Preview */}
-                                    <div 
+                                    <button
+                                        type="button"
                                         onClick={() => thumbnailInputRef.current?.click()}
-                                        className="w-24 h-24 bg-black/30 border border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:border-red-500/50 transition-colors overflow-hidden"
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition-colors"
                                     >
-                                        {thumbnailPreview ? (
-                                            <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <Camera className="text-slate-500" size={32} />
-                                        )}
-                                    </div>
-                                    
-                                    {/* Upload Controls */}
-                                    <div className="flex-1">
-                                        <input
-                                            ref={thumbnailInputRef}
-                                            type="file"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            onChange={handleThumbnailChange}
-                                            className="hidden"
-                                        />
+                                        Choose file
+                                    </button>
+                                    <p className="text-xs text-slate-500 mt-2">Max: 3MB (JPG, PNG, WEBP)</p>
+                                    {thumbnailPreview && (
                                         <button
                                             type="button"
-                                            onClick={() => thumbnailInputRef.current?.click()}
-                                            className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition-colors"
+                                            onClick={clearThumbnail}
+                                            className="mt-2 text-xs text-red-400 hover:text-red-300"
                                         >
-                                            Choose file
+                                            ลบรูป
                                         </button>
-                                        <span className="ml-2 text-slate-400 text-sm">
-                                            {thumbnailFile ? thumbnailFile.name : 'No file chosen'}
-                                        </span>
-                                        <p className="text-xs text-slate-500 mt-2">Max size: 3MB. Formats: JPG, PNG, WEBP.</p>
-                                        {thumbnailPreview && (
-                                            <button
-                                                type="button"
-                                                onClick={clearThumbnail}
-                                                className="mt-2 text-xs text-red-400 hover:text-red-300"
-                                            >
-                                                ลบรูป
-                                            </button>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                         
-                        {/* Drop Zone - Drag Reorder */}
-                        <div 
-                            onDrop={handleDrop}
-                            onDragOver={handleDragOver}
-                            className="bg-white/10 backdrop-blur-md border-2 border-dashed border-red-500/30 rounded-xl p-4 min-h-[180px]"
-                        >
-                            <h3 className="text-white font-bold mb-3">🧩 Expander ของคุณ <span className="text-xs font-normal text-slate-400">(ลากเพื่อสลับตำแหน่ง)</span></h3>
-                            {selectedBlocks.length === 0 ? (
-                                <div className="text-center text-slate-400 py-8">
-                                    <p>ลากกล่องจากด้านซ้ายมาวางที่นี่</p>
+                        {/* Category */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <label className="text-xs font-semibold text-red-400 mb-2 block uppercase tracking-wider">Category</label>
+                            <div className="glass-dropdown-wrapper w-full">
+                                <GlassDropdown
+                                    value={selectedCategory}
+                                    onChange={setSelectedCategory}
+                                    options={CATEGORIES.map(cat => ({ value: cat, label: cat }))}
+                                    buttonClassName="glass-dropdown w-full"
+                                />
+                                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
+                            </div>
+                        </div>
+                        
+                        {/* Video URLs Section */}
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <h3 className="text-xs font-semibold text-red-400 mb-3 uppercase tracking-wider flex items-center gap-2">
+                                🎬 ตัวอย่างวีดีโอ
+                                <span className="text-slate-500 font-normal normal-case">(ต้องมีก่อนขาย)</span>
+                            </h3>
+                            <div className="space-y-3">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="url"
+                                        value={newVideoUrl}
+                                        onChange={(e) => setNewVideoUrl(e.target.value)}
+                                        placeholder="https://youtube.com/watch?v=..."
+                                        className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-sm"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddVideoUrl()}
+                                    />
+                                    <button
+                                        onClick={handleAddVideoUrl}
+                                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 rounded-lg text-white text-sm font-bold flex items-center gap-1"
+                                    >
+                                        <Plus size={14} /> Add VDO
+                                    </button>
                                 </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {selectedBlocks.map((block, index) => (
-                                        <div 
-                                            key={block.id}
-                                            draggable
-                                            onDragStart={(e) => handleBlockDragStart(e, index)}
-                                            onDragOver={(e) => handleBlockDragOver(e, index)}
-                                            onDragEnd={handleBlockDragEnd}
-                                            className={`bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-lg flex items-center gap-2 text-white text-sm font-medium cursor-grab active:cursor-grabbing hover:bg-white/20 transition-all ${draggedBlockIndex === index ? 'opacity-50 border-red-500' : ''}`}
-                                        >
-                                            <GripVertical size={14} className="opacity-50" />
-                                            <span className="bg-red-500/30 px-1.5 py-0.5 rounded text-xs font-bold">{index + 1}</span>
-                                            <span className="flex-1">{block.name}</span>
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={() => moveBlockUp(index)}
-                                                    disabled={index === 0}
-                                                    className="p-1 hover:bg-white/20 rounded disabled:opacity-30"
-                                                    title="ขึ้น"
-                                                >
-                                                    <ArrowUp size={12} />
-                                                </button>
-                                                <button
-                                                    onClick={() => moveBlockDown(index)}
-                                                    disabled={index === selectedBlocks.length - 1}
-                                                    className="p-1 hover:bg-white/20 rounded disabled:opacity-30"
-                                                    title="ลง"
-                                                >
-                                                    <ArrowDown size={12} />
-                                                </button>
-                                                <button
-                                                    onClick={() => removeBlock(block.id)}
-                                                    className="p-1 hover:bg-red-500/30 rounded text-red-300"
-                                                    title="ลบ"
-                                                >
-                                                    <X size={12} />
-                                                </button>
+                                {videoUrls.length > 0 ? (
+                                    <div className="space-y-2 max-h-24 overflow-y-auto">
+                                        {videoUrls.map((url, index) => (
+                                            <div key={index} className="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2">
+                                                <span className="text-purple-400 text-sm">🎬</span>
+                                                <a href={url} target="_blank" rel="noopener noreferrer" className="flex-1 text-slate-300 text-xs truncate hover:text-purple-400">{url}</a>
+                                                <button onClick={() => handleRemoveVideoUrl(url)} className="p-1 hover:bg-red-500/30 rounded text-red-400"><X size={12} /></button>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Video URLs Section - เฉพาะเจ้าของ Expander */}
-                        {!editingExpander?.fromMarketplace && (
-                            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4">
-                                <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-                                    🎬 ตัวอย่างวีดีโอ
-                                    <span className="text-xs text-slate-400 font-normal">(ต้องมีอย่างน้อย 1 URL ก่อนขาย)</span>
-                                </h3>
-                                <div className="space-y-3">
-                                    {/* Input เพิ่ม URL */}
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="url"
-                                            value={newVideoUrl}
-                                            onChange={(e) => setNewVideoUrl(e.target.value)}
-                                            placeholder="https://youtube.com/watch?v=..."
-                                            className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-sm"
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddVideoUrl()}
-                                        />
-                                        <button
-                                            onClick={handleAddVideoUrl}
-                                            className="group relative px-5 py-2.5 bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 hover:from-purple-500 hover:via-purple-400 hover:to-pink-400 rounded-xl text-white text-sm font-bold flex items-center gap-2 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 overflow-hidden"
-                                        >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                                            <Plus size={14} className="relative z-10 group-hover:rotate-90 transition-transform duration-300" />
-                                            <span className="relative z-10">Add VDO</span>
-                                        </button>
+                                        ))}
                                     </div>
-                                    
-                                    {/* รายการ URLs ที่เพิ่มแล้ว */}
-                                    {videoUrls.length > 0 ? (
-                                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                                            {videoUrls.map((url, index) => (
-                                                <div key={index} className="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2">
-                                                    <span className="text-purple-400 text-sm">🎬</span>
-                                                    <a 
-                                                        href={url} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
-                                                        className="flex-1 text-slate-300 text-sm truncate hover:text-purple-400"
-                                                    >
-                                                        {url}
-                                                    </a>
-                                                    <button
-                                                        onClick={() => handleRemoveVideoUrl(url)}
-                                                        className="p-1 hover:bg-red-500/30 rounded text-red-400"
-                                                    >
-                                                        <X size={14} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-slate-500 text-xs text-center py-2">ยังไม่มี URL วีดีโอ</p>
-                                    )}
-                                    
-                                    {/* Warning ถ้า blocks เปลี่ยน */}
-                                    {editingExpander && videoUrls.length > 0 && (
-                                        <p className="text-amber-400 text-xs flex items-center gap-1">
-                                            ⚠️ หากเพิ่ม/ลบ Block จะทำให้ URL วีดีโอหายไปทั้งหมด
-                                        </p>
-                                    )}
-                                </div>
+                                ) : (
+                                    <p className="text-slate-500 text-xs text-center py-2">ยังไม่มี URL วีดีโอ</p>
+                                )}
                             </div>
-                        )}
+                        </div>
                         
                         {/* Test Zone */}
-                        <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-4">
-                            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-                                <TestTube size={18} className="text-green-400" />
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                            <h3 className="text-xs font-semibold text-red-400 mb-3 uppercase tracking-wider flex items-center gap-2">
+                                <TestTube size={14} className="text-green-400" />
                                 ทดสอบ Expander
                             </h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-slate-300 text-sm mb-1 block">Prompt ทดสอบ (ภาษาไทย)</label>
+                                    <label className="text-slate-400 text-xs mb-1 block">Prompt ทดสอบ (ภาษาไทย)</label>
                                     <input
                                         type="text"
                                         value={testPrompt}
                                         onChange={(e) => setTestPrompt(e.target.value)}
-                                        placeholder="ใส่ Prompt สั้นๆ"
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                                        placeholder="มาลองทดสอบ Generate วัตถุดิบตัวไหนให้ดูก่อนไหมครับ?"
+                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-sm"
                                     />
                                 </div>
                                 {testResult && (
-                                    <div className="bg-white/5 border border-white/10 rounded-lg p-3 relative">
+                                    <div className="bg-black/30 border border-white/10 rounded-lg p-3 relative max-h-40 overflow-y-auto">
                                         <button
                                             onClick={handleCopyPrompt}
-                                            className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-500 rounded-lg text-white flex items-center gap-1 text-xs font-bold"
+                                            className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-500 rounded text-white text-xs font-bold flex items-center gap-1"
                                         >
-                                            {copied ? <Check size={14} /> : <Copy size={14} />}
-                                            {copied ? 'คัดลอกแล้ว!' : 'คัดลอก'}
+                                            {copied ? <Check size={12} /> : <Copy size={12} />}
                                         </button>
-                                        <p className="text-slate-200 text-sm whitespace-pre-wrap pr-24">{testResult}</p>
+                                        <p className="text-slate-200 text-xs whitespace-pre-wrap pr-12">{testResult}</p>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        
-                        {/* Action Buttons - 3 ปุ่มเรียงกัน ธีมส้มเหมือนกัน */}
-                        <div className="flex gap-3">
-                            <button
-                                onClick={handleTest}
-                                disabled={testing}
-                                className="group relative flex-1 py-3 bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:via-amber-400 hover:to-yellow-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                                {testing ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin relative z-10" />
-                                        <span className="relative z-10">ทดสอบ...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <TestTube size={16} className="relative z-10 group-hover:rotate-12 transition-transform duration-300" />
-                                        <span className="relative z-10">ทดสอบ</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="group relative flex-1 py-3 bg-gradient-to-r from-amber-600 via-orange-500 to-red-500 hover:from-amber-500 hover:via-orange-400 hover:to-red-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                                {saving ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin relative z-10" />
-                                        <span className="relative z-10">บันทึก...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save size={16} className="relative z-10 group-hover:rotate-12 transition-transform duration-300" />
-                                        <span className="relative z-10">{editingExpander ? 'อัปเดต' : 'บันทึก'}</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                className="group relative flex-1 py-3 bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 hover:from-rose-500 hover:via-orange-400 hover:to-amber-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30 hover:shadow-rose-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                                <Upload size={16} className="relative z-10 group-hover:rotate-12 transition-transform duration-300" />
-                                <span className="relative z-10">เผยแพร่</span>
-                            </button>
-                        </div>
+                    </div>
+                    
+                    {/* Action Buttons - Full Width */}
+                    <div className="col-span-12 flex gap-3">
+                        <button
+                            onClick={handleTest}
+                            disabled={testing}
+                            className="group relative flex-1 py-3 bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:via-amber-400 hover:to-yellow-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+                            {testing ? (
+                                <><Loader2 size={16} className="animate-spin relative z-10" /><span className="relative z-10">ทดสอบ...</span></>
+                            ) : (
+                                <><TestTube size={16} className="relative z-10" /><span className="relative z-10">ทดสอบ</span></>
+                            )}
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="group relative flex-1 py-3 bg-gradient-to-r from-amber-600 via-orange-500 to-red-500 hover:from-amber-500 hover:via-orange-400 hover:to-red-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+                            {saving ? (
+                                <><Loader2 size={16} className="animate-spin relative z-10" /><span className="relative z-10">บันทึก...</span></>
+                            ) : (
+                                <><Save size={16} className="relative z-10" /><span className="relative z-10">{editingExpander ? 'อัปเดต' : 'บันทึก'}</span></>
+                            )}
+                        </button>
+                        <button
+                            className="group relative flex-1 py-3 bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 hover:from-rose-500 hover:via-orange-400 hover:to-amber-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-500/30 hover:shadow-rose-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+                            <Upload size={16} className="relative z-10" /><span className="relative z-10">เผยแพร่</span>
+                        </button>
                     </div>
                 </div>
                 )}

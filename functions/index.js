@@ -2322,6 +2322,56 @@ Return ONLY the expanded prompt, no explanations.`;
     }
   });
 
+// Function: Expand Prompt with Custom Instructions (Gemini Gems Style)
+exports.expandPromptWithInstructions = functions
+  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60 })
+  .https.onCall(async (data, context) => {
+    const { simplePrompt, instructions } = data;
+
+    if (!simplePrompt || !instructions) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing simplePrompt or instructions');
+    }
+
+    try {
+      const openai = getOpenAI();
+
+      const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
+
+Your job is to expand a simple prompt into a detailed, cinematic prompt.
+
+=== CUSTOM INSTRUCTIONS (User-defined rules for this Expander) ===
+${instructions}
+
+=== OUTPUT RULES ===
+1. Write in English (required for Google Flow)
+2. For Thai names, include original in parentheses: "Bas (บาส)"
+3. Include: character descriptions, emotions, lighting, camera angles, ambient sounds
+4. Be cinematic and detailed
+5. Keep it under 500 words
+6. Follow ALL the custom instructions above strictly
+
+=== FORMAT ===
+Return ONLY the expanded prompt, no explanations.`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Expand this prompt: "${simplePrompt}"` }
+        ],
+        temperature: 0.8,
+        max_tokens: 1000
+      });
+
+      const expandedPrompt = response.choices[0].message.content.trim();
+
+      return { expandedPrompt };
+    } catch (error) {
+      console.error('Error expanding prompt with instructions:', error);
+      throw new functions.https.HttpsError('internal', error.message);
+    }
+  });
+
 // Function: Generate Custom Block via AI Chat
 exports.generateBlock = functions
   .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 30 })
