@@ -130,6 +130,7 @@ const ExpanderCreator = () => {
     const [selectedCategory, setSelectedCategory] = useState('Cinematic / Movie');
     const [selectedBlocks, setSelectedBlocks] = useState([]);
     const [customBlocks, setCustomBlocks] = useState([]);
+    const [scenesCount, setScenesCount] = useState(5); // จำนวน Scenes สำหรับ Expander นี้
     const [expandedCategories, setExpandedCategories] = useState({ language: true, style: true, lighting: true, audio: true });
     
     // Custom Groups State
@@ -899,6 +900,7 @@ const ExpanderCreator = () => {
                 blocks: selectedBlocks, // Keep for backward compatibility
                 customBlocks: customBlocks.filter(cb => selectedBlocks.find(sb => sb.id === cb.id)),
                 videoUrls: finalVideoUrls,
+                scenesCount: scenesCount, // จำนวน Scenes
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
@@ -960,6 +962,7 @@ const ExpanderCreator = () => {
             setExpanderDescription('');
             setExpanderInstructions(''); // Reset instructions
             setSelectedBlocks([]);
+            setScenesCount(5); // Reset scenes count
             setEditingExpander(null);
             clearThumbnail();
             setVideoUrls([]);
@@ -1014,6 +1017,7 @@ const ExpanderCreator = () => {
         setExpanderInstructions(expander.instructions || ''); // Load instructions
         setSelectedCategory(expander.categoryId);
         setSelectedBlocks(expander.blocks || []);
+        setScenesCount(expander.scenesCount || 5); // Load scenes count
         if (expander.customBlocks) {
             setCustomBlocks(prev => [...prev, ...expander.customBlocks]);
         }
@@ -1457,6 +1461,7 @@ const ExpanderCreator = () => {
                                         setExpanderDescription('');
                                         setExpanderInstructions(''); // Reset instructions
                                         setSelectedBlocks([]);
+                                        setScenesCount(5); // Reset scenes count
                                         setVideoUrls([]);
                                         setOriginalBlocksHash('');
                                         setNewVideoUrl('');
@@ -1719,16 +1724,34 @@ const ExpanderCreator = () => {
                 <div className="grid grid-cols-12 gap-6">
                     {/* Left Panel: Name, Description, Instructions (แบบ Gemini Gems) */}
                     <div className="col-span-7 space-y-4">
-                        {/* Name */}
+                        {/* Name + Scenes Row */}
                         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
-                            <label className="text-xs font-semibold text-red-400 mb-2 block uppercase tracking-wider">Name</label>
-                            <input
-                                type="text"
-                                value={expanderName}
-                                onChange={(e) => setExpanderName(e.target.value)}
-                                placeholder="เช่น ผู้กำกับผักปากจัด, Thai Drama Pro"
-                                className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 focus:shadow-lg focus:shadow-red-500/10 transition-all duration-300"
-                            />
+                            <div className="flex gap-4">
+                                {/* Name */}
+                                <div className="flex-1">
+                                    <label className="text-xs font-semibold text-red-400 mb-2 block uppercase tracking-wider">Name</label>
+                                    <input
+                                        type="text"
+                                        value={expanderName}
+                                        onChange={(e) => setExpanderName(e.target.value)}
+                                        placeholder="เช่น ผู้กำกับผักปากจัด, Thai Drama Pro"
+                                        className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:bg-black/60 focus:shadow-lg focus:shadow-red-500/10 transition-all duration-300"
+                                    />
+                                </div>
+                                {/* Scenes Count */}
+                                <div className="w-32">
+                                    <label className="text-xs font-semibold text-yellow-400 mb-2 block uppercase tracking-wider">Scenes</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={scenesCount}
+                                        onChange={(e) => setScenesCount(Math.max(1, Math.min(20, Number(e.target.value))))}
+                                        className="w-full bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-xl px-4 py-3 text-white text-center focus:outline-none focus:border-yellow-500/50 focus:bg-black/60 transition-all duration-300"
+                                    />
+                                    <p className="text-xs text-yellow-400/60 mt-1 text-center">จำนวนฉาก</p>
+                                </div>
+                            </div>
                         </div>
                         
                         {/* Description */}

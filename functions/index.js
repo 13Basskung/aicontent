@@ -2810,7 +2810,8 @@ Return ONLY the expanded prompt, no explanations.`;
 // TEST PROMPT PIPELINE
 // ============================================
 
-// Function: Test full prompt pipeline (Mode + Expander → Full Prompts + Titles + Tags)
+// Function: Test full prompt pipeline (Expander-based → Full Prompts + Titles + Tags)
+// MODE SYSTEM REMOVED - Now uses Expander's scenesCount and instructions
 exports.testPromptPipeline = functions
   .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 300, memory: '1GB' })
   .https.onCall(async (data, context) => {
@@ -2853,70 +2854,58 @@ exports.testPromptPipeline = functions
       }
       console.log(`📏 Scene Duration: ${sceneDuration} seconds`);
 
-      // 2. Get Mode
-      const modeId = project.executionModeId;
-      if (!modeId) {
-        throw new functions.https.HttpsError('failed-precondition', 'No Mode selected for this project');
+      // 2. Get Expander (REQUIRED - Mode System removed)
+      const expanderId = project.expanderId;
+      if (!expanderId) {
+        throw new functions.https.HttpsError('failed-precondition', 'No Expander selected for this project');
       }
 
-      const modeDoc = await db
+      const expanderDoc = await db
         .collection('users').doc(userId)
-        .collection('modes').doc(modeId)
+        .collection('expanders').doc(expanderId)
         .get();
 
-      if (!modeDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Mode not found');
+      if (!expanderDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Expander not found');
       }
-      const modeData = modeDoc.data();
+      const expanderData = expanderDoc.data();
+      const expanderBlocks = expanderData.blocks || [];
+      const expanderInstructions = expanderData.instructions || '';
+      const expanderScenesCount = expanderData.scenesCount || 5;
 
-      // 3. Get Expander (optional)
-      let expanderBlocks = [];
-      const expanderId = project.expanderId;
-      if (expanderId) {
-        const expanderDoc = await db
-          .collection('users').doc(userId)
-          .collection('expanders').doc(expanderId)
-          .get();
-
-        if (expanderDoc.exists) {
-          const expanderData = expanderDoc.data();
-          expanderBlocks = expanderData.blocks || [];
-        }
-      }
-
-      // 3.5. Get Episode from Content Queue using SHARED HELPER
-      // Read episode selection mode from project settings (default: sequential)
+      // 3. Get Episode from Content Queue using SHARED HELPER
       const episodeSelectionMode = project.episodeSelection || 'sequential';
       const projectRef = db.collection('users').doc(userId).collection('projects').doc(projectId);
       
-      // Use SHARED getNextEpisode helper (same logic as scheduleJobs)
       const episodeData = await getNextEpisode(projectRef, episodeSelectionMode);
 
       if (episodeData) {
         console.log(`📺 Episode Topic: "${episodeData.title}" (mode: ${episodeSelectionMode})`);
-        // NOTE: We do NOT change episode status for Test - it stays 'pending'
       } else {
-        console.log(`⚠️ No pending episodes, using Mode name as topic`);
+        console.log(`⚠️ No pending episodes, using Expander name as topic`);
       }
 
-      // 4. Extract Scenes from Mode using SHARED HELPER
-      const rawScenes = extractRawScenesFromMode(modeData);
-      const characters = modeData.characters || [];
-
-      if (rawScenes.length === 0) {
-        throw new functions.https.HttpsError('failed-precondition', 'Mode has no scenes. Add evolution steps to blocks.');
+      // 4. Generate scenes based on Expander's scenesCount (Mode System removed)
+      const rawScenes = [];
+      for (let i = 1; i <= expanderScenesCount; i++) {
+        rawScenes.push({
+          sceneNumber: i,
+          rawPrompt: `Scene ${i}`,
+          blockTitle: `Scene ${i} of ${expanderScenesCount}`
+        });
       }
+      const characters = []; // No characters from Mode
 
       // Build Episode context
-      const episodeTopic = episodeData?.title || modeData.name || 'Untitled Video';
-      const episodeDesc = episodeData?.description || modeData.description || '';
+      const episodeTopic = episodeData?.title || expanderData.name || 'Untitled Video';
+      const episodeDesc = episodeData?.description || expanderData.description || '';
 
-      console.log(`📋 testPromptPipeline: Using SHARED LOGIC (per-scene expansion)`);
+      console.log(`📋 testPromptPipeline: Using Expander-based logic`);
       console.log(`   Episode Topic: "${episodeTopic}"`);
-      console.log(`   Raw Scenes: ${rawScenes.length}`);
+      console.log(`   Scenes Count: ${expanderScenesCount}`);
       console.log(`   Expander Blocks: ${expanderBlocks.length}`);
 
-      // 5. Use SHARED HELPER for per-scene expansion (same as Production)
+      // 5. Use Expander instructions for expansion
       const expandedPrompts = await expandScenesWithTopic({
         rawScenes,
         expanderBlocks,
@@ -2924,15 +2913,15 @@ exports.testPromptPipeline = functions
         episodeDesc,
         characters,
         sceneDuration,
-        modeCategory: modeData.category,
-        systemInstruction: modeData.systemInstruction
+        modeCategory: expanderData.categoryId || 'General',
+        systemInstruction: expanderInstructions
       });
 
       // 6. Generate Titles and Tags using SHARED HELPER
       const titlesAndTags = await generateTitlesAndTags({
         episodeTopic,
         episodeDesc,
-        modeCategory: modeData.category,
+        modeCategory: expanderData.categoryId || 'General',
         expandedPrompts
       });
 
@@ -2953,9 +2942,8 @@ exports.testPromptPipeline = functions
         tags: result.tags,
         episodeId: episodeData?.id || null,
         episodeTitle: episodeData?.title || null,
-        modeId: modeId,
-        modeName: modeData.name || 'Unknown',
-        expanderId: expanderId || null,
+        expanderId: expanderId,
+        expanderName: expanderData.name || 'Unknown',
         expanderBlockCount: expanderBlocks.length,
         sceneCount: rawScenes.length,
         sceneDuration: sceneDuration,
@@ -2982,9 +2970,8 @@ exports.testPromptPipeline = functions
             ...result,
             testLogId: testLogRef.id,
             testedAt: admin.firestore.FieldValue.serverTimestamp(),
-            modeId: modeId,
-            modeName: modeData.name || 'Unknown',
-            expanderId: expanderId || null,
+            expanderId: expanderId,
+            expanderName: expanderData.name || 'Unknown',
             sceneCount: rawScenes.length,
             episodeId: episodeData?.id || null,
             episodeTitle: episodeData?.title || null
@@ -3005,8 +2992,8 @@ exports.testPromptPipeline = functions
           sceneDuration: sceneDuration,
           totalLength: rawScenes.length * sceneDuration,
           topic: episodeTopic,
-          modeId: modeId,
-          modeName: modeData.name || 'Unknown'
+          expanderId: expanderId,
+          expanderName: expanderData.name || 'Unknown'
         });
 
       console.log(`✅ Test Pipeline completed: ${result.prompts?.length || 0} prompts for project ${projectId}`);
@@ -3014,15 +3001,13 @@ exports.testPromptPipeline = functions
       return {
         success: true,
         ...result,
-        modeInfo: {
-          id: modeId,
-          name: modeData.name,
-          sceneCount: rawScenes.length
-        },
-        expanderInfo: expanderId ? {
+        expanderName: expanderData.name,
+        expanderInfo: {
           id: expanderId,
-          blockCount: expanderBlocks.length
-        } : null
+          name: expanderData.name,
+          blockCount: expanderBlocks.length,
+          sceneCount: rawScenes.length
+        }
       };
 
     } catch (error) {

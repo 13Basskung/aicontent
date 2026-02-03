@@ -146,7 +146,7 @@ const TimelineVisualizer = ({ slots }) => {
     );
 };
 
-export default function TimeSlotPicker({ projectId, modeScenes = null, userTimezone = 'Asia/Bangkok', onTimezoneChange = null }) {
+export default function TimeSlotPicker({ projectId, expanderScenes = null, userTimezone = 'Asia/Bangkok', onTimezoneChange = null }) {
     const { t } = useTranslation();
     const dropdownRef = useRef(null);
     const timezoneButtonRef = useRef(null);
@@ -173,17 +173,17 @@ export default function TimeSlotPicker({ projectId, modeScenes = null, userTimez
     // New Slot State: Platforms now store OBJECTS { platformId, accountId, name, avatar }
     const [newSlot, setNewSlot] = useState({
         start: '09:00',
-        scenes: modeScenes || 1,
+        scenes: expanderScenes || 1,
         sceneDuration: 8, // seconds per scene
         platforms: []
     });
 
-    // Sync scenes when modeScenes changes
+    // Sync scenes when expanderScenes changes
     useEffect(() => {
-        if (modeScenes && modeScenes > 0) {
-            setNewSlot(prev => ({ ...prev, scenes: modeScenes }));
+        if (expanderScenes && expanderScenes > 0) {
+            setNewSlot(prev => ({ ...prev, scenes: expanderScenes }));
         }
-    }, [modeScenes]);
+    }, [expanderScenes]);
 
     // Auth & Data Fetching
     useEffect(() => {
@@ -674,18 +674,18 @@ export default function TimeSlotPicker({ projectId, modeScenes = null, userTimez
                         {/* 2. Scenes Input */}
                         <div className="flex-shrink-0">
                             <label className="text-xs text-gray-400 mb-2 block uppercase tracking-wider font-semibold">
-                                Scenes {modeScenes ? <span className="text-purple-400">(Mode)</span> : ''}
+                                Scenes {expanderScenes ? <span className="text-yellow-400">(Expander)</span> : ''}
                             </label>
                             <input
                                 type="number"
                                 min="1" max="20"
-                                value={modeScenes || newSlot.scenes}
-                                onChange={e => !modeScenes && setNewSlot({ ...newSlot, scenes: Number(e.target.value) })}
-                                readOnly={!!modeScenes}
+                                value={expanderScenes || newSlot.scenes}
+                                onChange={e => !expanderScenes && setNewSlot({ ...newSlot, scenes: Number(e.target.value) })}
+                                readOnly={!!expanderScenes}
                                 className={twMerge(
                                     "w-20 h-12 border rounded-xl px-3 text-lg text-white text-center placeholder-white/20 outline-none transition-all",
-                                    modeScenes 
-                                        ? "bg-purple-500/10 border-purple-500/30 cursor-not-allowed" 
+                                    expanderScenes 
+                                        ? "bg-yellow-500/10 border-yellow-500/30 cursor-not-allowed" 
                                         : "bg-white/5 border-white/10 focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50"
                                 )}
                             />

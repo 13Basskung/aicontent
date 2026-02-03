@@ -1318,13 +1318,20 @@ export default function Projects() {
 
                                     </div>
 
-                                    {/* TimeSlotPicker (Mode System removed - no modeScenes lock) */}
-                                    <TimeSlotPicker 
-                                        projectId={selectedProject.id} 
-                                        key={selectedProject.id}
-                                        userTimezone={userTimezone}
-                                        onTimezoneChange={handleTimezoneChange}
-                                    />
+                                    {/* TimeSlotPicker - ดึง scenes จาก Expander */}
+                                    {(() => {
+                                        const selectedExpander = expanders.find(ex => ex.id === selectedExpanderId);
+                                        const expanderScenes = selectedExpander?.scenesCount || null;
+                                        return (
+                                            <TimeSlotPicker 
+                                                projectId={selectedProject.id} 
+                                                expanderScenes={expanderScenes}
+                                                key={`${selectedProject.id}-${expanderScenes}`}
+                                                userTimezone={userTimezone}
+                                                onTimezoneChange={handleTimezoneChange}
+                                            />
+                                        );
+                                    })()}
 
                                     {/* ========================================== */}
                                     {/* TEST PROMPT PIPELINE SECTION */}
