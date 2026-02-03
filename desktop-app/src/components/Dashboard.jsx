@@ -971,11 +971,14 @@ function Dashboard({ keyData }) {
                   const today = new Date();
                   const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
                   const todayCode = dayNames[today.getDay()];
+                  // Debug: ดูว่า slot.day เป็นอะไร
+                  console.log(`📅 ${project.name}: todayCode=${todayCode}, slots=`, slots.map(s => ({ day: s.day, time: s.time })));
                   const hasTaskToday = slots.some(slot => slot.day === todayCode);
+                  const todaySlots = slots.filter(s => s.day === todayCode);
                   return (
                     <span className="flex items-center gap-1.5 text-xs text-gray-400">
                       <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                      {hasTaskToday ? `มีงานวันนี้ (${slots.filter(s => s.day === todayCode).length} slots)` : 'ไม่มีงานวันนี้'}
+                      {hasTaskToday ? `มีงานวันนี้ (${todaySlots.length} slots)` : 'ไม่มีงานวันนี้'}
                     </span>
                   );
                 })()}
