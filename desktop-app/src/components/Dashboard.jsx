@@ -251,6 +251,8 @@ function Dashboard({ keyData }) {
           }
         }
       }
+      console.log('🔥 SLOTS CACHE LOADED:', newSlotsCache);
+      console.log('🔥 EXPANDER CACHE LOADED:', newExpanderCache);
       setProjectSlotsCache(newSlotsCache);
       setExpanderCache(newExpanderCache);
 
@@ -838,6 +840,16 @@ function Dashboard({ keyData }) {
 
       {/* Tab Content: Debug Selector (Admin only) */}
       {activeTab === 'debug' && keyData?.isAdmin && (
+        <div className="space-y-4">
+          {/* Console Button - ปุ่มเปิด DevTools */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => window.electronAPI?.openDevTools?.()}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm rounded-lg flex items-center gap-2 transition-colors"
+            >
+              🖥️ เปิด Console (DevTools)
+            </button>
+          </div>
         <DebugSelectorPanel 
           blocks={blocks}
           onShootToStep={(step) => {
@@ -893,6 +905,7 @@ function Dashboard({ keyData }) {
             }
           }}
         />
+        </div>
       )}
 
       {/* Projects Section - Only show on Instances tab */}
