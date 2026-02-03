@@ -207,5 +207,15 @@ service cloud.firestore {
     match /users/{userId}/instance_settings/{instanceId} {
       allow read, write: if true; // Allow Desktop Agent to save instance block selections
     }
+
+    // 🟢 DESKTOP APP: Allow Agent to read user expanders (for SCENES display)
+    match /users/{userId}/expanders/{expanderId} {
+      allow read: if true; // Allow Desktop Agent to read expanders
+    }
+
+    // 🟢 DESKTOP APP: Allow Agent to read user slots (for posting schedule)
+    match /users/{userId}/projects/{projectId}/slots/{slotId} {
+      allow read: if true; // Allow Desktop Agent to read slots
+    }
   }
 }
