@@ -196,27 +196,7 @@ function Dashboard({ keyData }) {
     }
   }
 
-  // Load slots and expanders for ALL projects (not just instances)
-  useEffect(() => {
-    async function loadAllData() {
-      // Clear cache first to ensure fresh data
-      setProjectSlotsCache({});
-      setExpanderCache({});
-      
-      console.log(`🔄 Loading slots and expanders for ${projects.length} projects`);
-      
-      // Load for ALL projects, not just instances
-      for (const project of projects) {
-        if (project?.id) {
-          await loadProjectSlots(project.id);
-          await loadProjectExpander(project);
-        }
-      }
-    }
-    if (projects.length > 0) {
-      loadAllData();
-    }
-  }, [projects]);
+  // NOTE: Slots and expanders are now loaded in loadData() for immediate availability
 
   async function loadData() {
     setLoading(true);
@@ -229,6 +209,36 @@ function Dashboard({ keyData }) {
       // Create a map of valid projectIds for this user
       const validProjectIds = new Set(projectsData.map(p => p.id));
       console.log(`✅ Valid projectIds for user ${keyData.userId}:`, Array.from(validProjectIds));
+      
+      // Load slots and expanders for ALL projects immediately
+      const newSlotsCache = {};
+      const newExpanderCache = {};
+      for (const project of projectsData) {
+        if (project?.id) {
+          // Load slots
+          try {
+            const slots = await fetchSlots(keyData.userId, project.id);
+            newSlotsCache[project.id] = slots;
+          } catch (err) {
+            console.error(`Failed to load slots for project ${project.id}:`, err);
+            newSlotsCache[project.id] = [];
+          }
+          // Load expander
+          if (project.expanderId) {
+            try {
+              const expander = await fetchExpander(keyData.userId, project.expanderId);
+              if (expander) {
+                newExpanderCache[project.id] = expander;
+                console.log(`📦 Expander "${expander.name}" loaded: scenesCount=${expander.scenesCount}`);
+              }
+            } catch (err) {
+              console.error(`Failed to load expander for project ${project.id}:`, err);
+            }
+          }
+        }
+      }
+      setProjectSlotsCache(newSlotsCache);
+      setExpanderCache(newExpanderCache);
 
       // Fetch global blocks + user-specific settings
       const [blocksData, userBlockSettings] = await Promise.all([
