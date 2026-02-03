@@ -33,7 +33,7 @@ async function callGemini(prompt, systemInstruction = '') {
     : `IMPORTANT: Return valid JSON only, no markdown.\n\n${prompt}`;
   
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-pro',
     contents: fullPrompt
   });
   
