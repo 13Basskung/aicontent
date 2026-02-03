@@ -33,7 +33,8 @@ function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
   const [shootValue, setShootValue] = useState('');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
 
-  const runningInstances = instances.filter(i => i.status === 'ready' || i.status === 'idle');
+  // Filter instances that have a browser running (not 'stopped' or 'error')
+  const runningInstances = instances.filter(i => i.status && i.status !== 'stopped' && i.status !== 'error' && i.status !== 'launching');
 
   const executeHumanSimulation = async (type) => {
     if (!selector.trim()) {
