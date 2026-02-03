@@ -217,5 +217,10 @@ service cloud.firestore {
     match /users/{userId}/projects/{projectId}/slots/{slotId} {
       allow read: if true; // Allow Desktop Agent to read slots
     }
+
+    // 🟢 DESKTOP APP: Allow Agent to read execution_logs (for debug/history)
+    match /users/{userId}/projects/{projectId}/execution_logs/{logId} {
+      allow read: if true; // Allow Desktop Agent to read execution logs
+    }
   }
 }
