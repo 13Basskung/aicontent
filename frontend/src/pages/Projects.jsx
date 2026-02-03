@@ -35,8 +35,7 @@ export default function Projects() {
     const [isSaving, setIsSaving] = useState(false);
 
     // --- NEW: Project Execution State ---
-    const [modes, setModes] = useState([]);
-    const [selectedModeId, setSelectedModeId] = useState('');
+    // REMOVED: modes state (Mode System replaced by Expander)
     const [formValues, setFormValues] = useState({});
     const [runningProjectIds, setRunningProjectIds] = useState([]); // NEW: Track multiple running projects
     
@@ -64,8 +63,7 @@ export default function Projects() {
         return lockedIds;
     };
 
-    // คำนวณ locked IDs สำหรับ Modes และ Expanders
-    const lockedModeIds = getLockedIds(modes, subStatus.limits?.modes || 0);
+    // คำนวณ locked IDs สำหรับ Expanders (Mode System ถูกลบแล้ว)
     const lockedExpanderIds = getLockedIds(
         expanders.filter(exp => exp.source !== 'purchased' && !exp.fromMarketplace && !exp.isTrial && !exp.originalExpanderId && !exp.purchasedAt && !exp.receivedFree),
         subStatus.limits?.extenders || 0
@@ -235,17 +233,7 @@ export default function Projects() {
                     setProjects(loadedProjects);
                 });
 
-                // 2. Fetch Modes (NEW)
-                const modesRef = collection(db, 'users', user.uid, 'modes');
-                const unsubscribeModes = onSnapshot(modesRef, (snapshot) => {
-                    const loadedModes = [];
-                    snapshot.forEach(doc => {
-                        loadedModes.push({ id: doc.id, ...doc.data() });
-                    });
-                    setModes(loadedModes);
-                });
-                
-                // 3. Fetch Expanders
+                // 2. Fetch Expanders (Mode System removed)
                 const expandersRef = collection(db, 'users', user.uid, 'expanders');
                 const unsubscribeExpanders = onSnapshot(expandersRef, (snapshot) => {
                     const loadedExpanders = [];
@@ -257,13 +245,11 @@ export default function Projects() {
 
                 return () => {
                     unsubscribeSnapshot();
-                    unsubscribeModes();
                     unsubscribeExpanders();
                 };
             } else {
                 setProjects([]);
                 setSelectedProject(null);
-                setModes([]);
                 setExpanders([]);
             }
         });
@@ -325,44 +311,27 @@ export default function Projects() {
 
 
 
-    // --- SYNC MODE SELECTION & VARIABLES & EXPANDER ---
+    // --- SYNC EXPANDER SELECTION (Mode System removed) ---
     useEffect(() => {
         if (selectedProject) {
-            // 1. Sync Mode ID - Only if mode exists in modes array
-            if (selectedProject.executionModeId && modes.length > 0) {
-                const modeExists = modes.some(m => m.id === selectedProject.executionModeId);
-                if (modeExists) {
-                    setSelectedModeId(selectedProject.executionModeId);
-                } else {
-                    // Mode doesn't exist, select first available
-                    setSelectedModeId(modes[0].id);
-                }
-            } else if (modes.length > 0 && !selectedProject.executionModeId) {
-                // No mode saved, auto-select first
-                setSelectedModeId(modes[0].id);
-            } else {
-                setSelectedModeId('');
-            }
-
-            // 2. Sync Variable Values (Deep Load)
+            // 1. Sync Variable Values (Deep Load)
             if (selectedProject.variableValues) {
                 setFormValues(selectedProject.variableValues);
             } else {
                 setFormValues({});
             }
             
-            // 3. Sync Expander ID
+            // 2. Sync Expander ID
             if (selectedProject.expanderId) {
                 setSelectedExpanderId(selectedProject.expanderId);
             } else {
                 setSelectedExpanderId('');
             }
         } else {
-            setSelectedModeId('');
             setFormValues({});
             setSelectedExpanderId('');
         }
-    }, [selectedProject, modes]);
+    }, [selectedProject]);
 
     // --- NEW: SCHEDULING & LOGS STATE ---
     const [mockLogs, setMockLogs] = useState([]);
@@ -517,26 +486,9 @@ export default function Projects() {
         const isRunning = targetProject.status === 'running';
         const newStatus = isRunning ? 'idle' : 'running';
 
-        // ✅ VALIDATION: ต้องเลือก Mode และ Expander ก่อน Run
+        // ✅ VALIDATION: ต้องเลือก Expander ก่อน Run (Mode System removed)
         if (!isRunning) {
-            const hasModeId = targetProject.executionModeId;
             const hasExpanderId = targetProject.expanderId;
-            
-            if (!hasModeId && !hasExpanderId) {
-                showAlert(
-                    '⚠️ กรุณาเลือก Mode และ Expander ก่อนกด Run\n\nไปที่ Dashboard > เลือก Mode และ Expander ให้ครบ',
-                    '❌ ไม่สามารถ Run ได้'
-                );
-                return;
-            }
-            
-            if (!hasModeId) {
-                showAlert(
-                    '⚠️ กรุณาเลือก Execution Mode ก่อนกด Run\n\nไปที่ Dashboard > Select Execution Mode',
-                    '❌ ไม่สามารถ Run ได้'
-                );
-                return;
-            }
             
             if (!hasExpanderId) {
                 showAlert(
@@ -565,7 +517,7 @@ export default function Projects() {
         }
     };
 
-    const selectedMode = modes.find(m => m.id === selectedModeId);
+    // REMOVED: selectedMode (Mode System removed)
 
     // --- NEW: Inline Renaming State ---
     const [editingProjectId, setEditingProjectId] = useState(null);
@@ -816,16 +768,6 @@ export default function Projects() {
                                     <span>{projects.length}/{subStatus.limits.projects}</span>
                                     <span className="text-white/60">Projects</span>
                                 </div>
-                                {/* Modes Box */}
-                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-semibold border ${
-                                    modes.length >= (subStatus.limits.modes || 0) 
-                                        ? 'bg-red-500/20 text-red-300 border-red-500/30' 
-                                        : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                                }`}>
-                                    <Layers size={14} />
-                                    <span>{modes.length}/{subStatus.limits.modes || 0}</span>
-                                    <span className="text-white/60">Modes</span>
-                                </div>
                                 {/* Extenders Box - นับเฉพาะที่สร้างเอง (ไม่รวมที่ซื้อมา/ทดลอง) */}
                                 {(() => {
                                     // นับเฉพาะ Expander ที่สร้างเอง: ไม่รวมที่มาจาก Marketplace (ทั้งเก่าและใหม่)
@@ -955,14 +897,8 @@ export default function Projects() {
                                         )}
                                     >
                                         {(() => {
-                                            // Match associated mode logic
-                                            const associatedMode = modes.find(m =>
-                                                m.id === project.executionModeId ||
-                                                m.name === project.executionMode
-                                            );
-
-                                            // Priority: project.coverImage > modeImageUrl
-                                            const imageUrl = project.coverImage || associatedMode?.coverImage;
+                                            // Use project coverImage only (Mode System removed)
+                                            const imageUrl = project.coverImage;
                                             const isUploading = uploadingProjectId === project.id;
 
                                             return (
@@ -1175,121 +1111,6 @@ export default function Projects() {
 
                                         <div className="flex flex-col gap-4 relative z-10">
 
-                                            {/* MODE BOX - Contains Selector + Info */}
-                                            <div className="w-full bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
-                                                {/* Warning: Selected Mode is Locked */}
-                                                {selectedModeId && lockedModeIds.has(selectedModeId) && (
-                                                    <div className="mb-3 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-start gap-2">
-                                                        <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
-                                                        <div className="text-xs text-red-300">
-                                                            <span className="font-bold">⚠️ Mode ที่คุณเลือกถูกล็อคอยู่</span>
-                                                            <p className="mt-1 text-red-300/80">กรุณาเลือก Mode ที่ใช้งานได้ หรือ Upgrade เพื่อปลดล็อค</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* Mode Selector */}
-                                                <div className="mb-4">
-                                                    <label className="text-xs text-purple-300 uppercase font-bold mb-2 flex items-center gap-2">
-                                                        <Layers size={14} /> Select Execution Mode
-                                                    </label>
-                                                    <div className="glass-dropdown-wrapper w-full">
-                                                        <GlassDropdown
-                                                            value={selectedModeId}
-                                                            onChange={async (newModeId) => {
-                                                                setSelectedModeId(newModeId);
-
-                                                                // OPTIMISTIC UPDATE: Update Firestore Immediately
-                                                                if (selectedProject && newModeId) {
-                                                                    const modeObj = modes.find(m => m.id === newModeId);
-                                                                    if (modeObj) {
-                                                                        try {
-                                                                            const projectRef = doc(db, 'users', currentUser.uid, 'projects', selectedProject.id);
-                                                                            await updateDoc(projectRef, {
-                                                                                executionMode: modeObj.name,
-                                                                                executionModeId: modeObj.id
-                                                                            });
-                                                                            console.log("Optimistic Update: Mode set to", modeObj.name);
-                                                                        } catch (err) {
-                                                                            console.error("Error updating mode:", err);
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }}
-                                                            options={
-                                                                modes.length > 0
-                                                                    ? modes.map(m => ({
-                                                                        value: m.id,
-                                                                        label: lockedModeIds.has(m.id) ? `🔒 ${m.name}` : m.name,
-                                                                        disabled: lockedModeIds.has(m.id)
-                                                                    }))
-                                                                    : [{ value: '', label: 'No modes found', disabled: true }]
-                                                            }
-                                                            disabled={modes.length === 0}
-                                                            buttonClassName="glass-dropdown w-full"
-                                                        />
-                                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" size={16} />
-                                                    </div>
-                                                </div>
-
-                                                {/* Mode Info - Show when selected */}
-                                                {selectedModeId && (() => {
-                                                    const selectedModeData = modes.find(m => m.id === selectedModeId);
-                                                    
-                                                    // Always show Mode Info section
-                                                    const totalScenes = selectedModeData 
-                                                        ? (selectedModeData.blocks || []).reduce((acc, block) => acc + (block.evolution?.length || 0), 0)
-                                                        : 0;
-                                                    
-                                                    return (
-                                                        <div className="flex items-start justify-between gap-4 pt-4 border-t border-purple-500/20">
-                                                            {/* Left: Info */}
-                                                            <div className="flex-1">
-                                                                <label className="text-xs text-purple-300/70 uppercase font-bold mb-2 flex items-center gap-2">
-                                                                    <Layers size={12} /> Mode Info
-                                                                </label>
-                                                                {/* คำอธิบายภาษาบ้านๆ */}
-                                                                <p className="text-sm text-white/80 mb-3 leading-relaxed">
-                                                                    🎯 <strong>Mode</strong> = "สูตรสำเร็จ" ในการสร้างวิดีโอ กำหนดว่าวิดีโอจะมีกี่ฉาก เล่าเรื่องแบบไหน ใช้ตัวละครอะไร
-                                                                </p>
-                                                                {selectedModeData ? (
-                                                                    <>
-                                                                        {selectedModeData.description && (
-                                                                            <p className="text-sm text-white/60 mb-3 italic border-l-2 border-purple-500/30 pl-3">{selectedModeData.description}</p>
-                                                                        )}
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            <span className="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30" title="จำนวนตอนหลัก">
-                                                                                📽️ {(selectedModeData.blocks || []).length} ตอน
-                                                                            </span>
-                                                                            <span className="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30" title="จำนวนฉากทั้งหมด">
-                                                                                🎬 {totalScenes} ฉาก
-                                                                            </span>
-                                                                            {selectedModeData.storyOverview?.tone && (
-                                                                                <span className="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30" title="อารมณ์ของเรื่อง">
-                                                                                    🎭 {selectedModeData.storyOverview.tone}
-                                                                                </span>
-                                                                            )}
-                                                                            {(selectedModeData.characters || []).length > 0 && (
-                                                                                <span className="px-2 py-1 rounded-lg text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30" title="ตัวละครที่ใช้">
-                                                                                    👥 {selectedModeData.characters.length} ตัวละคร
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </>
-                                                                ) : (
-                                                                    <p className="text-yellow-400 text-sm">⏳ กำลังโหลดข้อมูล Mode... (ID: {selectedModeId})</p>
-                                                                )}
-                                                            </div>
-                                                            {/* Right: Thumbnail */}
-                                                            {selectedModeData?.coverImage && (
-                                                                <div className="w-40 h-40 rounded-lg overflow-hidden border border-purple-500/30 shrink-0">
-                                                                    <img src={selectedModeData.coverImage} alt={selectedModeData.name} className="w-full h-full object-cover" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-
                                             {/* EXPANDER BOX - Contains Selector + Blocks */}
                                             <div className="w-full bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
                                                 {/* Warning: Selected Expander is Locked */}
@@ -1384,43 +1205,8 @@ export default function Projects() {
                                                 })()}
                                             </div>
 
-                                            {/* BOTTOM ROW: Variables & Buttons - Grid Layout */}
-                                            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-
-                                                {/* Dynamic Variable Inputs */}
-                                                {selectedMode && selectedMode.variables && selectedMode.variables.map((variable, idx) => (
-                                                    <div key={idx} className="w-full">
-                                                        <label className="text-xs text-blue-300 uppercase font-bold mb-2 flex items-center gap-2">
-                                                            <AlignLeft size={14} /> {variable.name || `Input ${idx + 1}`}
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={formValues[variable.name] || ''}
-                                                            onChange={(e) => {
-                                                                const newVal = e.target.value;
-                                                                setFormValues(prev => {
-                                                                    const updated = { ...prev, [variable.name]: newVal };
-
-                                                                    // DEBOUNCED AUTO-SAVE
-                                                                    if (currentUser && selectedProject) {
-                                                                        clearTimeout(window[`save_timers_${variable.name}`]);
-                                                                        window[`save_timers_${variable.name}`] = setTimeout(async () => {
-                                                                            console.log(`💾 Auto-saving input: ${variable.name}`);
-                                                                            const projectRef = doc(db, 'users', currentUser.uid, 'projects', selectedProject.id);
-                                                                            await setDoc(projectRef, {
-                                                                                variableValues: updated,
-                                                                                lastUpdated: serverTimestamp()
-                                                                            }, { merge: true });
-                                                                        }, 1000);
-                                                                    }
-                                                                    return updated;
-                                                                });
-                                                            }}
-                                                            placeholder={`Enter ${variable.name}...`}
-                                                            className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all placeholder-white/20"
-                                                        />
-                                                    </div>
-                                                ))}
+                                            {/* BOTTOM ROW: Buttons (Mode Variables removed) */}
+                                            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">{/* Dynamic Variable Inputs removed - Mode System replaced by Expander */}
                                             </div>
                                         </div>
 
@@ -1532,20 +1318,13 @@ export default function Projects() {
 
                                     </div>
 
-                                    {/* Pass modeScenes to TimeSlotPicker - locks Scenes input to Mode's scene count */}
-                                    {(() => {
-                                        const selectedModeData = modes.find(m => m.id === selectedModeId);
-                                        const modeScenes = selectedModeData 
-                                            ? (selectedModeData.blocks || []).reduce((acc, block) => acc + (block.evolution?.length || 0), 0)
-                                            : null;
-                                        return <TimeSlotPicker 
-                                            projectId={selectedProject.id} 
-                                            modeScenes={modeScenes} 
-                                            key={`${selectedProject.id}-${modeScenes}`}
-                                            userTimezone={userTimezone}
-                                            onTimezoneChange={handleTimezoneChange}
-                                        />;
-                                    })()}
+                                    {/* TimeSlotPicker (Mode System removed - no modeScenes lock) */}
+                                    <TimeSlotPicker 
+                                        projectId={selectedProject.id} 
+                                        key={selectedProject.id}
+                                        userTimezone={userTimezone}
+                                        onTimezoneChange={handleTimezoneChange}
+                                    />
 
                                     {/* ========================================== */}
                                     {/* TEST PROMPT PIPELINE SECTION */}
@@ -1559,14 +1338,14 @@ export default function Projects() {
                                                 </div>
                                                 <div>
                                                     <h3 className="text-lg font-bold text-white">Test Prompt Pipeline</h3>
-                                                    <p className="text-xs text-orange-300/60">ทดสอบสร้าง Prompts จาก Mode + Expander ก่อนใช้งานจริง</p>
+                                                    <p className="text-xs text-orange-300/60">ทดสอบสร้าง Prompts จาก Expander ก่อนใช้งานจริง</p>
                                                 </div>
                                             </div>
                                             <button
                                                 onClick={handleTestPromptPipeline}
-                                                disabled={isTestingPrompt || !selectedModeId}
+                                                disabled={isTestingPrompt || !selectedExpanderId}
                                                 className={`group relative flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 overflow-hidden ${
-                                                    !selectedModeId 
+                                                    !selectedExpanderId 
                                                         ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                                                         : 'bg-gradient-to-r from-orange-600 to-red-600 text-white hover:scale-105 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50'
                                                 }`}
@@ -1586,10 +1365,10 @@ export default function Projects() {
                                             </button>
                                         </div>
 
-                                        {/* No Mode Selected Warning */}
-                                        {!selectedModeId && (
+                                        {/* No Expander Selected Warning */}
+                                        {!selectedExpanderId && (
                                             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-center">
-                                                <p className="text-yellow-400 text-sm">⚠️ กรุณาเลือก Mode ก่อนทดสอบ</p>
+                                                <p className="text-yellow-400 text-sm">⚠️ กรุณาเลือก Expander ก่อนทดสอบ</p>
                                             </div>
                                         )}
 
@@ -1602,7 +1381,7 @@ export default function Projects() {
                                                         <CheckCircle size={24} className="text-green-400" />
                                                         <div>
                                                             <p className="text-green-400 font-bold">✅ สร้าง {testResult.prompts?.length || 0} Prompts สำเร็จ!</p>
-                                                            <p className="text-green-300/60 text-xs">Mode: {testResult.modeInfo?.name || testResult.modeName} | Scenes: {testResult.modeInfo?.sceneCount || testResult.sceneCount}</p>
+                                                            <p className="text-green-300/60 text-xs">Expander: {testResult.expanderName || 'N/A'} | Prompts: {testResult.prompts?.length || 0}</p>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">

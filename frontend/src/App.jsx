@@ -16,7 +16,7 @@ import PlatformSetupUser from './pages/PlatformSetupUser';
 import OAuthCallback from './pages/OAuthCallback';
 import Admin from './pages/Admin';
 
-import ModeCreator from './pages/ModeCreator';
+// import ModeCreator from './pages/ModeCreator'; // REMOVED: Mode System replaced by Expander
 import Marketplace from './pages/Marketplace';
 import Characters from './pages/Characters';
 import ExpanderCreator from './pages/ExpanderCreator';
@@ -247,9 +247,8 @@ return (
         <NavItem to="/" icon={LayoutDashboard} label={t('common.dashboard')} />
         
         {/* VDO Creator Dropdown */}
-        <NavItemDropdown icon={Video} label="VDO Creator" childPaths={['/projects', '/mode-creator', '/expander', '/characters']}>
+        <NavItemDropdown icon={Video} label="VDO Creator" childPaths={['/projects', '/expander', '/characters']}>
           <SubNavItem to="/projects" icon={FolderKanban} label="Projects" />
-          <SubNavItem to="/mode-creator" icon={Wand2} label="Mode System" />
           <SubNavItem to="/expander" icon={Sparkles} label="Expander" />
           <SubNavItem to="/characters" icon={Users} label="Characters" />
         </NavItemDropdown>
@@ -333,7 +332,7 @@ return (
           <Route path="/platforms/setup/:platform/:accountId" element={<PlatformSetupUser />} />
           {isAdmin && <Route path="/platforms/setup-admin/:platform/:accountId" element={<PlatformSetup />} />}
           <Route path="/oauth/callback" element={<OAuthCallback />} />
-          <Route path="/mode-creator" element={<ModeCreator />} />
+          {/* <Route path="/mode-creator" element={<ModeCreator />} /> REMOVED: Mode System */}
           <Route path="/expander" element={<ExpanderCreator />} />
           <Route path="/characters" element={<Characters />} />
           <Route path="/marketplace" element={<Marketplace />} />

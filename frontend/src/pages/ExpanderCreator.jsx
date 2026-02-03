@@ -1877,127 +1877,128 @@ Output: ให้แสดงผล 5 Prompts...
                             </div>
                         </div>
                         
-                        {/* Test Zone */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
-                            <h3 className="text-xs font-semibold text-red-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                                <TestTube size={14} className="text-green-400" />
+                    </div>
+                    
+                    {/* Test Zone - Full Width */}
+                    <div className="col-span-12 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                                <TestTube size={16} className="text-green-400" />
                                 ทดสอบ Expander
                             </h3>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-slate-400 text-xs mb-1 block">Prompt ทดสอบ (ภาษาไทย)</label>
-                                    <input
-                                        type="text"
-                                        value={testPrompt}
-                                        onChange={(e) => setTestPrompt(e.target.value)}
-                                        placeholder="มาลองทดสอบ Generate วัตถุดิบตัวไหนให้ดูก่อนไหมครับ?"
-                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 text-sm"
-                                    />
-                                </div>
-                                {/* Structured Result Display */}
-                                {structuredResult?.prompts && structuredResult.prompts.length > 0 ? (
-                                    <div className="space-y-2 max-h-80 overflow-y-auto">
-                                        {/* Copy All Button */}
-                                        <div className="flex justify-end mb-2">
-                                            <button
-                                                onClick={handleCopyPrompt}
-                                                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-white text-xs font-bold flex items-center gap-1.5"
-                                            >
-                                                {copied ? <Check size={12} /> : <Copy size={12} />}
-                                                {copied ? 'Copied!' : 'Copy All'}
-                                            </button>
-                                        </div>
-                                        
-                                        {/* Individual Prompt Cards */}
-                                        {structuredResult.prompts.map((p, idx) => {
-                                            const style = getPromptTypeStyle(p.type);
-                                            return (
-                                                <div 
-                                                    key={idx} 
-                                                    className={`bg-gradient-to-br ${style.color} border ${style.border} rounded-xl p-3 relative group`}
-                                                >
-                                                    {/* Header */}
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-lg">{style.icon}</span>
-                                                            <span className="text-white font-semibold text-sm">
-                                                                {p.type === 'social' ? 'Social' : `Prompt ${p.index}`}: {p.title}
-                                                            </span>
-                                                            {p.duration && (
-                                                                <span className="bg-white/10 px-2 py-0.5 rounded text-xs text-slate-300">
-                                                                    {p.duration}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <button
-                                                            onClick={() => handleCopyIndividualPrompt(p, idx)}
-                                                            className="opacity-0 group-hover:opacity-100 p-1.5 bg-white/20 hover:bg-white/30 rounded text-white transition-opacity"
-                                                            title="Copy this prompt"
-                                                        >
-                                                            {copiedIndex === idx ? <Check size={12} /> : <Copy size={12} />}
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    {/* Content based on type */}
-                                                    {p.type === 'image' && (
-                                                        <p className="text-slate-200 text-xs leading-relaxed">{p.prompt}</p>
-                                                    )}
-                                                    
-                                                    {p.type === 'video' && (
-                                                        <div className="space-y-1.5 text-xs">
-                                                            <p className="text-slate-300"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
-                                                            <p className="text-slate-300"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
-                                                            <p className="text-slate-300"><span className="text-purple-400 font-medium">Technical:</span> {p.technical}</p>
-                                                            <p className="text-slate-300"><span className="text-pink-400 font-medium">Audio:</span> {p.audio}</p>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {p.type === 'social' && (
-                                                        <div className="space-y-2 text-xs">
-                                                            <p className="text-slate-200">{p.description}</p>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {p.hashtags?.map((tag, i) => (
-                                                                    <span key={i} className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-xs">
-                                                                        {tag}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : testResult && (
-                                    /* Fallback: Plain text display */
-                                    <div className="bg-black/30 border border-white/10 rounded-lg p-3 relative max-h-40 overflow-y-auto">
-                                        <button
-                                            onClick={handleCopyPrompt}
-                                            className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-500 rounded text-white text-xs font-bold flex items-center gap-1"
-                                        >
-                                            {copied ? <Check size={12} /> : <Copy size={12} />}
-                                        </button>
-                                        <p className="text-slate-200 text-xs whitespace-pre-wrap pr-12">{testResult}</p>
-                                    </div>
-                                )}
-                            </div>
+                            {structuredResult?.prompts && (
+                                <button
+                                    onClick={handleCopyPrompt}
+                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-white text-xs font-bold flex items-center gap-1.5"
+                                >
+                                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                                    {copied ? 'Copied!' : 'Copy All'}
+                                </button>
+                            )}
                         </div>
+                        
+                        {/* Input Row */}
+                        <div className="flex gap-3 mb-4">
+                            <input
+                                type="text"
+                                value={testPrompt}
+                                onChange={(e) => setTestPrompt(e.target.value)}
+                                placeholder="ใส่ Prompt ทดสอบ เช่น: มะเขือเทศ, บาสคุยกับออยลี่..."
+                                className="flex-1 bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                            />
+                            <button
+                                onClick={handleTest}
+                                disabled={testing}
+                                className="px-6 py-3 bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:via-amber-400 hover:to-yellow-400 rounded-lg text-white font-bold flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {testing ? <Loader2 size={16} className="animate-spin" /> : <TestTube size={16} />}
+                                {testing ? 'กำลังทดสอบ...' : 'ทดสอบ'}
+                            </button>
+                        </div>
+                        
+                        {/* Structured Result Display */}
+                        {structuredResult?.prompts && structuredResult.prompts.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                                {structuredResult.prompts.map((p, idx) => {
+                                    const style = getPromptTypeStyle(p.type);
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`bg-gradient-to-br ${style.color} border ${style.border} rounded-xl p-4 relative group`}
+                                        >
+                                            {/* Header */}
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xl">{style.icon}</span>
+                                                    <div>
+                                                        <span className="text-white font-semibold text-sm block">
+                                                            {p.type === 'social' ? 'Social' : `Prompt ${p.index}`}
+                                                        </span>
+                                                        <span className="text-slate-300 text-xs">{p.title}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCopyIndividualPrompt(p, idx)}
+                                                    className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-all"
+                                                    title="Copy this prompt"
+                                                >
+                                                    {copiedIndex === idx ? <Check size={14} /> : <Copy size={14} />}
+                                                </button>
+                                            </div>
+                                            
+                                            {p.duration && (
+                                                <span className="inline-block bg-white/10 px-2 py-0.5 rounded text-xs text-slate-300 mb-2">
+                                                    {p.duration}
+                                                </span>
+                                            )}
+                                            
+                                            {/* Content based on type */}
+                                            {p.type === 'image' && (
+                                                <p className="text-slate-200 text-xs leading-relaxed line-clamp-4">{p.prompt}</p>
+                                            )}
+                                            
+                                            {p.type === 'video' && (
+                                                <div className="space-y-1 text-xs">
+                                                    <p className="text-slate-300 line-clamp-2"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
+                                                    <p className="text-slate-300 line-clamp-2"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
+                                                </div>
+                                            )}
+                                            
+                                            {p.type === 'social' && (
+                                                <div className="space-y-2 text-xs">
+                                                    <p className="text-slate-200 line-clamp-2">{p.description}</p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {p.hashtags?.slice(0, 4).map((tag, i) => (
+                                                            <span key={i} className="bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full text-xs">
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                        {p.hashtags?.length > 4 && (
+                                                            <span className="text-slate-400 text-xs">+{p.hashtags.length - 4}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : testResult && (
+                            /* Fallback: Plain text display */
+                            <div className="bg-black/30 border border-white/10 rounded-lg p-4 relative max-h-60 overflow-y-auto">
+                                <button
+                                    onClick={handleCopyPrompt}
+                                    className="absolute top-3 right-3 p-2 bg-red-600 hover:bg-red-500 rounded text-white"
+                                >
+                                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                                </button>
+                                <p className="text-slate-200 text-sm whitespace-pre-wrap pr-12">{testResult}</p>
+                            </div>
+                        )}
                     </div>
                     
                     {/* Action Buttons - Full Width */}
                     <div className="col-span-12 flex gap-3">
-                        <button
-                            onClick={handleTest}
-                            disabled={testing}
-                            className="group relative flex-1 py-3 bg-gradient-to-r from-orange-600 via-amber-500 to-yellow-500 hover:from-orange-500 hover:via-amber-400 hover:to-yellow-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                            {testing ? (
-                                <><Loader2 size={16} className="animate-spin relative z-10" /><span className="relative z-10">ทดสอบ...</span></>
-                            ) : (
-                                <><TestTube size={16} className="relative z-10" /><span className="relative z-10">ทดสอบ</span></>
-                            )}
-                        </button>
                         <button
                             onClick={handleSave}
                             disabled={saving}
