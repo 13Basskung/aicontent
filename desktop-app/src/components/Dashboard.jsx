@@ -18,7 +18,7 @@ const PLATFORMS = [
   { id: 'tiktok', name: 'TikTok', short: 'TikTok', color: 'bg-black', icon: '🎵' },
   { id: 'instagram', name: 'Instagram', short: 'IG', color: 'bg-gradient-to-r from-purple-500 to-pink-500', icon: '📷' }
 ];
-import { fetchProjects, fetchBlocks, fetchSlots, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock, saveInstanceSettings, fetchInstanceSettings, fetchReadyPrompts } from '../lib/firebase';
+import { fetchProjects, fetchBlocks, fetchSlots, fetchExpander, fetchUserBlockSettings, saveUserBlockSettings, deleteUserBlock, saveInstanceSettings, fetchInstanceSettings, fetchReadyPrompts } from '../lib/firebase';
 
 function Dashboard({ keyData }) {
   const [projects, setProjects] = useState([]);
@@ -48,6 +48,9 @@ function Dashboard({ keyData }) {
   
   // Project slots cache (for platforms and scenes info)
   const [projectSlotsCache, setProjectSlotsCache] = useState({});
+  
+  // Expander cache (for scenesCount - source of truth)
+  const [expanderCache, setExpanderCache] = useState({});
   
   // Active tab: 'instances' | 'scheduler' | 'recorder'
   const [activeTab, setActiveTab] = useState('instances');
@@ -155,11 +158,19 @@ function Dashboard({ keyData }) {
     );
   }
 
-  // Get scenes info from slots (use first slot or max)
-  function getScenesInfoFromSlots(slots) {
+  // Get scenes info from Expander (source of truth) or fallback to slots
+  function getScenesInfo(projectId, slots) {
+    // First try to get from Expander cache (source of truth)
+    const expander = expanderCache[projectId];
+    if (expander?.scenesCount) {
+      // Get sceneDuration from first slot
+      const sceneDuration = slots?.[0]?.sceneDuration || 8;
+      return { scenes: expander.scenesCount, sceneDuration };
+    }
+    
+    // Fallback to slots if no expander
     if (!slots || slots.length === 0) return { scenes: 0, sceneDuration: 0 };
     
-    // Use max scenes and first sceneDuration found
     let maxScenes = 0;
     let sceneDuration = 0;
     
@@ -170,26 +181,42 @@ function Dashboard({ keyData }) {
     
     return { scenes: maxScenes, sceneDuration: sceneDuration || 8 };
   }
+  
+  // Load expander for a project
+  async function loadProjectExpander(project) {
+    if (!project?.expanderId) return;
+    try {
+      const expander = await fetchExpander(keyData.userId, project.expanderId);
+      if (expander) {
+        setExpanderCache(prev => ({ ...prev, [project.id]: expander }));
+        console.log(`📦 Expander "${expander.name}" loaded: scenesCount=${expander.scenesCount}`);
+      }
+    } catch (err) {
+      console.error('Load expander error:', err);
+    }
+  }
 
-  // Load slots for all instances' projects on mount
+  // Load slots and expanders for ALL projects (not just instances)
   useEffect(() => {
-    async function loadAllSlots() {
+    async function loadAllData() {
       // Clear cache first to ensure fresh data
       setProjectSlotsCache({});
+      setExpanderCache({});
       
-      const projectIds = [...new Set(instances.map(i => i.projectId))];
-      console.log(`🔄 Loading slots for ${projectIds.length} unique projects:`, projectIds);
+      console.log(`🔄 Loading slots and expanders for ${projects.length} projects`);
       
-      for (const projectId of projectIds) {
-        if (projectId) {
-          await loadProjectSlots(projectId);
+      // Load for ALL projects, not just instances
+      for (const project of projects) {
+        if (project?.id) {
+          await loadProjectSlots(project.id);
+          await loadProjectExpander(project);
         }
       }
     }
-    if (instances.length > 0) {
-      loadAllSlots();
+    if (projects.length > 0) {
+      loadAllData();
     }
-  }, [instances]);
+  }, [projects]);
 
   async function loadData() {
     setLoading(true);
@@ -881,7 +908,7 @@ function Dashboard({ keyData }) {
                 {/* SCENES & Duration boxes */}
                 {(() => {
                   const slots = projectSlotsCache[project.id] || [];
-                  const scenesInfo = getScenesInfoFromSlots(slots);
+                  const scenesInfo = getScenesInfo(project.id, slots);
                   if (scenesInfo.scenes === 0) return null;
                   return (
                     <div className="flex items-center gap-1.5 ml-2">
@@ -1123,7 +1150,7 @@ function Dashboard({ keyData }) {
                       {(() => {
                         const slots = projectSlotsCache[instance.projectId] || [];
                         const platforms = getProjectPlatformsFromSlots(slots);
-                        const scenesInfo = getScenesInfoFromSlots(slots);
+                        const scenesInfo = getScenesInfo(instance.projectId, slots);
                         
                         // Debug: log what we're showing
                         console.log(`📊 Instance ${instance.id} (project: ${instance.projectId}): slots=${slots.length}, platforms=${platforms.length}`);

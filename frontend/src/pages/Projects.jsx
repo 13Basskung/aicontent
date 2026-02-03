@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Folder, LayoutGrid, List, ArrowRight, Loader2, Play, Square, Layers, AlignLeft, Pencil, Check, X, Terminal, Clock, Activity, Filter, Youtube, Facebook, Video, ChevronDown, Trash2, Sparkles, Camera, Key, FlaskConical, Copy, CheckCircle, Hash, FileText, Crown, AlertTriangle, Zap } from 'lucide-react';
@@ -68,6 +68,20 @@ export default function Projects() {
         expanders.filter(exp => exp.source !== 'purchased' && !exp.fromMarketplace && !exp.isTrial && !exp.originalExpanderId && !exp.purchasedAt && !exp.receivedFree),
         subStatus.limits?.extenders || 0
     );
+
+    // คำนวณ Expanders ที่ถูกใช้โดย projects อื่นแล้ว (ไม่รวม project ปัจจุบัน)
+    const usedExpanderIds = useMemo(() => {
+        const usedIds = new Set();
+        projects.forEach(project => {
+            // ข้าม project ปัจจุบันที่กำลังแก้ไข
+            if (project.id === selectedProject?.id) return;
+            // เพิ่ม expanderId ที่ถูกใช้โดย project อื่น
+            if (project.expanderId) {
+                usedIds.add(project.expanderId);
+            }
+        });
+        return usedIds;
+    }, [projects, selectedProject?.id]);
 
     // --- NEW: Firestore Sequences Sync ---
     const [userTimezone, setUserTimezone] = useState('Asia/Bangkok'); // Added back
@@ -1149,11 +1163,18 @@ export default function Projects() {
                                                             }}
                                                             options={[
                                                                 { value: '', label: 'ไม่ใช้ Expander' },
-                                                                ...expanders.map(ex => ({
-                                                                    value: ex.id,
-                                                                    label: lockedExpanderIds.has(ex.id) ? `🔒 ${ex.name}` : ex.name,
-                                                                    disabled: lockedExpanderIds.has(ex.id)
-                                                                }))
+                                                                ...expanders.map(ex => {
+                                                                    const isLocked = lockedExpanderIds.has(ex.id);
+                                                                    const isUsedByOther = usedExpanderIds.has(ex.id);
+                                                                    let label = ex.name;
+                                                                    if (isLocked) label = `🔒 ${ex.name}`;
+                                                                    else if (isUsedByOther) label = `🚫 ${ex.name} (ใช้แล้ว)`;
+                                                                    return {
+                                                                        value: ex.id,
+                                                                        label,
+                                                                        disabled: isLocked || isUsedByOther
+                                                                    };
+                                                                })
                                                             ]}
                                                             buttonClassName="glass-dropdown w-full"
                                                         />

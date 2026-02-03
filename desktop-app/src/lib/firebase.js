@@ -257,6 +257,28 @@ export async function updateJobStatus(userId, projectId, jobId, status, addition
 }
 
 /**
+ * Fetch expander by ID
+ */
+export async function fetchExpander(userId, expanderId) {
+  try {
+    if (!expanderId) return null;
+    const url = `${FIRESTORE_BASE}/users/${userId}/expanders/${expanderId}?key=${API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.log('Expander not found:', expanderId);
+      return null;
+    }
+    
+    return parseDocument(data);
+  } catch (error) {
+    console.error('fetchExpander error:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch posting schedule slots for a project
  */
 export async function fetchSlots(userId, projectId) {
@@ -661,6 +683,7 @@ export default {
   fetchJobs,
   fetchReadyPrompts,
   fetchSlots,
+  fetchExpander,
   updateJobStatus,
   updateAgentStatus,
   fetchUserBlockSettings,
