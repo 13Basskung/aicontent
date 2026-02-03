@@ -239,12 +239,28 @@ export default function Projects() {
                 // 1. Fetch Projects
                 const projectsRef = collection(db, 'users', user.uid, 'projects');
                 const q = query(projectsRef, orderBy('createdAt', 'desc'));
-                const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                const unsubscribeSnapshot = onSnapshot(q, async (snapshot) => {
                     const loadedProjects = [];
-                    snapshot.forEach(doc => {
-                        loadedProjects.push({ id: doc.id, ...doc.data() });
+                    snapshot.forEach(docSnap => {
+                        loadedProjects.push({ id: docSnap.id, ...docSnap.data() });
                     });
                     setProjects(loadedProjects);
+                    
+                    // ✅ AUTO-STOP: โปรเจคที่ running แต่ไม่มี Expander
+                    for (const project of loadedProjects) {
+                        if (project.status === 'running' && !project.expanderId) {
+                            console.log(`🛑 Auto-stopping "${project.name}" - no Expander`);
+                            try {
+                                const projectRef = doc(db, 'users', user.uid, 'projects', project.id);
+                                await updateDoc(projectRef, {
+                                    status: 'idle',
+                                    lastUpdated: serverTimestamp()
+                                });
+                            } catch (err) {
+                                console.error('Auto-stop error:', err);
+                            }
+                        }
+                    }
                 });
 
                 // 2. Fetch Expanders (Mode System removed)
@@ -269,31 +285,6 @@ export default function Projects() {
         });
         return () => unsubscribeAuth();
     }, []); // Removed specific deps to ensure clean mounting logic
-
-    // ✅ AUTO-STOP: โปรเจคที่มี status='running' แต่ไม่มี expanderId จะถูก stop อัตโนมัติ
-    useEffect(() => {
-        if (!currentUser || projects.length === 0) return;
-        
-        const autoStopProjects = async () => {
-            for (const project of projects) {
-                // ถ้า running แต่ไม่มี Expander → auto stop
-                if (project.status === 'running' && !project.expanderId) {
-                    console.log(`🛑 Auto-stopping project "${project.name}" - no Expander selected`);
-                    try {
-                        const projectRef = doc(db, 'users', currentUser.uid, 'projects', project.id);
-                        await updateDoc(projectRef, {
-                            status: 'idle',
-                            lastUpdated: serverTimestamp()
-                        });
-                    } catch (err) {
-                        console.error('Auto-stop error:', err);
-                    }
-                }
-            }
-        };
-        
-        autoStopProjects();
-    }, [projects, currentUser]);
 
     const handleCreateProject = async () => {
         if (!newProjectName.trim() || !currentUser) return;
@@ -922,7 +913,8 @@ export default function Projects() {
                             {projects.map(project => {
                                 const isSelected = selectedProject?.id === project.id;
                                 const isEditing = editingProjectId === project.id;
-                                const isRunning = project.status === 'running';
+                                const hasExpander = !!project.expanderId;
+                                const isRunning = project.status === 'running' && hasExpander; // ต้องมี Expander ถึงจะ running ได้จริง
 
                                 return (
                                     <div
@@ -1070,15 +1062,17 @@ export default function Projects() {
                                                         e.stopPropagation();
                                                         handleRun(project);
                                                     }}
+                                                    disabled={!hasExpander}
                                                     className={twMerge(
                                                         "font-bold px-4 py-1.5 rounded transition-all duration-300 text-xs tracking-wider uppercase",
-                                                        // Conditional Styles
-                                                        isRunning
-                                                            ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]" // STOP State (More alarming)
-                                                            : "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.2)]" // RUN State (More inviting)
+                                                        !hasExpander
+                                                            ? "bg-gray-500/20 text-gray-500 border border-gray-500/30 cursor-not-allowed" // NO EXPANDER (Disabled)
+                                                            : isRunning
+                                                                ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]" // STOP State
+                                                                : "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.2)]" // RUN State
                                                     )}
                                                 >
-                                                    {isRunning ? 'STOP' : 'RUN'}
+                                                    {!hasExpander ? 'NO EXP' : isRunning ? 'STOP' : 'RUN'}
                                                 </button>
                                             </div>
                                         </div>

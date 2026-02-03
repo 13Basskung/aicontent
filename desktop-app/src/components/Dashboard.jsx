@@ -160,39 +160,25 @@ function Dashboard({ keyData }) {
 
   // Get scenes info from Expander (source of truth) or fallback to slots
   function getScenesInfo(projectId, slots) {
-    // First try to get from Expander cache (source of truth)
+    const project = projects.find(p => p.id === projectId);
     const expander = expanderCache[projectId];
     
-    // Debug log
-    const project = projects.find(p => p.id === projectId);
-    console.log(`🔍 getScenesInfo: ${project?.name || projectId}`, {
-      hasExpanderInCache: !!expander,
-      expanderScenesCount: expander?.scenesCount,
-      projectExpanderId: project?.expanderId,
-      slotsCount: slots?.length,
-      firstSlotScenes: slots?.[0]?.scenes
-    });
-    
+    // ✅ Priority 1: Expander cache
     if (expander?.scenesCount) {
-      // Get sceneDuration from first slot
       const sceneDuration = slots?.[0]?.sceneDuration || 8;
-      console.log(`✅ Using Expander scenesCount: ${expander.scenesCount}`);
       return { scenes: expander.scenesCount, sceneDuration };
     }
     
-    // Fallback to slots if no expander
-    if (!slots || slots.length === 0) return { scenes: 0, sceneDuration: 0 };
+    // ✅ Priority 2: Get sceneDuration from slots only (scenes from Expander or 0)
+    const sceneDuration = slots?.[0]?.sceneDuration || 8;
     
-    let maxScenes = 0;
-    let sceneDuration = 0;
+    // ถ้าไม่มี Expander ใน cache แต่มี expanderId → return 0 (ยังโหลดไม่เสร็จ)
+    if (project?.expanderId && !expander) {
+      return { scenes: 0, sceneDuration };
+    }
     
-    slots.forEach(slot => {
-      if (slot.scenes > maxScenes) maxScenes = slot.scenes;
-      if (!sceneDuration && slot.sceneDuration) sceneDuration = slot.sceneDuration;
-    });
-    
-    console.log(`⚠️ Fallback to slots maxScenes: ${maxScenes}`);
-    return { scenes: maxScenes, sceneDuration: sceneDuration || 8 };
+    // ❌ ไม่ fallback ไป slots.scenes - ต้องใช้ Expander เท่านั้น
+    return { scenes: 0, sceneDuration };
   }
   
   // Load expander for a project
