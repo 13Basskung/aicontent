@@ -933,16 +933,17 @@ function Dashboard({ keyData }) {
                 {(() => {
                   const slots = projectSlotsCache[project.id] || [];
                   const scenesInfo = getScenesInfo(project.id, slots);
-                  if (scenesInfo.scenes === 0) return null;
+                  // แสดงเสมอถ้ามี slots (แม้ scenes = 0 ก็แสดง "-")
+                  if (slots.length === 0) return null;
                   return (
                     <div className="flex items-center gap-1.5 ml-2">
                       <div className="bg-slate-800/80 border border-purple-500/30 rounded px-2 py-1 text-center">
                         <div className="text-white/50 text-[8px] uppercase">SCENES</div>
-                        <div className="text-white font-semibold text-xs">{scenesInfo.scenes}</div>
+                        <div className="text-white font-semibold text-xs">{scenesInfo.scenes || '-'}</div>
                       </div>
                       <div className="bg-slate-800/80 border border-purple-500/30 rounded px-2 py-1 text-center">
                         <div className="text-white/50 text-[8px] uppercase">วินาที/ชิ้น</div>
-                        <div className="text-white font-semibold text-xs">{scenesInfo.sceneDuration}</div>
+                        <div className="text-white font-semibold text-xs">{scenesInfo.sceneDuration || '-'}</div>
                       </div>
                     </div>
                   );
@@ -952,10 +953,19 @@ function Dashboard({ keyData }) {
                 )}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <span className={`w-2 h-2 rounded-full ${project.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                  {project.status === 'active' ? 'มีงานวันนี้' : 'ไม่มีงานวันนี้'}
-                </span>
+                {(() => {
+                  const slots = projectSlotsCache[project.id] || [];
+                  const today = new Date();
+                  const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                  const todayCode = dayNames[today.getDay()];
+                  const hasTaskToday = slots.some(slot => slot.day === todayCode);
+                  return (
+                    <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                      {hasTaskToday ? `มีงานวันนี้ (${slots.filter(s => s.day === todayCode).length} slots)` : 'ไม่มีงานวันนี้'}
+                    </span>
+                  );
+                })()}
               </div>
             </button>
           ))}
