@@ -48,10 +48,12 @@ function createWindow() {
   // Load app
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+  
+  // ✅ Always open DevTools for debugging (temporary)
+  mainWindow.webContents.openDevTools();
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
