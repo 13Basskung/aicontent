@@ -298,16 +298,18 @@ function DebugSelectorPanel({
       <div className="flex gap-3">
         <button
           onClick={() => handleTest('hover')}
-          disabled={testing || !selector.trim() || !testUrl || testUrl === 'https://'}
+          disabled={testing || !testUrl || testUrl === 'https://'}
           className="flex-1 px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          title={selector.trim() ? 'เปิด Browser และ Hover ที่ Element' : 'เปิด Browser เพื่อหา Selector (จำ Login)'}
         >
           <MousePointer className="w-5 h-5" />
-          {testing ? 'กำลังทดสอบ...' : 'Hover'}
+          {testing ? 'กำลังทดสอบ...' : selector.trim() ? 'Hover' : 'Open Browser'}
         </button>
         <button
           onClick={() => handleTest('click')}
           disabled={testing || !selector.trim() || !testUrl || testUrl === 'https://'}
           className="flex-1 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-green-300 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          title="คลิก Element ที่ระบุ"
         >
           <Hand className="w-5 h-5" />
           {testing ? 'กำลังทดสอบ...' : 'Human Click'}
