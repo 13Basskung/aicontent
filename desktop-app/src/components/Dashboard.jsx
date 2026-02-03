@@ -810,12 +810,33 @@ function Dashboard({ keyData }) {
             setActiveTab('recorder');
             showToast(`Shoot to Option สำเร็จ!`, 'success');
           }}
-          onShootToBlock={(blockId, step) => {
-            // Add step to existing block
+          onShootToBlock={async (blockId, step) => {
+            // Add step to existing block and update in Firebase
             const block = blocks.find(b => b.id === blockId);
-            if (block && recorderPanelRef.current?.addStepToBlock) {
-              recorderPanelRef.current.addStepToBlock(blockId, step);
-              showToast(`${step.emoji} Shoot to "${block.name}" สำเร็จ!`, 'success');
+            if (block) {
+              const newStep = {
+                action: step.action,
+                selector: step.selector || '',
+                value: step.value || '',
+                text: ''
+              };
+              const updatedSteps = [...(block.steps || []), newStep];
+              const updatedBlock = { ...block, steps: updatedSteps };
+              
+              // Update in Firebase
+              try {
+                await window.electronAPI.store.saveBlockToFirestore(
+                  keyData?.userId,
+                  blockId,
+                  updatedBlock
+                );
+                // Update local state
+                setBlocks(prev => prev.map(b => b.id === blockId ? updatedBlock : b));
+                showToast(`${step.emoji} Shoot to "${block.name}" สำเร็จ!`, 'success');
+              } catch (error) {
+                console.error('Failed to update block:', error);
+                showToast('ไม่สามารถบันทึก Block ได้', 'error');
+              }
             }
           }}
         />

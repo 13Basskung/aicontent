@@ -26,9 +26,16 @@ function DebugSelectorPanel({
   const [selectedEmoji, setSelectedEmoji] = useState('🎯');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  // URL State (replaces Instance)
+  // URL State - use localStorage initializer like RecorderPanel
   const [testUrl, setTestUrl] = useState('https://');
-  const [savedUrls, setSavedUrls] = useState([]);
+  const [savedUrls, setSavedUrls] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SAVED_URLS_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [showSavedUrls, setShowSavedUrls] = useState(false);
   
   // Shoot Dropdown State
@@ -40,15 +47,14 @@ function DebugSelectorPanel({
   // Test Result
   const [result, setResult] = useState(null);
 
-  // Load saved URLs from localStorage
+  // Save URLs to localStorage when changed
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SAVED_URLS_KEY);
-      if (saved) setSavedUrls(JSON.parse(saved));
+      localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(savedUrls));
     } catch (e) {
-      console.error('Failed to load saved URLs:', e);
+      console.error('Failed to save URLs:', e);
     }
-  }, []);
+  }, [savedUrls]);
 
   // Filter blocks by type
   const vdoBlocks = blocks?.filter(b => b.type === 'video') || [];
