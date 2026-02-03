@@ -163,22 +163,24 @@ function Dashboard({ keyData }) {
     const project = projects.find(p => p.id === projectId);
     const expander = expanderCache[projectId];
     
-    // ✅ Priority 1: Expander cache
+    // ✅ Priority 1: Expander cache (source of truth)
     if (expander?.scenesCount) {
       const sceneDuration = slots?.[0]?.sceneDuration || 8;
       return { scenes: expander.scenesCount, sceneDuration };
     }
     
-    // ✅ Priority 2: Get sceneDuration from slots only (scenes from Expander or 0)
-    const sceneDuration = slots?.[0]?.sceneDuration || 8;
+    // ✅ Priority 2: Fallback to slots if no expander
+    if (!slots || slots.length === 0) return { scenes: 0, sceneDuration: 0 };
     
-    // ถ้าไม่มี Expander ใน cache แต่มี expanderId → return 0 (ยังโหลดไม่เสร็จ)
-    if (project?.expanderId && !expander) {
-      return { scenes: 0, sceneDuration };
-    }
+    let maxScenes = 0;
+    let sceneDuration = 0;
     
-    // ❌ ไม่ fallback ไป slots.scenes - ต้องใช้ Expander เท่านั้น
-    return { scenes: 0, sceneDuration };
+    slots.forEach(slot => {
+      if (slot.scenes > maxScenes) maxScenes = slot.scenes;
+      if (!sceneDuration && slot.sceneDuration) sceneDuration = slot.sceneDuration;
+    });
+    
+    return { scenes: maxScenes, sceneDuration: sceneDuration || 8 };
   }
   
   // Load expander for a project
