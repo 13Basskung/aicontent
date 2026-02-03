@@ -48,12 +48,10 @@ function createWindow() {
   // Load app
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
+    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
-  
-  // ✅ Always open DevTools for debugging (temporary)
-  mainWindow.webContents.openDevTools();
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
@@ -224,6 +222,14 @@ ipcMain.handle('get-app-info', () => {
 // Open external URL in default browser
 ipcMain.handle('open-external', async (event, url) => {
   await shell.openExternal(url);
+  return true;
+});
+
+// Open DevTools
+ipcMain.handle('open-devtools', () => {
+  if (mainWindow) {
+    mainWindow.webContents.openDevTools();
+  }
   return true;
 });
 

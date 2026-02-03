@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('open-external', url)
   },
+  
+  // DevTools
+  openDevTools: () => ipcRenderer.invoke('open-devtools'),
 
   // Playwright operations
   playwright: {
