@@ -38,10 +38,8 @@ function DebugSelectorPanel({
   const [result, setResult] = useState(null);
   const [testing, setTesting] = useState(false);
 
-  // Filter running instances
-  const runningInstances = instances?.filter(i => 
-    i.status && !['stopped', 'error', 'launching'].includes(i.status)
-  ) || [];
+  // Use all instances (same as RecorderPanel)
+  const runningInstances = instances || [];
 
   // Filter blocks by type
   const vdoBlocks = blocks?.filter(b => b.type === 'video') || [];
