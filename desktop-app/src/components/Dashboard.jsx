@@ -770,17 +770,19 @@ function Dashboard({ keyData }) {
         <SchedulerPanel keyData={keyData} instances={instances} />
       )}
 
-      {/* Tab Content: Recorder (Admin only) */}
-      {activeTab === 'recorder' && keyData?.isAdmin && (
-        <RecorderPanel 
-          keyData={keyData} 
-          instances={instances} 
-          onBlockCreated={loadData} 
-          onInstanceSelect={setRecorderSelectedInstance}
-          blockToEdit={blockToEdit}
-          onBlockEditComplete={() => setBlockToEdit(null)}
-          ref={recorderPanelRef}
-        />
+      {/* Tab Content: Recorder (Admin only) - Always render but hide when not active for ref access */}
+      {keyData?.isAdmin && (
+        <div style={{ display: activeTab === 'recorder' ? 'block' : 'none' }}>
+          <RecorderPanel 
+            keyData={keyData} 
+            instances={instances} 
+            onBlockCreated={loadData} 
+            onInstanceSelect={setRecorderSelectedInstance}
+            blockToEdit={blockToEdit}
+            onBlockEditComplete={() => setBlockToEdit(null)}
+            ref={recorderPanelRef}
+          />
+        </div>
       )}
 
       {/* Tab Content: Debug Selector (Admin only) */}
