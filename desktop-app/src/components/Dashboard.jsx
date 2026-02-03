@@ -786,21 +786,38 @@ function Dashboard({ keyData }) {
       {/* Tab Content: Debug Selector (Admin only) */}
       {activeTab === 'debug' && keyData?.isAdmin && (
         <DebugSelectorPanel 
-          onShootToAction={(step) => {
-            // Switch to Recorder tab and add step
+          instances={instances}
+          blocks={blocks}
+          onShootToStep={(step) => {
+            // Switch to Recorder tab and add step (don't clear existing steps)
             if (recorderPanelRef.current?.addStepFromDebug) {
               recorderPanelRef.current.addStepFromDebug(step);
             }
             setActiveTab('recorder');
-            showToast(`เพิ่ม Step "${step.action}" สำเร็จ!`, 'success');
+            showToast(`${step.emoji} Shoot to Step สำเร็จ!`, 'success');
+          }}
+          onShootToAction={(step) => {
+            // Add to Action list in RecorderPanel
+            if (recorderPanelRef.current?.addCustomAction) {
+              recorderPanelRef.current.addCustomAction(step);
+            }
+            showToast(`${step.emoji} Shoot to Action สำเร็จ!`, 'success');
           }}
           onShootToOption={(selector) => {
-            // Switch to Recorder tab and set option selector
+            // Set option selector for wait_progress
             if (recorderPanelRef.current?.setOptionSelector) {
               recorderPanelRef.current.setOptionSelector(selector);
             }
             setActiveTab('recorder');
-            showToast(`Shoot selector to Option สำเร็จ!`, 'success');
+            showToast(`Shoot to Option สำเร็จ!`, 'success');
+          }}
+          onShootToBlock={(blockId, step) => {
+            // Add step to existing block
+            const block = blocks.find(b => b.id === blockId);
+            if (block && recorderPanelRef.current?.addStepToBlock) {
+              recorderPanelRef.current.addStepToBlock(blockId, step);
+              showToast(`${step.emoji} Shoot to "${block.name}" สำเร็จ!`, 'success');
+            }
           }}
         />
       )}

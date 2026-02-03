@@ -63,6 +63,9 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
   // State for Debug Selector shoot
   const [shootedOptionSelector, setShootedOptionSelector] = useState(null);
   
+  // Custom actions from Debug Selector
+  const [customActions, setCustomActions] = useState([]);
+  
   // Expose functions to parent via ref (for Debug Selector)
   useImperativeHandle(ref, () => ({
     addStepFromDebug: (step) => {
@@ -71,14 +74,31 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
         action: step.action,
         selector: step.selector || '',
         value: step.value || '',
+        label: step.label || '',
+        emoji: step.emoji || '🎯',
         modifiers: step.modifiers || { preActions: [], postActions: [] }
       };
       setSteps(prev => [...prev, newStep]);
       console.log('🎯 Step added from Debug:', newStep);
     },
+    addCustomAction: (step) => {
+      const newAction = {
+        value: `custom_${Date.now()}`,
+        label: step.label || step.selector,
+        icon: step.emoji || '🎯',
+        selector: step.selector,
+        defaultValue: step.value || ''
+      };
+      setCustomActions(prev => [...prev, newAction]);
+      console.log('🎯 Custom action added:', newAction);
+    },
     setOptionSelector: (selector) => {
       setShootedOptionSelector(selector);
       console.log('🎯 Option selector set:', selector);
+    },
+    addStepToBlock: (blockId, step) => {
+      // This will be handled by Dashboard to update the block in Firebase
+      console.log('🎯 Adding step to block:', blockId, step);
     }
   }));
   
@@ -581,6 +601,15 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                               {type.icon} {type.label}
                             </option>
                           ))}
+                          {customActions.length > 0 && (
+                            <optgroup label="── Custom Actions ──">
+                              {customActions.map(action => (
+                                <option key={action.value} value={action.value}>
+                                  {action.icon} {action.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
                         </select>
                         {/* Input field based on action type */}
                         {!['loop_start', 'loop_end', 'inject_prompt'].includes(step.action) && (
