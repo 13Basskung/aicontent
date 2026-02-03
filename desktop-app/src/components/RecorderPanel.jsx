@@ -123,7 +123,7 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [showModifiersModal, setShowModifiersModal] = useState(null); // index of step being configured
   
-  // Apply shooted selector to wait_progress option when set
+  // Apply shooted selector to wait_progress option when modal opens
   useEffect(() => {
     if (shootedOptionSelector && showModifiersModal !== null) {
       const newSteps = [...steps];
@@ -139,10 +139,10 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
         }
         setSteps(newSteps);
         console.log('🎯 Applied shooted selector to wait_progress:', shootedOptionSelector);
+        setShootedOptionSelector(null); // Clear only after applying
       }
-      setShootedOptionSelector(null);
     }
-  }, [shootedOptionSelector, showModifiersModal]);
+  }, [showModifiersModal]); // Only trigger when modal opens
   
   // Drag and drop handlers for reordering steps
   function handleDragStart(e, index) {

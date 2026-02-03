@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, MousePointer, Type, Play, Check, X, 
-  Target, Zap, ChevronDown, Settings
+  Search, Check, X, Target, Zap, ChevronDown, Settings, Link
 } from 'lucide-react';
 
 const ACTION_TYPES = [
@@ -20,62 +19,14 @@ const ACTION_TYPES = [
   { value: 'inject_prompt', label: 'ดึง Prompt', icon: '📝' },
 ];
 
-function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
+function DebugSelectorPanel({ onShootToAction, onShootToOption }) {
   const [selector, setSelector] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [selectedInstance, setSelectedInstance] = useState(null);
+  const [shootValue, setShootValue] = useState('');
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [elementInfo, setElementInfo] = useState(null);
   
   // Shoot to Action state
   const [shootAction, setShootAction] = useState('click');
-  const [shootValue, setShootValue] = useState('');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
-
-  // Filter instances that have a browser running (not 'stopped' or 'error')
-  const runningInstances = instances.filter(i => i.status && i.status !== 'stopped' && i.status !== 'error' && i.status !== 'launching');
-
-  const executeHumanSimulation = async (type) => {
-    if (!selector.trim()) {
-      setResult({ success: false, error: 'กรุณาใส่ Selector' });
-      return;
-    }
-    if (!selectedInstance) {
-      setResult({ success: false, error: 'กรุณาเลือก Instance' });
-      return;
-    }
-
-    setLoading(true);
-    setResult(null);
-    setElementInfo(null);
-
-    try {
-      const response = await window.electronAPI.playwright.debugSelector({
-        instanceId: selectedInstance.id,
-        selector: selector.trim(),
-        action: type,
-        text: inputText
-      });
-
-      setResult({
-        success: response.success,
-        action: type,
-        error: response.error || null
-      });
-
-      if (response.elementInfo) {
-        setElementInfo(response.elementInfo);
-      }
-    } catch (error) {
-      setResult({
-        success: false,
-        error: error.message
-      });
-    }
-
-    setLoading(false);
-  };
 
   const handleShootToAction = () => {
     if (!selector.trim()) {
@@ -121,29 +72,6 @@ function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
         </div>
       </div>
 
-      {/* Instance Selector */}
-      <div>
-        <label className="block text-white/70 text-sm mb-2">Instance</label>
-        <select
-          value={selectedInstance?.id || ''}
-          onChange={(e) => {
-            const inst = runningInstances.find(i => i.id === e.target.value);
-            setSelectedInstance(inst || null);
-          }}
-          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50"
-        >
-          <option value="">-- เลือก Instance --</option>
-          {runningInstances.map(inst => (
-            <option key={inst.id} value={inst.id}>
-              {inst.name || inst.id} ({inst.projectName})
-            </option>
-          ))}
-        </select>
-        {runningInstances.length === 0 && (
-          <p className="text-yellow-400/70 text-xs mt-1">⚠️ ไม่มี Instance ที่พร้อมใช้งาน</p>
-        )}
-      </div>
-
       {/* Target Selector */}
       <div>
         <label className="block text-white/70 text-sm mb-2">Target Selector</label>
@@ -156,44 +84,16 @@ function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
         />
       </div>
 
-      {/* Input Text (Optional) */}
+      {/* Value Input */}
       <div>
-        <label className="block text-white/70 text-sm mb-2">Input Text (Optional)</label>
-        <textarea
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="ข้อความที่ต้องการพิมพ์..."
-          rows={2}
-          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 resize-none"
+        <label className="block text-white/70 text-sm mb-2">Value (สำหรับ fill, wait, goto)</label>
+        <input
+          type="text"
+          value={shootValue}
+          onChange={(e) => setShootValue(e.target.value)}
+          placeholder="ข้อความ, URL, หรือเวลา (ms)"
+          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/30 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50"
         />
-      </div>
-
-      {/* Human Simulation Buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => executeHumanSimulation('hover')}
-          disabled={loading}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-300 font-medium transition disabled:opacity-50"
-        >
-          <MousePointer className="w-4 h-4" />
-          Hover
-        </button>
-        <button
-          onClick={() => executeHumanSimulation('click')}
-          disabled={loading}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg text-green-300 font-medium transition disabled:opacity-50"
-        >
-          <MousePointer className="w-4 h-4" />
-          Click
-        </button>
-        <button
-          onClick={() => executeHumanSimulation('type')}
-          disabled={loading || !inputText.trim()}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-purple-300 font-medium transition disabled:opacity-50"
-        >
-          <Type className="w-4 h-4" />
-          Type
-        </button>
       </div>
 
       {/* Result */}
@@ -210,16 +110,9 @@ function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
               <X className="w-5 h-5 text-red-400" />
             )}
             <span className={result.success ? 'text-green-300' : 'text-red-300'}>
-              {result.message || (result.success 
-                ? `Human ${result.action} สำเร็จ!` 
-                : result.error)}
+              {result.message || result.error}
             </span>
           </div>
-          {elementInfo && (
-            <div className="mt-2 text-xs text-white/60 font-mono">
-              Element: &lt;{elementInfo.tagName} {elementInfo.id && `id="${elementInfo.id}"`} {elementInfo.className && `class="${elementInfo.className}"`}&gt;
-            </div>
-          )}
         </div>
       )}
 
@@ -230,47 +123,33 @@ function DebugSelectorPanel({ instances, onShootToAction, onShootToOption }) {
           <h3 className="text-white font-semibold">Shoot to Recorder</h3>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          {/* Action Dropdown */}
-          <div className="relative">
-            <label className="block text-white/70 text-xs mb-1">Action</label>
-            <button
-              onClick={() => setShowActionDropdown(!showActionDropdown)}
-              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm text-left flex items-center justify-between"
-            >
-              <span>{ACTION_TYPES.find(a => a.value === shootAction)?.icon} {ACTION_TYPES.find(a => a.value === shootAction)?.label}</span>
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            {showActionDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-60 overflow-auto">
-                {ACTION_TYPES.map(action => (
-                  <button
-                    key={action.value}
-                    onClick={() => {
-                      setShootAction(action.value);
-                      setShowActionDropdown(false);
-                    }}
-                    className="w-full px-3 py-2 text-left text-white/80 hover:bg-white/10 text-sm flex items-center gap-2"
-                  >
-                    <span>{action.icon}</span>
-                    <span>{action.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Value Input */}
-          <div>
-            <label className="block text-white/70 text-xs mb-1">Value (Optional)</label>
-            <input
-              type="text"
-              value={shootValue}
-              onChange={(e) => setShootValue(e.target.value)}
-              placeholder="ค่าสำหรับ action"
-              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm placeholder-white/30"
-            />
-          </div>
+        {/* Action Dropdown */}
+        <div className="relative mb-4">
+          <label className="block text-white/70 text-xs mb-1">Action Type</label>
+          <button
+            onClick={() => setShowActionDropdown(!showActionDropdown)}
+            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-left flex items-center justify-between"
+          >
+            <span>{ACTION_TYPES.find(a => a.value === shootAction)?.icon} {ACTION_TYPES.find(a => a.value === shootAction)?.label}</span>
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          {showActionDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-white/20 rounded-lg shadow-xl z-50 max-h-60 overflow-auto">
+              {ACTION_TYPES.map(action => (
+                <button
+                  key={action.value}
+                  onClick={() => {
+                    setShootAction(action.value);
+                    setShowActionDropdown(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-white/80 hover:bg-white/10 text-sm flex items-center gap-2"
+                >
+                  <span>{action.icon}</span>
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Shoot Buttons */}
