@@ -313,14 +313,15 @@ function initPlaywrightBridge(mainWindow) {
       const context = await browser.newContext({ viewport: null });
       page = await context.newPage();
       
-      // Navigate to URL
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Navigate to URL and wait for page to fully load
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
-      // Check if element exists
-      const elementHandle = await page.$(selector);
-      if (!elementHandle) {
-        await browser.close();
-        return { success: false, error: `Element not found: ${selector}` };
+      // Wait for element to appear (with timeout)
+      try {
+        await page.waitForSelector(selector, { timeout: 15000 });
+      } catch (e) {
+        // Don't close browser - let user login or interact manually
+        return { success: false, error: `Element not found: ${selector} (รอ 15 วินาทีแล้ว - Browser ยังเปิดอยู่ให้ Login หรือทดสอบเอง)` };
       }
 
       // Get element info
@@ -336,7 +337,7 @@ function initPlaywrightBridge(mainWindow) {
       }, selector);
 
       // Highlight element
-      await highlightElement(page, selector, 2000);
+      await highlightElement(page, selector, 3000);
 
       switch (action) {
         case 'hover':
@@ -369,17 +370,14 @@ function initPlaywrightBridge(mainWindow) {
           break;
 
         default:
-          await browser.close();
           return { success: false, error: `Unknown action: ${action}` };
       }
 
-      // Wait a bit to show result, then close browser
-      await page.waitForTimeout(2000);
-      await browser.close();
-
-      return { success: true, action, elementInfo };
+      // DON'T close browser - let user interact manually
+      // User will close it when done
+      return { success: true, action, elementInfo, message: 'Browser ยังเปิดอยู่ - ปิดเองเมื่อเสร็จแล้ว' };
     } catch (error) {
-      if (browser) await browser.close();
+      // DON'T close browser on error - let user debug
       return { success: false, error: error.message };
     }
   });
