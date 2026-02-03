@@ -1850,7 +1850,7 @@ Output: ให้แสดงผล 5 Prompts...
                                     return (
                                         <div 
                                             key={idx} 
-                                            className={`bg-gradient-to-br ${style.color} border ${style.border} rounded-xl p-4 relative group`}
+                                            className={`bg-gradient-to-br ${style.color} border ${style.border} rounded-xl p-4 relative group max-h-64 overflow-y-auto hover:overflow-y-scroll scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-white/30 scrollbar-track-transparent transition-all`}
                                         >
                                             {/* Header */}
                                             <div className="flex items-center justify-between mb-3">
@@ -1880,13 +1880,13 @@ Output: ให้แสดงผล 5 Prompts...
                                             
                                             {/* Content based on type */}
                                             {p.type === 'image' && (
-                                                <p className="text-slate-200 text-xs leading-relaxed line-clamp-4">{p.prompt}</p>
+                                                <p className="text-slate-200 text-xs leading-relaxed">{p.prompt}</p>
                                             )}
                                             
                                             {p.type === 'video' && (
                                                 <div className="space-y-1 text-xs">
-                                                    <p className="text-slate-300 line-clamp-2"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
-                                                    <p className="text-slate-300 line-clamp-2"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
+                                                    <p className="text-slate-300"><span className="text-cyan-400 font-medium">Action:</span> {p.action}</p>
+                                                    <p className="text-slate-300"><span className="text-yellow-400 font-medium">Script:</span> "{p.script}"</p>
                                                 </div>
                                             )}
                                             
