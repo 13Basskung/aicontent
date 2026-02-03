@@ -117,7 +117,6 @@ const CATEGORIES = [
 const ExpanderCreator = () => {
     const { showAlert, showConfirm, showSuccess, showError } = useConfirmModal();
     const [user, setUser] = useState(null);
-    const messagesEndRef = useRef(null);
     
     // Subscription Hook
     const { subscription, loading: loadingSub, getStatus, canCreate } = useSubscription(user?.uid);
@@ -156,13 +155,6 @@ const ExpanderCreator = () => {
     const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
     const thumbnailInputRef = useRef(null);
     
-    // AI Chat State (Floating)
-    const [showAIChat, setShowAIChat] = useState(false);
-    const [chatMessages, setChatMessages] = useState([
-        { role: 'assistant', content: 'สวัสดีครับ! ผมช่วยสร้างกล่อง (Block) ใหม่ให้คุณได้ บอกมาได้เลยว่าอยากได้กล่องแบบไหน เช่น "อยากได้กล่องที่ทำให้ตัวละครพูดแบบโบราณ"' }
-    ]);
-    const [chatInput, setChatInput] = useState('');
-    const [chatLoading, setChatLoading] = useState(false);
     
     // UI State
     const [saving, setSaving] = useState(false);
@@ -774,91 +766,6 @@ const ExpanderCreator = () => {
         }
     };
     
-    // === AI CHAT HANDLER ===
-    const handleChatSend = async () => {
-        if (!chatInput.trim() || chatLoading) return;
-        
-        const userMessage = chatInput.trim();
-        setChatInput('');
-        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-        setChatLoading(true);
-        
-        try {
-            const generateBlock = httpsCallable(functions, 'generateBlock');
-            const result = await generateBlock({ message: userMessage });
-            
-            const newBlock = result.data;
-            
-            // ตรวจจับภาษาและเพิ่ม flag ธงชาติอัตโนมัติ
-            const languageFlags = {
-                'ไทย': 'th', 'thai': 'th', 'thailand': 'th',
-                'อังกฤษ': 'gb', 'english': 'gb', 'uk': 'gb', 'british': 'gb',
-                'ญี่ปุ่น': 'jp', 'japanese': 'jp', 'japan': 'jp',
-                'เกาหลี': 'kr', 'korean': 'kr', 'korea': 'kr',
-                'จีน': 'cn', 'chinese': 'cn', 'china': 'cn', 'mandarin': 'cn',
-                'ลาว': 'la', 'lao': 'la', 'laos': 'la',
-                'เวียดนาม': 'vn', 'vietnamese': 'vn', 'vietnam': 'vn',
-                'พม่า': 'mm', 'myanmar': 'mm', 'burmese': 'mm',
-                'กัมพูชา': 'kh', 'cambodian': 'kh', 'khmer': 'kh', 'cambodia': 'kh',
-                'มาเลเซีย': 'my', 'malay': 'my', 'malaysia': 'my',
-                'อินโดนีเซีย': 'id', 'indonesian': 'id', 'indonesia': 'id',
-                'ฟิลิปปินส์': 'ph', 'filipino': 'ph', 'philippines': 'ph', 'tagalog': 'ph',
-                'อินเดีย': 'in', 'hindi': 'in', 'india': 'in',
-                'ฝรั่งเศส': 'fr', 'french': 'fr', 'france': 'fr',
-                'เยอรมัน': 'de', 'german': 'de', 'germany': 'de',
-                'สเปน': 'es', 'spanish': 'es', 'spain': 'es',
-                'อิตาลี': 'it', 'italian': 'it', 'italy': 'it',
-                'โปรตุเกส': 'pt', 'portuguese': 'pt', 'portugal': 'pt',
-                'รัสเซีย': 'ru', 'russian': 'ru', 'russia': 'ru',
-                'อาหรับ': 'sa', 'arabic': 'sa', 'arab': 'sa',
-            };
-            
-            // หา flag จากชื่อ block
-            let detectedFlag = null;
-            const blockNameLower = (newBlock.name || '').toLowerCase();
-            for (const [keyword, flag] of Object.entries(languageFlags)) {
-                if (blockNameLower.includes(keyword.toLowerCase())) {
-                    detectedFlag = flag;
-                    break;
-                }
-            }
-            
-            // Save to Firestore and get ID
-            const blockData = {
-                ...newBlock,
-                isCustom: true,
-                type: 'custom',
-                ...(detectedFlag && { flag: detectedFlag })
-            };
-            
-            const savedId = await saveCustomBlock(blockData);
-            
-            if (savedId) {
-                // Add to state with Firestore ID
-                const blockWithId = {
-                    ...blockData,
-                    id: savedId
-                };
-                setCustomBlocks(prev => [...prev, blockWithId]);
-                
-                setChatMessages(prev => [...prev, { 
-                    role: 'assistant', 
-                    content: `สร้างกล่อง "${newBlock.name}" ให้แล้ว! 🎉\n\nกล่องถูกบันทึกแล้ว ลากไปวางใน Expander ได้เลยครับ`
-                }]);
-            } else {
-                throw new Error('Failed to save block');
-            }
-        } catch (error) {
-            console.error('Error generating block:', error);
-            setChatMessages(prev => [...prev, { 
-                role: 'assistant', 
-                content: 'ขออภัย เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งครับ'
-            }]);
-        } finally {
-            setChatLoading(false);
-        }
-    };
-    
     // === SAVE EXPANDER ===
     const handleSave = async () => {
         if (!user) {
@@ -1375,10 +1282,6 @@ const ExpanderCreator = () => {
         return exp.receivedFree && exp.originalBlocks && !isModifiedFromOriginal(exp);
     };
     
-    // Scroll to bottom of chat
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [chatMessages]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-red-900 via-slate-900 to-slate-950 p-6 relative">
@@ -1941,7 +1844,7 @@ Output: ให้แสดงผล 5 Prompts...
                         
                         {/* Structured Result Display */}
                         {structuredResult?.prompts && structuredResult.prompts.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                                 {structuredResult.prompts.map((p, idx) => {
                                     const style = getPromptTypeStyle(p.type);
                                     return (
@@ -2635,79 +2538,6 @@ Output: ให้แสดงผล 5 Prompts...
                 </div>
             )}
             
-            {/* Floating AI Chat Button */}
-            <button
-                onClick={() => setShowAIChat(!showAIChat)}
-                className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-full shadow-lg flex items-center justify-center text-white z-40"
-            >
-                {showAIChat ? <X size={24} /> : <MessageCircle size={24} />}
-            </button>
-            
-            {/* Floating AI Chat Panel */}
-            {showAIChat && (
-                <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
-                    {/* Header */}
-                    <div className="p-4 bg-gradient-to-r from-red-900/50 to-orange-900/50 border-b border-white/10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
-                                <Bot size={20} className="text-white" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-white">AI Block Generator</h3>
-                                <p className="text-xs text-slate-400">สร้างกล่องใหม่ด้วย AI</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {chatMessages.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                                    msg.role === 'assistant' 
-                                        ? 'bg-slate-800 text-white rounded-tl-none' 
-                                        : 'bg-red-600 text-white rounded-tr-none'
-                                }`}>
-                                    {msg.content}
-                                </div>
-                            </div>
-                        ))}
-                        {chatLoading && (
-                            <div className="flex justify-start">
-                                <div className="bg-slate-800 p-3 rounded-2xl rounded-tl-none">
-                                    <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                        <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                        <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-                    
-                    {/* Input */}
-                    <div className="p-4 bg-slate-900/50 border-t border-white/5">
-                        <div className="relative flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
-                                placeholder="อยากได้กล่องแบบไหน..."
-                                className="w-full bg-slate-800 text-white rounded-full pl-4 pr-12 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-red-500/50 border border-white/10 placeholder-slate-500"
-                            />
-                            <button
-                                onClick={handleChatSend}
-                                disabled={!chatInput.trim() || chatLoading}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 p-2 bg-red-600 rounded-full text-white hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 transition-colors"
-                            >
-                                <Send size={14} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

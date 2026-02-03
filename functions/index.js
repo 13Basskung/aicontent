@@ -1,184 +1,55 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const { OpenAI } = require('openai');
+const { GoogleGenAI } = require('@google/genai');
 const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
-const https = require('https');
 
-// Force redeploy: 2026-01-26T01:10
+// Force redeploy: 2026-02-04 - Gemini 2.5 Migration (New SDK)
 admin.initializeApp();
 
-// Initialize OpenAI only when function is called
-function getOpenAI() {
-  // CRITICAL: Trim API Key to remove newlines/whitespace (Firebase Secrets issue)
-  const apiKey = (process.env.OPENAI_API_KEY || '').trim();
-  console.log(`🔑 OpenAI API Key: ${apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}` : 'NOT FOUND'}`);
-  console.log(`🔑 API Key Length: ${apiKey?.length || 0} characters`);
-  
-  if (!apiKey) {
-    console.error('❌ OPENAI_API_KEY is not set in environment!');
+// Initialize Gemini 2.5 (New SDK: @google/genai)
+let genAIClient = null;
+
+function getGeminiClient() {
+  if (!genAIClient) {
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    console.log(`🔑 Gemini API Key: ${apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT FOUND'}`);
+    
+    if (!apiKey) {
+      console.error('❌ GEMINI_API_KEY is not set in environment!');
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+    
+    genAIClient = new GoogleGenAI({ apiKey });
   }
+  return genAIClient;
+}
+
+// Helper: Call Gemini with JSON response (New SDK)
+async function callGemini(prompt, systemInstruction = '') {
+  const ai = getGeminiClient();
   
-  return new OpenAI({
-    apiKey: apiKey,
-    timeout: 60000, // 60 seconds timeout
-    maxRetries: 3   // Enable SDK retries
-  });
-}
-
-// Direct HTTPS call to OpenAI (bypass SDK)
-async function callOpenAIDirect(messages, model = 'gpt-4o') {
-  const apiKey = (process.env.OPENAI_API_KEY || '').trim();
+  const fullPrompt = systemInstruction 
+    ? `${systemInstruction}\n\nIMPORTANT: Return valid JSON only, no markdown.\n\n${prompt}`
+    : `IMPORTANT: Return valid JSON only, no markdown.\n\n${prompt}`;
   
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      model: model,
-      messages: messages,
-      temperature: 0.7,
-      response_format: { type: 'json_object' }
-    });
-    
-    const options = {
-      hostname: 'api.openai.com',
-      port: 443,
-      path: '/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(data)
-      },
-      timeout: 60000
-    };
-    
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => body += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(body);
-          if (res.statusCode === 200) {
-            const content = parsed.choices?.[0]?.message?.content || '{}';
-            resolve({ success: true, data: JSON.parse(content), raw: content });
-          } else {
-            console.error(`OpenAI API Error: ${res.statusCode}`, body.substring(0, 500));
-            reject(new Error(`API Error ${res.statusCode}: ${parsed.error?.message || 'Unknown'}`));
-          }
-        } catch (e) {
-          reject(new Error(`Parse error: ${e.message}`));
-        }
-      });
-    });
-    
-    req.on('error', (e) => reject(e));
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Request timeout'));
-    });
-    
-    req.write(data);
-    req.end();
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: fullPrompt
   });
+  
+  const text = response.text || '';
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Try to extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error(`Failed to parse Gemini response as JSON: ${text.substring(0, 200)}`);
+  }
 }
-
-// Helper: Get system mode
-function getSystemMode(modeId) {
-  const systemModes = {
-    'timelapse_build': {
-      name: { th: 'Time-lapse สร้างบ้าน', en: 'Time-lapse Build', zh: '延时建造' },
-      sceneBlueprint: [
-        { order: 1, description: 'Foundation', duration: 10 },
-        { order: 2, description: 'Frame construction', duration: 10 },
-        { order: 3, description: 'Completed house', duration: 10 }
-      ]
-    }
-    // Add more system modes here
-  };
-  return systemModes[modeId];
-}
-
-// Function: Generate Prompts (Auth Required)
-exports.generatePrompts = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'] })
-  .https.onCall(async (data, context) => {
-    // Check authentication
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-    const { projectId, modeId } = data;
-    const userId = context.auth.uid;
-
-    try {
-      // Get project data
-      const projectDoc = await admin.firestore()
-        .collection('users').doc(userId)
-        .collection('projects').doc(projectId)
-        .get();
-
-      if (!projectDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Project not found');
-      }
-
-      const project = projectDoc.data();
-
-      // Get mode data
-      let mode;
-      if (project.modeType === 'system') {
-        mode = getSystemMode(modeId);
-      } else if (project.modeType === 'custom') {
-        const modeDoc = await admin.firestore()
-          .collection('users').doc(userId)
-          .collection('customModes').doc(modeId)
-          .get();
-        mode = modeDoc.data();
-      } else if (project.modeType === 'marketplace') {
-        const modeDoc = await admin.firestore()
-          .collection('marketplaceModes').doc(modeId)
-          .get();
-        mode = modeDoc.data().mode;
-      }
-
-      if (!mode) {
-        throw new functions.https.HttpsError('not-found', 'Mode not found');
-      }
-
-      // Call OpenAI
-      const openai = new OpenAI({ apiKey: functions.config().openai.key });
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a video content planner. Generate detailed scene prompts for AI video generation. Return JSON only.'
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({
-              concept: project.concept,
-              scenes: project.scenes,
-              aspect: project.aspect,
-              modeBlueprint: mode.sceneBlueprint
-            })
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      });
-
-      let content = response.choices[0].message.content;
-      // Basic cleanup if markdown backticks are included
-      content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-      const result = JSON.parse(content);
-      return {
-        prompts: result.prompts,
-        caption: result.caption,
-        hashtags: result.hashtags
-      };
-    } catch (error) {
-      console.error('Error generating prompts:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
 
 // Function: Reset Daily Post Counts (Scheduled 00:00 BKK)
 exports.resetDailyPostCounts = functions.pubsub.schedule('0 0 * * *')
@@ -201,125 +72,6 @@ exports.resetDailyPostCounts = functions.pubsub.schedule('0 0 * * *')
     console.log('Daily post counts reset');
   });
 
-// Function: Seed Database (HTTP Utility)
-exports.seedDatabase = functions.https.onRequest(async (req, res) => {
-  try {
-    const userId = 'user_demo_123';
-    const batch = admin.firestore().batch();
-
-    // 1. Create User
-    const userRef = admin.firestore().collection('users').doc(userId);
-    batch.set(userRef, {
-      email: 'demo@example.com',
-      displayName: 'Demo User',
-      role: 'admin',
-      subscription: {
-        plan: 'pro',
-        status: 'active',
-        currentPeriodEnd: admin.firestore.FieldValue.serverTimestamp()
-      },
-      language: 'th',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // 2. Create Account
-    const accountRef = userRef.collection('accounts').doc('youtube_main');
-    batch.set(accountRef, {
-      platform: 'youtube',
-      accountName: 'My Channel',
-      profilePath: '',
-      dailyPostLimit: 20,
-      minIntervalMinutes: 20,
-      postsToday: 0,
-      lastPostTime: 0,
-      status: 'active',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // 3. Create Project
-    const projectRef = userRef.collection('projects').doc('project_demo');
-    batch.set(projectRef, {
-      name: 'Demo Project',
-      concept: 'Architecture',
-      scenes: 3,
-      aspect: '9:16',
-      modeType: 'system',
-      modeId: 'timelapse_build',
-      status: 'active',
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // 4. Create Timeslot
-    const date = new Date().toISOString().split('T')[0];
-    const timeslotRef = admin.firestore().collection('timeslots').doc(`${date}_${userId}`);
-    batch.set(timeslotRef, {
-      date: date,
-      userId: userId,
-      slots: []
-    }, { merge: true });
-
-    // 5. Create Marketplace Mode
-    const marketModeRef = admin.firestore().collection('marketplaceModes').doc('mode_demo');
-    batch.set(marketModeRef, {
-      creatorId: userId,
-      creatorName: 'Admin',
-      price: 0,
-      publishedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    // 6. Create STITCH_VIDEO Block in global_recipe_blocks
-    const stitchBlockRef = admin.firestore().collection('global_recipe_blocks').doc('STITCH_VIDEO');
-    batch.set(stitchBlockRef, {
-      name: 'STITCH_VIDEO',
-      type: 'ONCE',
-      category: 'processing',
-      description: 'รวมไฟล์ Scene เป็นวีดีโอเดียวด้วย FFmpeg',
-      icon: '🎬',
-      requiresAgent: true,
-      agentCommand: 'CMD_STITCH_VIDEO',
-      steps: [],
-      createdAt: new Date().toISOString().split('T')[0]
-    }, { merge: true });
-
-    await batch.commit();
-    res.json({ success: true, message: 'Database seeded successfully' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Function: Generate Speech (Secure TTS Proxy)
-exports.generateSpeech = functions
-  .runWith({ secrets: [] }) // Note: TTS usually uses default credentials if enabled in GCP
-  .https.onCall(async (data, context) => {
-    // Check authentication
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    const { text, voiceParams } = data;
-    if (!text) {
-      throw new functions.https.HttpsError('invalid-argument', 'Text is required');
-    }
-
-    try {
-      const client = new TextToSpeechClient();
-      const request = {
-        input: data.ssml ? { ssml: data.ssml } : { text: text },
-        voice: voiceParams || { languageCode: 'en-US', name: 'en-US-Chirp3-HD-Charon' },
-        audioConfig: {
-          audioEncoding: 'MP3'
-        },
-      };
-
-      const [response] = await client.synthesizeSpeech(request);
-      return { audioContent: response.audioContent.toString('base64') };
-    } catch (error) {
-      console.error('Error generating speech:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
 
 // Helper: Normalize Percentages (Auto-Correction)
 function normalizePercentages(items) {
@@ -356,765 +108,8 @@ function normalizePercentages(items) {
   return items;
 }
 
-// Function: Analyze Mode (AI Critique + TTS)
-exports.analyzeMode = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 300, memory: '1GB' }) // Fix Timeout & Memory for heavy AI tasks
-  .https.onCall(async (data, context) => {
-    // Check authentication
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    // Support both direct object (if called directly) or nested via Callable .data
-    const input = data.modeData || (data.data && data.data.modeData) || data;
-    let { name, description, category, systemInstruction, variables, blocks } = input;
-
-    // *If input is still just a prompt string (legacy fallback), handle it?*
-    // Ideally we force the frontend to send the object now. But let's check.
-    if (!blocks && data.promptText) {
-      // Fallback for direct promptText calls (Legacy) - Just wrap it
-      console.log("⚠️ Legacy promptText received. Bypassing percentage logic.");
-      // We can't do percentage logic here, so strictly we should just proceed or fail.
-      // Let's assume for this task we are moving to structured data.
-    }
-
-    // 1. Backend Normalization (Auto-Correct Logic)
-    if (blocks && Array.isArray(blocks)) {
-      // Level 1: Sequences
-      blocks = normalizePercentages(blocks);
-
-      // Level 2: Steps within Sequences
-      blocks.forEach(block => {
-        if (block.evolution && Array.isArray(block.evolution)) {
-          block.evolution = normalizePercentages(block.evolution);
-        }
-      });
-    }
-
-    try {
-      // 2. Construct Prompt from Structured Data (NEW: No rawPrompt - only block titles)
-      let structureText = "";
-      if (blocks) {
-        blocks.forEach((block, i) => {
-          const seqPercent = block.sequencePercentage || block.percentage || 0;
-          structureText += `Scene ${i + 1}: ${block.title} (${seqPercent}%)\n`;
-          // Note: evolution/steps still exist for timing but no rawPrompt
-          if (block.evolution && block.evolution.length > 1) {
-            block.evolution.forEach((step, j) => {
-              const stepPercent = step.stepPercentage || step.percentage || 0;
-              structureText += `  - Step ${j + 1}: [${stepPercent}% of scene time]\n`;
-            });
-          }
-        });
-      }
-
-      const fullPrompt = `
-      Title: ${name}
-      Category: ${category || 'Cinematic / Movie'}
-      Description: ${description}
-      Instruction: ${systemInstruction}
-      Variables: ${variables ? variables.map(v => v.name).join(', ') : 'None'}
-      
-      Blueprint / Timeline:
-      ${structureText}
-      
-      User Original Prompt (Legacy): ${data.promptText || ''}
-      `.trim();
-
-      console.log("Normalized Payload:", JSON.stringify(blocks, null, 2));
-
-      // 3. AI Analysis
-      const openai = getOpenAI();
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `You are Charon, a world-class AI Mode Architect Critic.
-            Speak Thai. CRITICAL RULE: You MUST use punctuation to control the audio flow for Google TTS.
-            
-            Analyze the user's Mode Blueprint. This is a TEMPLATE for video generation.
-            
-            [🎯 WHAT YOU ARE ANALYZING]
-            - Mode = Template with scene titles (NOT full scripts)
-            - Scene titles use [TOPIC] placeholder (will be replaced by Content Queue later)
-            - Expander system will add cinematic details later
-            - Focus on: STRUCTURE, PACING, SCENE FLOW
-            
-            [DYNAMIC PERSONA: WORLD-CLASS STRUCTURE CRITIC]
-            You are a Visionary Producer critiquing the TEMPLATE DESIGN:
-            - SCORE 0-4: Poor structure, confusing flow, bad pacing
-            - SCORE 5-7: Decent structure, room for improvement
-            - SCORE 8-10: Excellent narrative arc, perfect pacing
-
-            [TTS FORMATTING RULES - CRITICAL]
-            - DO NOT USE DIGITS (0-9). SPELL OUT ALL NUMBERS IN THAI.
-            - Example: "80%" -> "แปดสิบเปอร์เซ็นต์"
-
-            [WHAT TO CRITIQUE]
-            1. Scene count - เพียงพอสำหรับเล่าเรื่องหรือไม่?
-            2. Scene titles - ชัดเจน มีความหมายหรือไม่?
-            3. Percentage allocation - สัดส่วนเวลาสมเหตุสมผลหรือไม่?
-            4. Narrative arc - มี Hook, Rising Action, Climax หรือไม่?
-            5. System Instruction - ชัดเจนพอให้ AI เข้าใจหรือไม่?
-
-            MANDATORY SECTION: "🚑 คำแนะนำ:"
-            - จำนวนฉากที่แนะนำ
-            - ปรับสัดส่วนเวลาอย่างไร
-            - ชื่อฉากที่ควรเปลี่ยน
-            
-            Output a JSON object:
-            {
-              "score": integer (0-10),
-              "script": "..."
-            }
-            CRITICAL: Output strictly VALID JSON. MINIFY (single line). Use literal '\\n' for newlines.
-            `
-          },
-          {
-            role: 'user',
-            content: `Analyze this Mode: ${fullPrompt}`
-          }
-        ],
-        temperature: 0.7,
-      });
-
-      let content = completion.choices[0].message.content;
-
-      // 1. Remove Markdown Wrappers
-      content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-      // 2. Extract strictly from first '{' to last '}'
-      const firstBrace = content.indexOf('{');
-      const lastBrace = content.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        content = content.substring(firstBrace, lastBrace + 1);
-      }
-
-      // 3. DEBUG LOGGING (CRITICAL)
-      console.log("CLEANED_JSON_PAYLOAD:", content);
-
-      const result = JSON.parse(content);
-
-      // 2. Generate Speech for the Script (CHUNKED to avoid limit)
-      const ttsClient = new TextToSpeechClient();
-      const chunks = chunkText(result.script, 180); // Smart Splitter (limit 180)
-      const audioBuffers = [];
-
-      for (const chunk of chunks) {
-        if (!chunk.trim()) continue;
-        const ttsRequest = {
-          input: { text: chunk },
-          voice: { languageCode: 'en-US', name: 'en-US-Chirp3-HD-Charon' },
-          audioConfig: { audioEncoding: 'MP3' },
-        };
-        const [response] = await ttsClient.synthesizeSpeech(ttsRequest);
-        if (response.audioContent) {
-          audioBuffers.push(response.audioContent);
-        }
-      }
-
-      // Concatenate all audio buffers
-      const finalAudio = Buffer.concat(audioBuffers);
-
-      return {
-        score: parseInt(result.score) || 0, // Enforce Integer
-        script: result.script,
-        audioContent: finalAudio.toString('base64')
-      };
-
-    } catch (error) {
-      console.error('Error analyzing mode:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
-
-// --- HELPER: Text Chunking ---
-// --- HELPER: Smart Splitter for Lossless TTS ---
-function chunkText(text, maxLength) {
-  if (!text) return [];
-
-  const chunks = [];
-  let remaining = text;
-
-  while (remaining.length > maxLength) {
-    // Priority 1: Split at last Punctuation within limit
-    // We look for . ! ? or newline
-    let splitIndex = -1;
-    const punctuationRegex = /[.!?\n]/;
-
-    // Search backwards from limit
-    for (let i = maxLength; i >= 0; i--) {
-      if (punctuationRegex.test(remaining[i])) {
-        splitIndex = i + 1; // Include the punctuation
-        break;
-      }
-    }
-
-    // Priority 2: Split at last Space within limit (if no punctuation found)
-    if (splitIndex === -1) {
-      splitIndex = remaining.lastIndexOf(' ', maxLength);
-      if (splitIndex !== -1) splitIndex += 1; // Include space (or split after it)
-    }
-
-    // Priority 3: Hard limit (Force split)
-    if (splitIndex === -1) {
-      splitIndex = maxLength;
-    }
-
-    // Extract chunk
-    const chunk = remaining.substring(0, splitIndex).trim();
-    if (chunk) chunks.push(chunk);
-
-    // Update remaining text
-    remaining = remaining.substring(splitIndex).trim();
-  }
-
-  // Add the last piece
-  if (remaining) chunks.push(remaining);
-
-  return chunks;
-}
-
-// --- 3. Mode Architect (Consultant) - AI Story Director ---
-
 // ============================================
-// SHARED HELPER: Per-Scene Expansion with Episode Topic
-// Used by: testPromptPipeline, scheduleJobs
-// This ensures Generate Test and Production use IDENTICAL logic
-// Enhanced: Emotional Arc, Transition Hints, Sound Design, Visual Consistency, Scene Memory, Dialogue Markers
-// ============================================
-// ============================================
-// CATEGORY DIALOGUE RULES - Different categories have different dialogue patterns
-// ============================================
-const CATEGORY_DIALOGUE_RULES = {
-  "Cinematic / Movie": {
-    style: "dramatic dialogue between characters",
-    dialoguePerScene: "2-5 lines based on emotional arc",
-    type: "conversation, monologue, or reaction"
-  },
-  "Short Film / Story": {
-    style: "storytelling dialogue",
-    dialoguePerScene: "2-4 lines per scene",
-    type: "narrative conversation"
-  },
-  "Product Showcase / Commercial": {
-    style: "minimal or no dialogue",
-    dialoguePerScene: "0-1 lines",
-    type: "brief narration or tagline only"
-  },
-  "Real Estate / Architecture": {
-    style: "no dialogue",
-    dialoguePerScene: "0 lines",
-    type: "visual showcase only"
-  },
-  "Vlog / Lifestyle": {
-    style: "casual monologue to camera",
-    dialoguePerScene: "2-4 lines per scene",
-    type: "talking to camera, personal sharing"
-  },
-  "Time-lapse / Hyper-lapse": {
-    style: "no dialogue",
-    dialoguePerScene: "0 lines",
-    type: "music and ambient sounds only"
-  },
-  "Documentary / News": {
-    style: "interview or narration",
-    dialoguePerScene: "1-3 lines per scene",
-    type: "voiceover, interview clips, or narration"
-  },
-  "How-to / Tutorial": {
-    style: "instructional monologue",
-    dialoguePerScene: "3-5 lines per scene",
-    type: "step-by-step explanation"
-  },
-  "Relaxation / Lo-fi / ASMR": {
-    style: "no dialogue",
-    dialoguePerScene: "0 lines",
-    type: "ambient sounds and soft music only"
-  }
-};
-
-// ============================================
-// ✅ FIX #3: RETRY HELPER for GPT-4o calls (Using Direct HTTPS)
-// ============================================
-async function callOpenAIWithRetry(openai, params, maxRetries = 3) {
-  let lastError = null;
-  const messages = params.messages;
-  const model = params.model || 'gpt-4o';
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`   🔄 GPT-4o Direct HTTPS Call (Attempt ${attempt}/${maxRetries})...`);
-      
-      // Use direct HTTPS instead of SDK
-      const result = await callOpenAIDirect(messages, model);
-      console.log(`   ✅ GPT-4o Response valid (Attempt ${attempt})`);
-      return result;
-      
-    } catch (error) {
-      lastError = error;
-      // Detailed error logging
-      console.error(`   ⚠️ GPT-4o Attempt ${attempt} failed:`);
-      console.error(`      Error Type: ${error.constructor.name}`);
-      console.error(`      Error Message: ${error.message}`);
-      
-      // If it's a rate limit error, wait longer
-      if (error.message?.includes('rate_limit') || error.message?.includes('429')) {
-        const waitTime = attempt * 5000; // 5s, 10s, 15s
-        console.log(`   ⏳ Rate limited, waiting ${waitTime/1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      } else if (attempt < maxRetries) {
-        // For other errors, short wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-  }
-  
-  // All retries failed
-  console.error(`   ❌ All ${maxRetries} attempts failed. Last error: ${lastError?.message}`);
-  return { success: false, data: null, error: lastError };
-}
-
-// ============================================
-// SHARED HELPER: Expand Scenes with Topic (STORY-FIRST APPROACH)
-// Step 1: Create Full Story with all dialogues
-// Step 2: Split into Scene Prompts
-// ============================================
-async function expandScenesWithTopic(params) {
-  const {
-    rawScenes,
-    expanderBlocks,
-    episodeTopic,
-    episodeDesc,
-    characters,
-    sceneDuration = 8,
-    modeCategory,
-    systemInstruction
-  } = params;
-
-  const openai = getOpenAI();
-  const totalScenes = rawScenes.length;
-  const totalDuration = totalScenes * sceneDuration;
-
-  // ============================================
-  // DETAILED LOGGING
-  // ============================================
-  console.log(`🔧 expandScenesWithTopic: STORY-FIRST APPROACH`);
-  console.log(`   📊 Total Scenes: ${totalScenes}`);
-  console.log(`   📊 Duration per Scene: ${sceneDuration}s`);
-  console.log(`   📊 Total Duration: ${totalDuration}s`);
-  console.log(`   📊 Episode Topic: "${episodeTopic || 'No Episode'}"`);
-  console.log(`   📊 Category: "${modeCategory || 'Cinematic / Movie'}"`);
-  
-  // Log Expander Blocks
-  console.log(`   📊 Expander Blocks: ${expanderBlocks?.length || 0}`);
-  if (expanderBlocks && expanderBlocks.length > 0) {
-    expanderBlocks.forEach((b, i) => {
-      console.log(`      ${i + 1}. "${b.name}" → ${(b.instruction || 'NO INSTRUCTION').substring(0, 80)}...`);
-    });
-  }
-  
-  // Log Characters
-  console.log(`   📊 Characters: ${characters?.length || 0}`);
-  if (characters && characters.length > 0) {
-    characters.forEach((c, i) => {
-      console.log(`      ${i + 1}. "${c.name}" → ${(c.visualDescription || c.description || 'NO DESC').substring(0, 80)}...`);
-    });
-  }
-
-  // ============================================
-  // LANGUAGE DETECTION from Expander Blocks
-  // ============================================
-  let detectedLanguage = 'English';
-  const languageKeywords = {
-    'อีสาน': 'ภาษาอีสาน (Isan Thai dialect)',
-    'ไทย': 'ภาษาไทย (Thai)',
-    'thai': 'ภาษาไทย (Thai)',
-    'english': 'English',
-    'อังกฤษ': 'English',
-    'ญี่ปุ่น': 'ภาษาญี่ปุ่น (Japanese)',
-    'japanese': 'ภาษาญี่ปุ่น (Japanese)',
-    'จีน': 'ภาษาจีน (Chinese)',
-    'chinese': 'ภาษาจีน (Chinese)'
-  };
-
-  if (expanderBlocks && expanderBlocks.length > 0) {
-    for (const block of expanderBlocks) {
-      const blockNameLower = (block.name || '').toLowerCase();
-      const blockInstruction = (block.instruction || '').toLowerCase();
-      for (const [keyword, language] of Object.entries(languageKeywords)) {
-        if (blockNameLower.includes(keyword.toLowerCase()) || blockInstruction.includes(keyword.toLowerCase())) {
-          detectedLanguage = language;
-          console.log(`   🌐 Detected Language: "${block.name}" → ${language}`);
-          break;
-        }
-      }
-    }
-  }
-
-  // ============================================
-  // BUILD CONTEXT STRINGS (Priority Order)
-  // ============================================
-  
-  // 🔴 PRIORITY 1: Expander Block Instructions (HIGHEST)
-  const expanderInstructions = expanderBlocks && expanderBlocks.length > 0
-    ? expanderBlocks.map((b, i) => `${i + 1}. [${b.name}]: ${b.instruction || b.description || ''}`).join('\n')
-    : 'Standard cinematic style';
-
-  // 🟠 PRIORITY 2: Mode Structure (Scene titles and emotional arc)
-  const modeStructure = rawScenes.map((scene, i) => {
-    const position = i / (totalScenes - 1 || 1);
-    let arc = 'RISING';
-    if (position <= 0.2) arc = 'INTRODUCTION';
-    else if (position <= 0.4) arc = 'RISING';
-    else if (position <= 0.6) arc = 'CLIMAX';
-    else if (position <= 0.8) arc = 'FALLING';
-    else arc = 'RESOLUTION';
-    return `Scene ${i + 1} (${arc}): ${scene.blockTitle || 'Untitled'} - ${scene.sceneInstruction || scene.visualPrompt || ''}`;
-  }).join('\n');
-
-  // 🟡 PRIORITY 3: Character Context
-  const characterContext = characters && characters.length > 0
-    ? characters.map(c => `- ${c.name}: ${c.visualDescription || c.description || 'N/A'}`).join('\n')
-    : 'No specific characters defined';
-
-  // 🎬 DIALOGUE DENSITY MAPPING (1-5 ประโยค, สูงสุด 3.5x)
-  const densityMapping = {
-    1: { speed: '1.0x', style: 'หนัง/ดราม่า', introEffect: '3-4 วินาที', mood: 'Dramatic, Thoughtful', camera: 'Slow pan, Wide shots' },
-    2: { speed: '1.0x', style: 'เล่าเรื่องสมจริง', introEffect: '2-3 วินาที', mood: 'Engaging, Storytelling', camera: 'Medium shots' },
-    3: { speed: '2.0x', style: 'สมดุล', introEffect: '1-2 วินาที', mood: 'Balanced', camera: 'Mixed shots' },
-    4: { speed: '3.0x', style: 'ให้ความรู้/สอน', introEffect: '< 1 วินาที', mood: 'Energetic, Educational', camera: 'Close-up, Talking head' },
-    5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', introEffect: 'ไม่มี (พูดทันที)', mood: 'Fast-paced, Urgent', camera: 'Tight close-up' }
-  };
-
-  // 🎬 SCENE BLUEPRINT: สร้างข้อมูลซีนจาก Mode สำหรับ AI
-  const lastScene = rawScenes[rawScenes.length - 1];
-  const sceneBlueprint = rawScenes.map((scene, i) => {
-    const isLastScene = (i === rawScenes.length - 1);
-    const sceneRole = isLastScene ? '🔴 FINAL SCENE (MUST END STORY)' : `Scene ${i + 1}`;
-    const sceneDialogueDensity = Math.min(5, Math.max(1, scene.dialogueDensity || 3)); // จำกัด 1-5, default 3
-    const densityInfo = densityMapping[sceneDialogueDensity] || densityMapping[3];
-    return `${sceneRole}:
-  - Title: "${scene.blockTitle || 'Untitled'}"
-  - Instruction: "${scene.sceneInstruction || 'Follow Expander'}"
-  - Visual: "${scene.visualPrompt || 'N/A'}"
-  - 💬 Dialogue Density: EXACTLY ${sceneDialogueDensity} dialogue lines
-  - 🔊 Speech Speed: ${densityInfo.speed}
-  - 🎭 Style: ${densityInfo.style}
-  - ⏱️ Intro Effect: ${densityInfo.introEffect}
-  - 😊 Mood: ${densityInfo.mood}
-  - 📷 Camera: ${densityInfo.camera}`;
-  }).join('\n\n');
-
-  // คำนวณจำนวน Dialogue ที่เหมาะสมต่อซีน - ใช้ค่าจาก Mode Scene ถ้ามี (จำกัด 1-5)
-  const sceneDialogueDensities = rawScenes.map(s => Math.min(5, Math.max(1, s.dialogueDensity || 3)));
-  const avgDialogueDensity = Math.round(sceneDialogueDensities.reduce((a, b) => a + b, 0) / sceneDialogueDensities.length);
-  const minDialoguePerScene = Math.min(...sceneDialogueDensities);
-  const maxDialoguePerScene = Math.max(...sceneDialogueDensities);
-
-  console.log(`   🎬 Scene Blueprint: ${totalScenes} scenes × ${sceneDuration}s = ${totalDuration}s total`);
-  console.log(`   📊 Dialogue estimate: ${minDialoguePerScene}-${maxDialoguePerScene} lines per scene`);
-
-  try {
-    // ============================================
-    // STEP 1: STORY CREATOR - สร้างเนื้อเรื่องทั้งหมดก่อน
-    // ============================================
-    console.log(`\n   📖 STEP 1: Creating Full Story...`);
-
-    const storySystemPrompt = `You are a world-class professional screenwriter. Create a complete story with connected dialogues.
-
-=== 🎬 PRODUCTION CONSTRAINTS (READ FIRST!) ===
-📊 FROM POSTING SCHEDULE:
-- Total Scenes: ${totalScenes} scene(s)
-- Duration per Scene: ${sceneDuration} seconds
-- Total Video Length: ${totalDuration} seconds (${(totalDuration/60).toFixed(1)} minutes)
-
-⚠️ CRITICAL TIMING RULE:
-You have EXACTLY ${totalScenes} scene(s) × ${sceneDuration} seconds each = ${totalDuration} seconds total.
-- If 1 scene × 8s → Complete story in ONE 8-second scene
-- If 3 scenes × 8s → Spread story across THREE 8-second scenes  
-- If 5 scenes × 10s → Epic arc across FIVE 10-second scenes
-
-Each scene's content (dialogue + action) MUST be achievable within ${sceneDuration} seconds.
-Approximate dialogue: ${minDialoguePerScene} to ${maxDialoguePerScene} lines per scene.
-
-=== 🎬 SCENE BLUEPRINT (FROM MODE) ===
-${sceneBlueprint}
-
-=== 🔴 PRIORITY 1: EXPANDER RULES (ABSOLUTE AUTHORITY) ===
-${expanderInstructions}
-
-⚠️ EXPANDER IS KING:
-- Expander Instructions override ALL other rules
-- If Expander says "ภาษาอีสาน" → ALL dialogues in Isan dialect
-- If Expander says "horror" → ALL scenes must be horror
-- If Expander says "no dialogue" → ZERO dialogue lines
-- NEVER ignore Expander instructions to fit timing - ADAPT the story instead
-- Read each Expander block's Instruction carefully and follow EXACTLY
-
-=== 🟠 PRIORITY 2: MODE STRUCTURE ===
-${modeStructure}
-
-=== 🟡 PRIORITY 3: CHARACTERS ===
-${characterContext}
-
-=== 🟢 PRIORITY 4: EPISODE CONTEXT ===
-Topic: "${episodeTopic || 'Untitled'}"
-Description: ${episodeDesc || 'N/A'}
-Category: ${modeCategory || 'Cinematic'}
-Language for ALL dialogues: ${detectedLanguage}
-
-=== 🎯 SETTING RULES (CRITICAL!) ===
-1. SETTING must DIRECTLY relate to the Topic/Episode - NO EXCEPTIONS!
-   - Topic: "ลำไส้" → SETTING: ภายในร่างกาย, ระบบย่อยอาหาร, ลำไส้แบบ cartoon style
-   - Topic: "ปลา" → SETTING: ใต้น้ำ, มหาสมุทร, ตู้ปลา
-   - Topic: "หัวใจ" → SETTING: ภายในหัวใจ, ระบบไหลเวียนเลือด
-   - NEVER use generic unrelated settings like "ทุ่งกว้าง", "ป่า", "ชายหาด" if Topic is specific organ/object!
-2. If Expander says "ฉากหลังเหมาะกับหัวข้อ" → SETTING MUST be Topic-related environment
-3. Background should support the Topic, not distract from it
-
-=== 🎬 DIALOGUE-HEAVY SCENES (dialogueDensity >= 4) ===
-When scene has many dialogue lines:
-1. Main Subject = Character who speaks (center frame, prominent)
-2. Camera = Medium shot or Close-up on speaking character
-3. START SPEAKING within first 0.5 seconds - NO DELAY!
-4. NO slow intro pans, NO atmospheric establishing shots
-5. NO wasting time on effects - CHARACTER TALKS IMMEDIATELY
-6. Background = Simple, clean, Topic-related
-7. All dialogue MUST be spoken - prioritize speech over visual effects
-
-=== 🔗 SEAMLESS SCENE TRANSITIONS ===
-- Scene 1 → Scene 2: Must have visual/emotional bridge
-- Each scene MUST end with a natural bridge to the next
-- NO abrupt cuts - use continuity in audio, visual, or emotion
-- Maintain narrative flow across all scenes
-
-=== 🔴 FINAL SCENE ABSOLUTE RULES (Scene ${totalScenes}) ===
-1. This is the LAST scene - story MUST END here completely
-2. Title from Mode: "${lastScene?.blockTitle || 'Conclusion'}"
-3. Instruction from Mode: "${lastScene?.sceneInstruction || 'End the story'}"
-4. All character arcs RESOLVED
-5. Emotional payoff DELIVERED
-6. NO cliffhangers, NO "to be continued"
-
-=== 📖 YOUR TASK ===
-Write a COMPLETE STORY that:
-1. Fits EXACTLY within ${totalScenes} scenes × ${sceneDuration}s each
-2. Follows Expander Instructions as PRIMARY rules
-3. Creates seamless transitions between scenes
-4. ENDS the story completely in Scene ${totalScenes}
-5. All dialogues in ${detectedLanguage}
-
-=== OUTPUT FORMAT (JSON) ===
-{
-  "storyTitle": "Title of the story",
-  "storySynopsis": "Brief 2-3 sentence summary",
-  "fullDialogueScript": [
-    {
-      "sceneNumber": 1,
-      "emotionalArc": "INTRODUCTION/RISING/CLIMAX/RESOLUTION",
-      "setting": "Location and atmosphere",
-      "dialogues": [
-        { "character": "Character Name", "line": "Dialogue in ${detectedLanguage}" }
-      ],
-      "visualAction": "What happens visually (achievable in ${sceneDuration}s)",
-      "audioMood": "Sound/music mood",
-      "transitionToNext": "How this scene bridges to the next (or 'STORY ENDS' for final scene)"
-    }
-  ]
-}`;
-
-    // ✅ FIX #3: ใช้ Retry mechanism สำหรับ Story Creator
-    const storyResult = await callOpenAIWithRetry(openai, {
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: storySystemPrompt },
-        { role: 'user', content: `Create a complete story for ${totalScenes} scenes about "${episodeTopic}". Make sure all dialogues connect naturally from scene to scene.` }
-      ],
-      temperature: 0.8,
-      max_tokens: 6000,
-      response_format: { type: 'json_object' }
-    }, 3); // Max 3 retries
-
-    let storyData;
-    if (storyResult.success) {
-      storyData = storyResult.data;
-      console.log(`   ✅ Story created: "${storyData.storyTitle || 'Untitled'}"`);
-      console.log(`   📄 Synopsis: ${(storyData.storySynopsis || '').substring(0, 100)}...`);
-      console.log(`   📄 Dialogue scenes: ${storyData.fullDialogueScript?.length || 0}`);
-    } else {
-      console.error(`   ❌ Story creation failed after all retries`);
-      storyData = { fullDialogueScript: [] };
-    }
-
-    // ============================================
-    // STEP 2: SCENE SPLITTER - แบ่งเป็น Video Prompts
-    // ============================================
-    console.log(`\n   🎬 STEP 2: Splitting into Scene Prompts...`);
-
-    const splitSystemPrompt = `You are a video prompt specialist. Convert story scenes into AI video generation prompts.
-
-=== STORY DATA ===
-Title: ${storyData.storyTitle || episodeTopic}
-Synopsis: ${storyData.storySynopsis || episodeDesc}
-
-=== 🔴 EXPANDER RULES (MUST APPLY TO EVERY PROMPT) ===
-${expanderInstructions}
-
-=== CHARACTERS (Use exact visualDescription) ===
-${characterContext}
-
-=== VIDEO SPEC ===
-Duration per scene: ${sceneDuration} seconds
-Style: ${modeCategory || 'Cinematic'}
-Language: ${detectedLanguage}
-
-=== YOUR TASK ===
-Convert each scene from the story into a video prompt.
-Each prompt must:
-1. Include SETTING (from story - MUST relate to Topic "${episodeTopic}")
-2. Include MAIN SUBJECT (character with visualDescription)
-3. Include SHOT LIST (camera shots that prioritize showing character speaking)
-4. Include ALL DIALOGUE (every line from the story, in ${detectedLanguage})
-5. Include SPEECH SPEED (use value from Scene Blueprint - DO NOT calculate!)
-6. Follow ALL Expander rules
-
-=== 🎯 SETTING RULE ===
-SETTING must DIRECTLY relate to Topic "${episodeTopic}"
-- NEVER use generic unrelated settings!
-- If Topic is body part → SETTING inside body
-- If Topic is animal → SETTING in animal's habitat
-
-=== 🎬 DIALOGUE-HEAVY RULE ===
-If scene has 4+ dialogue lines:
-- Character speaks IMMEDIATELY (within 0.5s)
-- NO slow intro shots, NO establishing shots
-- Camera focused on speaking character
-- ALL dialogue MUST be included - NO CUTTING!
-
-=== 🔊 SPEECH SPEED (ใช้ค่าจาก Scene Blueprint เท่านั้น!) ===
-⚠️ ห้ามคำนวณเอง! ใช้ค่า Speech Speed จาก Scene Blueprint ที่กำหนดไว้ด้านบน
-- 1 ประโยค = 1.0x
-- 2 ประโยค = 1.0x
-- 3 ประโยค = 2.0x
-- 4 ประโยค = 3.0x
-- 5 ประโยค = 3.5x (สูงสุด)
-
-=== OUTPUT FORMAT (JSON) ===
-{
-  "scenes": [
-    {
-      "sceneNumber": 1,
-      "prompt": "VIDEO SPEC: Duration ${sceneDuration}s | Style ${modeCategory} | [Expander camera/lighting]\\nSETTING: [Topic-related setting]\\nMAIN SUBJECT: [character + visualDescription - speaking]\\nSHOT LIST: 1. [shot focused on speaker] 2. [shot] 3. [shot]\\nDIALOGUE: [character]: \\"[ALL lines in ${detectedLanguage}]\\"\\n🔊 SPEECH SPEED: [from Scene Blueprint]x\\nAVOID: No extra characters, no distortion, no wasted time on effects, NO SUBTITLES, NO TEXT OVERLAY",
-      "audioDescription": "Sound and music description",
-      "speechSpeed": 3.5,
-      "totalWords": 30
-    }
-  ]
-}`;
-
-    const dialogueScenes = storyData.fullDialogueScript || [];
-    const splitUserContent = `Convert these ${dialogueScenes.length} story scenes into video prompts:\n${JSON.stringify(dialogueScenes, null, 2)}`;
-
-    // ✅ FIX #3: ใช้ Retry mechanism สำหรับ Scene Splitter
-    const splitResult = await callOpenAIWithRetry(openai, {
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: splitSystemPrompt },
-        { role: 'user', content: splitUserContent }
-      ],
-      temperature: 0.7,
-      max_tokens: 8000,
-      response_format: { type: 'json_object' }
-    }, 3); // Max 3 retries
-
-    let splitData;
-    if (splitResult.success) {
-      splitData = splitResult.data;
-      console.log(`   ✅ Prompts generated: ${splitData.scenes?.length || 0} scenes`);
-    } else {
-      console.error(`   ❌ Scene split failed after all retries`);
-      splitData = { scenes: [] };
-    }
-
-    // ============================================
-    // MAP RESULTS TO OUTPUT FORMAT
-    // ============================================
-    const allExpandedPrompts = [];
-    const generatedScenes = splitData.scenes || [];
-
-    for (let i = 0; i < totalScenes; i++) {
-      const scene = rawScenes[i];
-      const generated = generatedScenes.find(s => s.sceneNumber === i + 1) || generatedScenes[i] || {};
-      
-      const position = i / (totalScenes - 1 || 1);
-      let emotionalArc = 'RISING';
-      if (position <= 0.2) emotionalArc = 'INTRODUCTION';
-      else if (position <= 0.4) emotionalArc = 'RISING';
-      else if (position <= 0.6) emotionalArc = 'CLIMAX';
-      else if (position <= 0.8) emotionalArc = 'FALLING';
-      else emotionalArc = 'RESOLUTION';
-
-      const hasPrompt = !!(generated.prompt && generated.prompt.length > 50);
-      if (!hasPrompt) {
-        console.log(`   ⚠️ Scene ${i + 1}: No prompt generated, using fallback`);
-      }
-
-      allExpandedPrompts.push({
-        sceneNumber: i + 1,
-        englishPrompt: generated.prompt || scene.visualPrompt || scene.rawPrompt || scene.blockTitle || `Scene ${i + 1}`,
-        originalPrompt: scene.visualPrompt || scene.rawPrompt || scene.blockTitle || '',
-        audioDescription: generated.audioDescription || scene.audioAmbience || 'Ambient sounds',
-        cameraAngle: scene.cameraAngle || 'wide',
-        blockTitle: scene.blockTitle || `Scene ${i + 1}`,
-        emotionalArc: emotionalArc || 'RISING',
-        storyConnected: hasPrompt
-      });
-    }
-
-    const successCount = allExpandedPrompts.filter(p => p.storyConnected).length;
-    console.log(`\n🏁 STORY-FIRST COMPLETE: ${successCount}/${totalScenes} scenes with connected story`);
-    
-    return allExpandedPrompts;
-
-  } catch (err) {
-    // ============================================
-    // ERROR HANDLING - Graceful Fallback
-    // ============================================
-    console.error(`   ❌ Story-First approach failed:`, err.message);
-    console.log(`   🔄 Falling back to basic prompts...`);
-    
-    const fallbackPrompts = [];
-    for (let i = 0; i < totalScenes; i++) {
-      const scene = rawScenes[i];
-      const position = i / (totalScenes - 1 || 1);
-      let emotionalArc = 'RISING';
-      if (position <= 0.2) emotionalArc = 'INTRODUCTION';
-      else if (position <= 0.4) emotionalArc = 'RISING';
-      else if (position <= 0.6) emotionalArc = 'CLIMAX';
-      else if (position <= 0.8) emotionalArc = 'FALLING';
-      else emotionalArc = 'RESOLUTION';
-
-      fallbackPrompts.push({
-        sceneNumber: i + 1,
-        englishPrompt: scene.visualPrompt || scene.rawPrompt || scene.blockTitle || `Scene ${i + 1}`,
-        originalPrompt: scene.visualPrompt || scene.rawPrompt || scene.blockTitle,
-        audioDescription: scene.audioAmbience || 'Ambient sounds',
-        cameraAngle: scene.cameraAngle || 'wide',
-        blockTitle: scene.blockTitle || `Scene ${i + 1}`,
-        emotionalArc,
-        storyConnected: false,
-        failed: true
-      });
-    }
-    
-    return fallbackPrompts;
-  }
-}
-
-// ============================================
-// SHARED HELPER: Generate Titles and Tags for all platforms
+// SHARED HELPER: Generate Titles and Tags for all platforms (Gemini)
 // ============================================
 async function generateTitlesAndTags(params) {
   const {
@@ -1123,8 +118,6 @@ async function generateTitlesAndTags(params) {
     modeCategory,
     expandedPrompts
   } = params;
-
-  const openai = getOpenAI();
 
   const prompt = `You are a social media expert. Generate engaging titles and tags for a video.
 
@@ -1157,19 +150,8 @@ IMPORTANT:
 - Output valid JSON only, no markdown`;
 
   try {
-    // Use Direct HTTPS instead of SDK
-    const messages = [
-      { role: 'system', content: 'You are a social media expert. Output valid JSON only.' },
-      { role: 'user', content: prompt }
-    ];
-    
-    const result = await callOpenAIDirect(messages, 'gpt-4o');
-    
-    if (result.success && result.data) {
-      return result.data;
-    }
-    
-    throw new Error('Failed to generate titles and tags');
+    const result = await callGemini(prompt, 'You are a social media expert. Output valid JSON only.');
+    return result;
   } catch (err) {
     console.error('generateTitlesAndTags error:', err.message);
     // Fallback
@@ -1285,303 +267,6 @@ async function getRemainingEpisodeCount(projectRef) {
   return snapshot.size;
 }
 
-exports.consultantChat = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60 })
-  .https.onCall(async (data, context) => {
-  try {
-    const openai = getOpenAI();
-    const { message, history, currentModeData, aiMode = 'architect', expanderList = [] } = data;
-    
-    // DEBUG: Log received expanderList
-    console.log(`[consultantChat] aiMode: ${aiMode}, expanderList count: ${expanderList?.length || 0}`);
-    if (expanderList && expanderList.length > 0) {
-      console.log(`[consultantChat] Expander names: ${expanderList.map(e => e.name).join(', ')}`);
-    }
-
-    // System prompt for Architect Mode (สร้างโครงเรื่อง)
-    const architectSystemPrompt = `You are "AI Mode Architect" - ผู้ช่วยออกแบบโครงสร้าง Mode 🎬
-
-[🎯 CORE MISSION]
-ช่วย User ออกแบบ "โครงสร้างฉาก" สำหรับวิดีโอ
-- Mode = Template ที่มีชื่อฉากหลายๆ ฉาก
-- Expander จะขยาย Prompt ให้ภายหลัง (ไม่ต้องเขียน Prompt ละเอียด)
-- ใช้ [TOPIC] เป็น Placeholder สำหรับหัวข้อจาก Content Queue
-
-[📋 RESPONSE FORMAT - JSON เท่านั้น]
-{
-  "reply": "ข้อความตอบกลับ",
-  "options": ["ตัวเลือก1", "ตัวเลือก2"] หรือ null,
-  "suggestedFix": null หรือ { Mode Object },
-  "inputFields": null
-}
-
-[💬 CONVERSATION FLOW]
-ต้องคุยกับ User ให้ได้ข้อมูลครบก่อนสร้าง Mode:
-
-1. **ถามประเภทวิดีโอ** (ถ้ายังไม่รู้)
-   - ให้เลือก 1 ใน 9 Categories:
-   - options: ["🎬 Cinematic / Movie", "📖 Short Film / Story", "📦 Product Showcase / Commercial", "🏠 Real Estate / Architecture", "📹 Vlog / Lifestyle", "⏱️ Time-lapse / Hyper-lapse", "📺 Documentary / News", "📚 How-to / Tutorial", "🎵 Relaxation / Lo-fi / ASMR"]
-
-2. **ถามจำนวนฉากที่ต้องการ** (ถ้ายังไม่รู้)
-   - ให้ User พิมพ์จำนวนเอง (ไม่จำกัด, แนะนำ 3-10 ฉาก)
-   - ถามว่า "ต้องการกี่ฉากครับ? (แนะนำ 3-10 ฉาก แต่ใส่มากกว่านี้ได้)"
-
-3. **ถามโทนหรือบรรยากาศ** (ถ้ายังไม่รู้)
-   - ตัวอย่าง options: ["🔥 ดราม่า", "😊 สนุกสนาน", "😢 ซึ้ง", "😱 ระทึก"]
-
-4. **ถาม System Instruction (The Brain)** (ถ้ายังไม่รู้)
-   - ถามว่า "อยากให้ AI มีบทบาทอย่างไรครับ? เช่น 'คุณเป็นผู้กำกับหนังที่เน้นดราม่า'"
-   - หรือแนะนำให้ตามประเภทวิดีโอ
-
-5. **เมื่อได้ข้อมูลครบ → เสนอสร้าง Mode**
-   - สรุปสิ่งที่จะสร้าง
-   - ให้ options: ["✅ สร้างเลย!", "🔄 ปรับแก้ก่อน"]
-
-[🎬 WHEN USER CONFIRMS OR CLICKS "สร้าง Mode"]
-ระบบจะส่ง message พิเศษ: "[[GENERATE_MODE]]" หรือ User บอก "สร้างเลย"
-
-เมื่อได้รับ → สร้าง Mode ทันที:
-
-[📝 MODE STRUCTURE - ใหม่! (ไม่ต้องมี rawPrompt)]
-{
-  "name": "ชื่อ Mode",
-  "description": "คำอธิบายสั้นๆ",
-  "category": "Cinematic / Movie",
-  "systemInstruction": "คำอธิบายบทบาทของ AI สำหรับ Mode นี้ เช่น 'คุณเป็นผู้กำกับหนังที่เชี่ยวชาญด้านดราม่า...'",
-  "blocks": [
-    {
-      "id": 1,
-      "title": "[TOPIC] - ฉาก 1: เปิดเรื่อง",
-      "sequencePercentage": 20,
-      "evolution": [{ "id": 101, "stepPercentage": 100 }]
-    },
-    {
-      "id": 2,
-      "title": "[TOPIC] - ฉาก 2: แนะนำปัญหา",
-      "sequencePercentage": 25,
-      "evolution": [{ "id": 102, "stepPercentage": 100 }]
-    },
-    ...
-  ]
-}
-
-[🎭 CATEGORY DIALOGUE RULES - IMPORTANT!]
-Category ที่เลือกจะกำหนดรูปแบบบทสนทนาในแต่ละฉาก:
-
-- **Cinematic / Movie**: 2-5 บทสนทนาตาม Emotional Arc (ดราม่า, สนทนา)
-- **Short Film / Story**: 2-4 บทสนทนาต่อฉาก (เล่าเรื่อง)
-- **Product Showcase / Commercial**: 0-1 บทสนทนา (แค่ Tagline)
-- **Real Estate / Architecture**: 0 บทสนทนา (ภาพอย่างเดียว)
-- **Vlog / Lifestyle**: 2-4 บทสนทนา (พูดกับกล้อง)
-- **Time-lapse / Hyper-lapse**: 0 บทสนทนา (เพลง+Ambient)
-- **Documentary / News**: 1-3 บทสนทนา (Voiceover, สัมภาษณ์)
-- **How-to / Tutorial**: 3-5 บทสนทนา (อธิบายทีละขั้นตอน)
-- **Relaxation / Lo-fi / ASMR**: 0 บทสนทนา (เสียงบรรยากาศ)
-
-⚠️ ต้องเลือก Category ที่ตรงเพื่อให้ AI Expander สร้างบทสนทนาได้ถูกต้อง!
-
-[🎭 SCENE TITLE EXAMPLES]
-ใช้ [TOPIC] + ชื่อฉากที่มีความหมาย:
-- "[TOPIC] - เปิดเรื่อง: พบกับตัวละครหลัก"
-- "[TOPIC] - ปัญหา: เผชิญอุปสรรค"
-- "[TOPIC] - จุดพลิก: ค้นพบความจริง"
-- "[TOPIC] - ไคลแมกซ์: การเผชิญหน้าครั้งสุดท้าย"
-- "[TOPIC] - บทสรุป: จบเรื่อง"
-
-[🎭 STORY STRUCTURE GUIDE]
-- Act 1 (15-20%): Hook - ดึงดูดคนดู (INTRODUCTION - minimal dialogue)
-- Act 2 (25-30%): Setup - แนะนำปัญหา (RISING - building dialogue)
-- Act 3 (35-40%): Rising Action - เข้มข้นขึ้น (CLIMAX - peak dialogue)
-- Act 4 (15-20%): Climax - จุดพีค (RESOLUTION - closing dialogue)
-
-[⚡ IMPORTANT]
-- ตอบกลับเสมอ ห้ามเงียบ
-- ถามทีละคำถาม ไม่ถามหลายอย่างพร้อมกัน
-- ใช้ options เพื่อให้ User เลือกง่าย
-- Category ต้องตรงกับ 1 ใน 9 รายการข้างบน
-- สร้าง Mode เมื่อได้ข้อมูลครบ + User ยืนยัน`;
-
-    // Build Expander list for AI to show
-    const expanderListText = expanderList && expanderList.length > 0
-      ? expanderList.map((exp, i) => `${i + 1}. "${exp.name}" - ${exp.blocks?.length || 0} กล่อง`).join('\n')
-      : 'ไม่มี Expander ในระบบ';
-
-    // Build Scene Dialogue Density info from Mode data with Speed mapping
-    const densityToStyle = {
-      1: { speed: '1.0x', style: 'หนัง/ดราม่า', intro: '3-4 วินาที' },
-      2: { speed: '1.0x', style: 'เล่าเรื่องสมจริง', intro: '2-3 วินาที' },
-      3: { speed: '2.0x', style: 'สมดุล', intro: '1-2 วินาที' },
-      4: { speed: '3.0x', style: 'ให้ความรู้/สอน', intro: '< 1 วินาที' },
-      5: { speed: '3.5x', style: 'ให้ความรู้เข้มข้น', intro: 'ไม่มี (พูดทันที)' }
-    };
-    
-    const sceneDialogueInfo = currentModeData?.blocks?.map((block, blockIdx) => {
-      const scenes = (block.evolution || []).map((step, stepIdx) => {
-        const density = Math.min(5, Math.max(1, step.dialogueDensity || 3));
-        const styleInfo = densityToStyle[density] || densityToStyle[3];
-        return `  - Step ${stepIdx + 1}: ${density} ประโยค (Speed ${styleInfo.speed}, สไตล์: ${styleInfo.style})`;
-      }).join('\n');
-      return `Block ${blockIdx + 1} (${block.title || 'Untitled'}):\n${scenes || '  - No steps'}`;
-    }).join('\n') || 'ไม่มีข้อมูล Scene';
-
-    // System prompt for Instruction Mode (สร้างคำสั่งฉาก)
-    const instructionSystemPrompt = `You are "AI Scene Writer" - ผู้ช่วยเขียนคำสั่งฉากระดับมืออาชีพ 🎬
-
-[🎯 CORE MISSION]
-ช่วย User เขียน **โครงสร้างฉาก (Scene Structure)** ที่กระชับ
-- ⚠️ สร้างเฉพาะ **โครงสร้าง** เท่านั้น ไม่ใช่บทพูดเต็ม
-- ⚠️ ห้ามเขียนบทพูดตรงๆ → ใช้ [DIALOGUE: หัวข้อ] แทน
-- ⚠️ ต้องเข้าใจ Expander อย่างละเอียดก่อนสร้างโครงสร้าง
-
-[📋 RESPONSE FORMAT - JSON เท่านั้น]
-{
-  "reply": "ข้อความตอบกลับ",
-  "options": ["ตัวเลือก1", "ตัวเลือก2"] หรือ null,
-  "sceneInstructions": [
-    { "blockIndex": 0, "instruction": "โครงสร้างฉาก 1" }
-  ] หรือ null,
-  "selectedExpander": "ชื่อ Expander ที่เลือก" หรือ null
-}
-
-[📦 EXPANDER LIST ที่มีในระบบ]
-${expanderListText}
-
-[💬 CONVERSATION FLOW - IMPORTANT!]
-
-**STEP 1: แสดง Expander ที่มีให้ User เลือก**
-เมื่อเริ่มต้น ต้องแสดงรายชื่อ Expander ทั้งหมดที่มี:
-
-"สวัสดีครับ! ผมคือ AI Scene Writer 🎬
-
-ก่อนสร้างโครงสร้างฉาก ผมต้องเข้าใจ Expander ที่คุณจะใช้ก่อนนะครับ
-
-📦 **Expander ที่มีในระบบ:**
-${expanderListText}
-
-กรุณาเลือก Expander ที่ต้องการใช้ครับ"
-
-options: ให้แสดงชื่อ Expander แต่ละตัวเป็น option + "❌ ไม่ใช้ Expander"
-
-**STEP 2: เมื่อ User เลือก Expander → แสดงรายละเอียดของ Expander นั้น**
-⚠️ สำคัญมาก! ต้องดูข้อมูล Expander จริงๆ จาก expanderList
-
-เมื่อ User เลือก Expander แล้ว ต้อง:
-1. ค้นหา Expander จาก expanderList
-2. แสดงกล่องทั้งหมดใน Expander นั้น
-3. สรุปว่าแต่ละกล่องทำอะไร
-4. ขออนุญาตสร้างโครงสร้างฉาก
-
-ตัวอย่างการตอบ:
-"ผมเข้าใจแล้วครับ! คุณเลือก Expander **'ดราม่าอีสาน'** 
-
-📋 **กล่องใน Expander นี้:**
-1. **กล่อง 'ภาษาอีสาน'**: กำหนดให้ใช้ภาษาอีสานในบทสนทนา
-2. **กล่อง 'สไตล์ดราม่า'**: เน้นอารมณ์ดราม่า ซึ้ง
-3. **กล่อง 'กล้อง Cinematic'**: ใช้มุมกล้องแบบหนัง
-
-📊 **สรุป:**
-- ภาษา: อีสาน
-- สไตล์: ดราม่า ซึ้ง
-- จำนวนบทสนทนา: 3-5 ต่อฉาก
-
-ผมพร้อมสร้างโครงสร้างฉากแล้วครับ ต้องการสร้างสำหรับฉากไหนครับ?"
-
-options: ["🎬 ทุกฉาก", "ฉาก 1", "ฉาก 2", ...]
-
-**STEP 3: สร้างโครงสร้างฉาก**
-เมื่อได้รับอนุญาต → สร้างโครงสร้างฉากโดยใช้ความเข้าใจจาก Expander
-
-[🎬 SCENE STRUCTURE FORMAT - โครงสร้างเท่านั้น!]
-
-✅ ถูกต้อง (โครงสร้าง):
-"Wide shot เปิดฉาก, กล้อง pan ช้า แสดงบรรยากาศ, Medium shot ตัวละครหลัก [DIALOGUE: แนะนำตัว], Close-up ใบหน้า แสดงอารมณ์ [DIALOGUE: ตอบโต้], transition fade"
-
-❌ ผิด (มีบทพูดเต็ม):
-"Wide shot เปิดฉาก กล้อง pan ช้า [DIALOGUE: มาส - 'พร้อมหรือยัว?'] Medium shot ออยลี่ [DIALOGUE: ออยลี่ - 'จ้นพร้อมแล้วเด้อ!']"
-
-[🔴 DIALOGUE PLACEHOLDER RULES]
-- ใช้ [DIALOGUE: หัวข้อ] เท่านั้น
-- ตัวอย่าง: [DIALOGUE: แนะนำตัว], [DIALOGUE: ถามคำถาม], [DIALOGUE: ตอบรับ]
-- ❌ ห้าม: [DIALOGUE: มาส - 'พร้อมหรือยัว?']
-- AI Expander จะสร้างบทพูดจริงตาม Expander rules + Episode Topic
-
-[📊 DIALOGUE DENSITY จาก MODE (สำคัญที่สุด!)]
-⚠️ User ได้กำหนด Dialogue Density ไว้ในแต่ละ Scene แล้ว ต้องใช้ค่านี้!
-
-${sceneDialogueInfo}
-
-🔴🔴🔴 **กฎเหล็กสำคัญที่สุด - แต่ละฉากมี dialogueDensity ต่างกัน!** 🔴🔴🔴
-- ⚠️ ห้ามใช้ dialogueDensity จากฉากแรกสำหรับทุกฉาก!
-- ⚠️ ต้องตรวจสอบค่า dialogueDensity ของแต่ละ Block/Step แยกกัน!
-- ⚠️ ถ้า Block 1 มี 2 ประโยค และ Block 2 มี 4 ประโยค → ต้องสร้าง instruction ที่มี 2 และ 4 dialogue ตามลำดับ!
-
-📋 **ตัวอย่าง:**
-- Block 1 (dialogueDensity = 2): instruction มี [DIALOGUE: ...] 2 ตัว
-- Block 2 (dialogueDensity = 4): instruction มี [DIALOGUE: ...] 4 ตัว
-- Block 3 (dialogueDensity = 5): instruction มี [DIALOGUE: ...] 5 ตัว
-
-❌ **ผิด:** สร้างทุกฉากมี 2 dialogue เหมือนกัน
-✅ **ถูก:** ฉาก 1 มี 2, ฉาก 2 มี 4, ฉาก 3 มี 5 ตามที่กำหนด
-
-[📊 DIALOGUE AMOUNT BY EXPANDER (ใช้เมื่อไม่มี dialogueDensity)]
-ปรับจำนวน [DIALOGUE: ...] ตาม Expander:
-- Expander บอก "พูดมาก/สนทนาเยอะ" → 3-5 dialogue placeholders ต่อฉาก
-- Expander บอก "พูดน้อย/minimal" → 1-2 dialogue placeholders ต่อฉาก
-- Expander บอก "ไม่มีบทพูด" → 0 dialogue placeholders
-- ไม่มี Expander → ใช้ Category rules
-
-[🎭 CATEGORY RULES (ใช้เมื่อไม่มี Expander)]
-- Cinematic / Movie: 2-5 dialogues per scene
-- Short Film / Story: 2-4 dialogues per scene
-- Product Showcase: 0-1 dialogues
-- Real Estate: 0 dialogues
-- Vlog / Lifestyle: 2-4 dialogues
-- Time-lapse: 0 dialogues
-- Documentary: 1-3 dialogues
-- Tutorial: 3-5 dialogues
-- Relaxation / ASMR: 0 dialogues
-
-[⚡ IMPORTANT]
-- 🔴 แสดง Expander ที่มีให้ User เลือกก่อนเสมอ!
-- 🔴 เมื่อ User เลือก Expander → ต้องแสดงรายละเอียดกล่องทั้งหมด
-- 🔴 สรุปความเข้าใจ Expander ก่อนขออนุญาตสร้าง
-- 🔴 สร้างเฉพาะโครงสร้าง ไม่ใช่บทพูดเต็ม
-- 🔴 ใช้ [DIALOGUE: หัวข้อ] ไม่ใช่ [DIALOGUE: ชื่อ - 'บทพูด']
-- โครงสร้างต้องกระชับ (30-50 คำต่อฉาก)
-- sceneInstructions ต้องมี blockIndex ที่ตรงกับ index ของ blocks array`;
-
-    // Select system prompt based on aiMode
-    const systemPrompt = aiMode === 'instruction' ? instructionSystemPrompt : architectSystemPrompt;
-
-    const fullHistory = [
-      { role: 'system', content: systemPrompt },
-      ...history,
-      {
-        role: 'user',
-        content: `Current Mode Data: ${JSON.stringify(currentModeData)} \n\nUser Request: ${message}`
-      }
-    ];
-
-    // Add explicit JSON instruction to satisfy OpenAI API requirement
-    const messagesWithJsonHint = [
-      ...fullHistory,
-      { role: 'system', content: 'IMPORTANT: Always respond with valid JSON format only. No other text.' }
-    ];
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: messagesWithJsonHint,
-      temperature: 0.3,
-      response_format: { type: "json_object" }
-    });
-
-    return JSON.parse(completion.choices[0].message.content);
-
-  } catch (error) {
-    console.error('Error in consultantChat:', error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
 
 // --- 4. Generate User Key (For Extension Access) ---
 // ADMIN EMAIL - can be moved to Firestore config later
@@ -1635,188 +320,6 @@ exports.generateUserKey = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
-
-// --- 4.5 AI Prompt Compiler (Translate TH→EN + Compile Scenes) ---
-exports.compilePrompts = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 120 })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    const { modeData, variableValues } = data;
-
-    if (!modeData || !modeData.blocks) {
-      throw new functions.https.HttpsError('invalid-argument', 'Mode data with blocks is required');
-    }
-
-    try {
-      const openai = getOpenAI();
-
-      // 1. Build COMPLETE context from Mode
-      const systemInstruction = modeData.systemInstruction || '';
-      const category = modeData.category || 'Cinematic';
-      const description = modeData.description || '';
-      const characters = modeData.characters || [];
-      const locations = modeData.locations || [];
-      const storyOverview = modeData.storyOverview || {};
-
-      // 2. Extract all scenes with COMPLETE data
-      const rawScenes = [];
-      (modeData.blocks || []).forEach((block, blockIndex) => {
-        (block.evolution || []).forEach((step, stepIndex) => {
-          // Get dialogues with character info
-          const dialogues = (step.dialogues || []).map(d => {
-            const char = characters.find(c => c.id === d.characterId);
-            return {
-              character: char?.name || 'Unknown',
-              voiceStyle: char?.voiceStyle || 'neutral',
-              visualDescription: char?.visualDescription || '',
-              text: d.text || '',
-              timing: d.timing || 'start'
-            };
-          });
-
-          // Get location info
-          const location = locations.find(l => l.id === step.locationId);
-
-          rawScenes.push({
-            sceneNumber: rawScenes.length + 1,
-            blockTitle: block.title || `Scene ${blockIndex + 1}`,
-            visualPrompt: step.rawPrompt || '',
-            audioAmbience: step.audioInstruction || '',
-            cameraAngle: step.cameraAngle || 'wide',
-            locationName: location?.name || '',
-            locationVisual: location?.visualDescription || '',
-            timeOfDay: step.timeOfDay || 'day',
-            bgmMood: step.bgmMood || 'epic',
-            backgroundVoices: step.backgroundVoices || '',
-            dialogues: dialogues,
-            dialogueDensity: step.dialogueDensity || 4 // ใช้ค่าจาก Mode Scene
-          });
-        });
-      });
-
-      // 3. Build DETAILED prompt for AI
-      const characterDescriptions = characters.map(c =>
-        `- ${c.name} (${c.role || 'main'}): ${c.description || 'No role'}\n  Appearance: ${c.visualDescription || 'Not specified'}\n  Voice: ${c.voiceStyle || 'neutral'}`
-      ).join('\n') || 'None';
-
-      const locationDescriptions = locations.map(l =>
-        `- ${l.name}: ${l.visualDescription || 'No description'}`
-      ).join('\n') || 'None';
-
-      const sceneDescriptions = rawScenes.map((s, i) => {
-        let sceneText = `\nScene ${i + 1} (${s.blockTitle}):\n`;
-        sceneText += `  Location: ${s.locationName || 'Not specified'} - ${s.locationVisual}\n`;
-        sceneText += `  Time: ${s.timeOfDay}\n`;
-        sceneText += `  Visual: ${s.visualPrompt}\n`;
-        sceneText += `  Audio Ambience: ${s.audioAmbience}\n`;
-        sceneText += `  BGM Mood: ${s.bgmMood}\n`;
-        sceneText += `  Camera: ${s.cameraAngle}\n`;
-        if (s.backgroundVoices) {
-          sceneText += `  Background Voices: ${s.backgroundVoices}\n`;
-        }
-        if (s.dialogues.length > 0) {
-          sceneText += `  Dialogues:\n`;
-          s.dialogues.forEach(d => {
-            sceneText += `    - ${d.character} (${d.timing}): "${d.text}"\n`;
-          });
-        }
-        return sceneText;
-      }).join('\n');
-
-      const aiPrompt = `You are a professional cinematic video prompt engineer. Your task is to:
-1. Read the following Thai video mode description COMPLETELY
-2. Create cohesive, connected scenes that tell a COMPLETE story
-3. Translate everything to English for AI video generation
-4. Each scene is 8 seconds long - make prompts appropriate for this duration
-5. Ensure VISUAL CONTINUITY - characters must look the same in every scene
-6. Include character appearance details in EVERY scene prompt
-
-=== STORY OVERVIEW ===
-Synopsis: ${storyOverview.synopsis || 'Not provided'}
-Theme: ${storyOverview.theme || 'Not provided'}
-Tone: ${storyOverview.tone || 'epic'}
-Target Duration: ${storyOverview.totalDuration || '3-5 min'}
-
-=== MODE CONTEXT ===
-Category: ${category}
-Description: ${description}
-System Instruction: ${systemInstruction}
-
-=== CHARACTERS (IMPORTANT - Include appearance in every scene) ===
-${characterDescriptions}
-
-=== LOCATIONS ===
-${locationDescriptions}
-
-=== RAW SCENES (in Thai) ===
-${sceneDescriptions}
-
-=== OUTPUT FORMAT (JSON array) ===
-[
-  {
-    "sceneNumber": 1,
-    "englishPrompt": "DETAILED English prompt including character appearances, location details, lighting based on time of day, 8 seconds...",
-    "audioDescription": "Sound effects, ambient sounds, and music mood in English...",
-    "cameraMovement": "Specific camera angle and movement in English...",
-    "dialogueScript": "Character dialogue in English with timing markers...",
-    "backgroundVoices": "Background/ambient character voices if any..."
-  }
-]
-
-=== CRITICAL RULES ===
-- ALWAYS include character visual descriptions (clothing, appearance) in englishPrompt
-- Match lighting to timeOfDay (dawn=golden, day=bright, sunset=warm orange, night=dark blue)
-- Keep BGM mood consistent with bgmMood field
-- Make scenes flow naturally - this is a cohesive story
-- Each prompt must be self-contained with all visual details for AI video generation
-- Translate Thai to natural, cinematic English`;
-
-      // 4. Call OpenAI
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a video prompt engineer. Output valid JSON only.' },
-          { role: 'user', content: aiPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000
-      });
-
-      const responseText = completion.choices[0]?.message?.content || '[]';
-
-      // 5. Parse JSON response
-      let compiledScenes;
-      try {
-        // Extract JSON from response (handle markdown code blocks)
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        compiledScenes = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      } catch (parseErr) {
-        console.error('Failed to parse AI response:', parseErr);
-        compiledScenes = rawScenes.map((s, i) => ({
-          sceneNumber: i + 1,
-          englishPrompt: s.visualPrompt,
-          audioDescription: s.audioAmbience,
-          cameraMovement: s.cameraAngle,
-          dialogueScript: s.dialogues.map(d => `${d.character}: ${d.text}`).join('; ')
-        }));
-      }
-
-      console.log(`✅ Compiled ${compiledScenes.length} scenes`);
-
-      return {
-        success: true,
-        compiledScenes: compiledScenes,
-        rawSceneCount: rawScenes.length
-      };
-
-    } catch (error) {
-      console.error('Prompt compilation error:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
 
 // --- 5. Central Scheduler (The Station Master) ---
 exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
@@ -2014,88 +517,73 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
                     }
                   }
 
-                  // === EXPANDER INTEGRATION using SHARED LOGIC ===
-                  // Check if project has an Expander selected
+                  // === EXPANDER INTEGRATION (Direct Instructions) ===
                   const expanderId = project.data.expanderId;
-                  let expanderBlocks = [];
                   let expandedPromptsResult = [];
                   let titlesAndTags = null;
+                  let expanderInstructions = '';
+                  let expanderScenesCount = 5;
+
+                  const slotSceneDuration = slot.sceneDuration || 8;
+                  console.log(`      ⏱️ Scene Duration from Posting Schedule: ${slotSceneDuration}s`);
 
                   if (expanderId) {
                     console.log(`      ⚡ Expander detected: ${expanderId}`);
                     try {
-                      // Fetch Expander blocks
                       const expanderDoc = await project.ref.parent.parent.collection('expanders').doc(expanderId).get();
                       if (expanderDoc.exists) {
                         const expanderData = expanderDoc.data();
-                        expanderBlocks = expanderData.blocks || [];
+                        expanderInstructions = expanderData.instructions || '';
+                        expanderScenesCount = expanderData.scenesCount || 5;
+                        
+                        const episodeTopic = episodeData?.title || expanderData.name || 'Video';
+                        
+                        console.log(`      📋 Using Expander Instructions directly`);
+                        console.log(`      📺 Episode Topic: "${episodeTopic}"`);
+                        console.log(`      🎬 Scenes Count: ${expanderScenesCount}`);
+
+                        // Use Expander Instructions directly (same logic as testPromptPipeline)
+                        const systemPrompt = `You are a Premium Prompt Expander for AI video generation.
+
+=== CUSTOM INSTRUCTIONS ===
+${expanderInstructions}
+
+=== SCENE COUNT ===
+Generate exactly ${expanderScenesCount} video scenes.
+
+=== OUTPUT FORMAT (JSON) ===
+{
+  "prompts": [
+    { "index": 1, "type": "image", "title": "Master Image", "prompt": "..." },
+    { "index": 2, "type": "video", "title": "Scene title", "duration": "${slotSceneDuration} seconds", "action": "...", "script": "...", "technical": "...", "audio": "..." },
+    ... ${expanderScenesCount} video scenes ...
+    { "index": "last", "type": "social", "title": "Social Media", "description": "...", "hashtags": ["..."] }
+  ]
+}`;
+
+                        const structuredPrompts = await callGemini(
+                          `Expand: "${episodeTopic}"`,
+                          systemPrompt
+                        );
+                        expandedPromptsResult = structuredPrompts.prompts || [];
+                        
+                        // Extract prompts for video generation
+                        prompts = expandedPromptsResult
+                          .filter(p => p.type === 'video')
+                          .map(p => `${p.action} ${p.script}`);
+                        scenes = expandedPromptsResult;
+
+                        // Extract titles and tags from social
+                        const socialPrompt = expandedPromptsResult.find(p => p.type === 'social');
+                        titlesAndTags = {
+                          titles: { tiktok: socialPrompt?.description, facebook: socialPrompt?.description, instagram: socialPrompt?.description, youtube: socialPrompt?.description },
+                          tags: { tiktok: socialPrompt?.hashtags || [], facebook: socialPrompt?.hashtags?.slice(0, 3) || [], instagram: socialPrompt?.hashtags || [], youtube: socialPrompt?.hashtags?.slice(0, 10) || [] }
+                        };
+
+                        console.log(`      ✅ Expanded ${expandedPromptsResult.length} prompts using Expander Instructions`);
                       }
                     } catch (expandErr) {
-                      console.error(`      ⚠️ Error loading Expander:`, expandErr.message);
-                    }
-                  }
-
-                  // Use SHARED LOGIC for expansion (same as testPromptPipeline)
-                  // ✅ FIX #1: ดึง sceneDuration จาก Posting Schedule (slot data)
-                  const slotSceneDuration = slot.sceneDuration || 8;
-                  console.log(`      ⏱️ Scene Duration from Posting Schedule: ${slotSceneDuration}s`);
-
-                  if (scenes.length > 0 || prompts.length > 0) {
-                    try {
-                      // ✅ FIX #2: Build raw scenes with sceneInstruction and dialogueDensity
-                      const rawScenes = scenes.length > 0
-                        ? scenes.map((s, i) => ({
-                            sceneNumber: i + 1,
-                            blockTitle: s.blockTitle || `Scene ${i + 1}`,
-                            visualPrompt: s.englishPrompt || prompts[i] || '',
-                            rawPrompt: s.englishPrompt || prompts[i] || '',
-                            sceneInstruction: s.sceneInstruction || s.dialogueScript || '',
-                            audioAmbience: s.audioDescription || '',
-                            cameraAngle: s.cameraMovement || 'wide',
-                            dialogueDensity: s.dialogueDensity || 4 // ใช้ค่าจาก Mode Scene
-                          }))
-                        : prompts.map((p, i) => ({
-                            sceneNumber: i + 1,
-                            blockTitle: `Scene ${i + 1}`,
-                            visualPrompt: p,
-                            rawPrompt: p,
-                            sceneInstruction: '',
-                            audioAmbience: '',
-                            cameraAngle: 'wide',
-                            dialogueDensity: 4 // Default 4
-                          }));
-
-                      console.log(`      🔧 Using SHARED expandScenesWithTopic() for ${rawScenes.length} scenes...`);
-
-                      // Use SHARED HELPER for per-scene expansion
-                      // ✅ FIX #1: ใช้ slotSceneDuration แทน hard-coded 8
-                      expandedPromptsResult = await expandScenesWithTopic({
-                        rawScenes,
-                        expanderBlocks,
-                        episodeTopic: episodeData?.title || modeMetadata.modeName || 'Video',
-                        episodeDesc: episodeData?.description || modeMetadata.description || '',
-                        characters: modeMetadata.characters || [],
-                        sceneDuration: slotSceneDuration,
-                        modeCategory: modeMetadata.category || 'Cinematic',
-                        systemInstruction: modeMetadata.systemInstruction || ''
-                      });
-
-                      // Update prompts array with expanded versions
-                      prompts = expandedPromptsResult.map(p => p.englishPrompt);
-                      scenes = expandedPromptsResult;
-
-                      console.log(`      ✅ Expanded ${prompts.length} prompts using SHARED LOGIC`);
-
-                      // Generate Titles and Tags using SHARED HELPER
-                      titlesAndTags = await generateTitlesAndTags({
-                        episodeTopic: episodeData?.title || modeMetadata.modeName || 'Video',
-                        episodeDesc: episodeData?.description || '',
-                        modeCategory: modeMetadata.category || 'Entertainment',
-                        expandedPrompts: expandedPromptsResult
-                      });
-
-                    } catch (expandErr) {
-                      console.error(`      ⚠️ Expansion error (using original prompts):`, expandErr.message);
+                      console.error(`      ⚠️ Expansion error:`, expandErr.message);
                     }
                   }
 
@@ -2269,63 +757,10 @@ exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
 
 // ===== EXPANDER SYSTEM =====
 
-// Function: Expand Prompt
-exports.expandPrompt = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60 })
-  .https.onCall(async (data, context) => {
-    const { simplePrompt, blocks } = data;
-
-    if (!simplePrompt || !blocks || blocks.length === 0) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing simplePrompt or blocks');
-    }
-
-    try {
-      const openai = getOpenAI();
-
-      // Build instruction from blocks
-      const blockInstructions = blocks.map((b, i) => `${i + 1}. ${b.name}: ${b.instruction}`).join('\n');
-
-      const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
-
-Your job is to expand a simple prompt into a detailed, cinematic prompt.
-
-=== ACTIVE BLOCKS (User selected these rules) ===
-${blockInstructions}
-
-=== OUTPUT RULES ===
-1. Write in English (required for Google Flow)
-2. For Thai names, include original in parentheses: "Bas (บาส)"
-3. Include: character descriptions, emotions, lighting, camera angles, ambient sounds
-4. Be cinematic and detailed
-5. Keep it under 500 words
-6. Apply ALL the block instructions above
-
-=== FORMAT ===
-Return ONLY the expanded prompt, no explanations.`;
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Expand this prompt: "${simplePrompt}"` }
-        ],
-        temperature: 0.8,
-        max_tokens: 1000
-      });
-
-      const expandedPrompt = response.choices[0].message.content.trim();
-
-      return { expandedPrompt };
-    } catch (error) {
-      console.error('Error expanding prompt:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
-
-// Function: Expand Prompt with Custom Instructions (Gemini Gems Style)
+// Function: Expand Prompt with Custom Instructions (Gemini)
 // Returns structured JSON with separate prompts for image, video scenes, and social
 exports.expandPromptWithInstructions = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 120 })
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 120 })
   .https.onCall(async (data, context) => {
     const { simplePrompt, instructions } = data;
 
@@ -2334,8 +769,6 @@ exports.expandPromptWithInstructions = functions
     }
 
     try {
-      const openai = getOpenAI();
-
       const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
 
 Your job is to expand a simple prompt into detailed, cinematic prompts.
@@ -2388,28 +821,14 @@ RULES:
 - Middle prompts are type "video" (number of scenes depends on instructions)
 - Return ONLY valid JSON, no markdown, no explanations, no code blocks`;
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Expand this prompt into structured JSON: "${simplePrompt}"` }
-        ],
-        temperature: 0.8,
-        max_tokens: 3000,
-        response_format: { type: 'json_object' }
-      });
+      const structuredPrompts = await callGemini(
+        `Expand this prompt into structured JSON: "${simplePrompt}"`,
+        systemPrompt
+      );
 
-      const rawContent = response.choices[0].message.content.trim();
-      
-      // Parse JSON response
-      let structuredPrompts;
-      try {
-        structuredPrompts = JSON.parse(rawContent);
-      } catch (parseError) {
-        console.error('Failed to parse JSON:', rawContent);
-        // Fallback: return as plain text
+      if (!structuredPrompts || !structuredPrompts.prompts) {
         return { 
-          expandedPrompt: rawContent,
+          expandedPrompt: JSON.stringify(structuredPrompts),
           structured: null,
           error: 'Failed to parse structured response'
         };
@@ -2437,9 +856,9 @@ RULES:
     }
   });
 
-// Function: Generate Custom Block via AI Chat
+// Function: Generate Custom Block via AI Chat (Gemini)
 exports.generateBlock = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 30 })
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 30 })
   .https.onCall(async (data, context) => {
     const { message } = data;
 
@@ -2448,8 +867,6 @@ exports.generateBlock = functions
     }
 
     try {
-      const openai = getOpenAI();
-
       const systemPrompt = `You are a Block Generator for a Prompt Expander system.
 
 User will describe what kind of "block" they want. A block is a rule/instruction that modifies how prompts are expanded.
@@ -2470,30 +887,9 @@ User will describe what kind of "block" they want. A block is a rule/instruction
   "color": "bg-amber-600"
 }
 
-=== EXAMPLES ===
-User: "อยากได้กล่องที่ทำให้ตัวละครพูดแบบโบราณ"
-Output: {"name": "🏛️ โบราณ", "type": "style", "instruction": "Characters speak in ancient/classical Thai style with formal expressions and traditional vocabulary.", "color": "bg-amber-600"}
-
-User: "กล่องฝนตก"
-Output: {"name": "🌧️ ฝนตก", "type": "lighting", "instruction": "Scene takes place during rain. Include rain sounds, wet surfaces, reflections, and characters getting wet.", "color": "bg-slate-600"}
-
 Return JSON only, no explanation.`;
 
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 300
-      });
-
-      let content = response.choices[0].message.content.trim();
-      content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-      const block = JSON.parse(content);
-
+      const block = await callGemini(message, systemPrompt);
       return block;
     } catch (error) {
       console.error('Error generating block:', error);
@@ -2501,9 +897,9 @@ Return JSON only, no explanation.`;
     }
   });
 
-// Function: Translate Block Instruction to Thai
+// Function: Translate Block Instruction to Thai (Gemini)
 exports.translateBlockToThai = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 30 })
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 30 })
   .https.onCall(async (data, context) => {
     const { blockName, instruction } = data;
 
@@ -2512,47 +908,24 @@ exports.translateBlockToThai = functions
     }
 
     try {
-      const openai = getOpenAI();
-
-      const systemPrompt = `คุณเป็นผู้ช่วยอธิบาย Block ให้ผู้ใช้เข้าใจ พูดแบบเป็นกันเอง เหมือนเพื่อนคุยกัน
-
-=== บทบาทของคุณ ===
-คุณเป็น "พี่แนะนำ" ที่จะอธิบายให้ผู้ใช้เข้าใจว่า Block นี้ทำอะไรได้บ้าง
-พูดแบบเป็นกันเอง ใช้ภาษาบ้านๆ แต่ยังคงความถูกต้องของข้อมูล
+      const systemPrompt = `คุณเป็นผู้ช่วยอธิบาย Block ให้ผู้ใช้เข้าใจ พูดแบบเป็นกันเอง
 
 === รูปแบบการตอบ ===
 - เริ่มต้นด้วย "สวัสดีครับ" หรือ "เฮ้ครับ"
 - แนะนำชื่อ Block ก่อน
 - อธิบายว่ามันทำอะไรได้แบบภาษาง่ายๆ
-- ถ้าเหมาะกับงานแบบไหน ก็แนะนำเพิ่ม
-- จบด้วยคำชวนใช้งาน เช่น "ลองใช้ดูนะครับ" หรือ "แนะนำเลยครับ"
-- ความยาว 3-4 ประโยค พอดีๆ
-- ห้ามใช้ภาษาอังกฤษ ห้ามใช้คำเทคนิค
+- จบด้วยคำชวนใช้งาน
+- ความยาว 3-4 ประโยค
+- ห้ามใช้ภาษาอังกฤษ
 
-=== ตัวอย่าง ===
-Block: "🇰🇷 ภาษาเกาหลี"
-Instruction: "Translate all dialogues and text into Korean. Ensure appropriate cultural nuances and expressions are maintained."
-ตอบ: "สวัสดีครับ นี่คือบล็อกภาษาเกาหลีครับ ถ้าคุณใส่บล็อกนี้เข้าไป วิดีโอของคุณจะพูดภาษาเกาหลีได้เลย แถมยังคำนึงถึงวัฒนธรรมเกาหลีด้วยนะครับ แนะนำเลยครับถ้าอยากทำคอนเทนต์ให้คนเกาหลีดู"
+ตอบเป็นข้อความภาษาไทยเท่านั้น ในรูปแบบ JSON: {"thaiDescription": "..."}`;
 
-Block: "🎬 ซีนีมาติก"
-Instruction: "Apply cinematic color grading with dramatic lighting. Use wide shots and smooth camera movements."
-ตอบ: "เฮ้ครับ บล็อกนี้ชื่อซีนีมาติกครับ ใส่ปุ๊บ วิดีโอของคุณจะดูเหมือนหนังฮอลลีวูดเลย มีแสงสีสวยๆ มุมกล้องกว้างๆ ดูอลังการมาก เหมาะกับคนที่อยากให้งานดูพรีเมียมครับ"
+      const result = await callGemini(
+        `Block: "${blockName}"\nInstruction: "${instruction}"`,
+        systemPrompt
+      );
 
-ตอบเป็นข้อความภาษาไทยเท่านั้น ไม่ต้องมี JSON`;
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Block: "${blockName}"\nInstruction: "${instruction}"` }
-        ],
-        temperature: 0.7,
-        max_tokens: 200
-      });
-
-      const thaiDescription = response.choices[0].message.content.trim();
-
-      return { thaiDescription };
+      return { thaiDescription: result.thaiDescription || result };
     } catch (error) {
       console.error('Error translating block:', error);
       throw new functions.https.HttpsError('internal', error.message);
@@ -2563,9 +936,9 @@ Instruction: "Apply cinematic color grading with dramatic lighting. Use wide sho
 // CONTENT PIPELINE FUNCTIONS
 // ============================================
 
-// Function: Generate Episodes from Topic (AI Episode Director)
+// Function: Generate Episodes from Topic (AI Episode Director) - Gemini
 exports.generateEpisodes = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -2577,231 +950,27 @@ exports.generateEpisodes = functions
     }
 
     try {
-      const openai = getOpenAI();
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI Episode Director. Create an episode list for video content.
+      const systemPrompt = `You are an AI Episode Director. Create an episode list for video content.
             
-            Rules:
-            - Generate 5-15 episodes based on the user's topic
-            - Each episode should have a clear, engaging title
-            - Include a brief description (1-2 sentences)
-            - Make episodes progressive (build on each other)
-            - Titles should be catchy and YouTube-friendly
-            
-            Output JSON format:
-            {
-              "episodes": [
-                { "title": "Episode Title", "description": "Brief description" },
-                ...
-              ]
-            }
-            
-            IMPORTANT: Output valid JSON only, no markdown.`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.8,
-        max_tokens: 2000
-      });
+Rules:
+- Generate 5-15 episodes based on the user's topic
+- Each episode should have a clear, engaging title
+- Include a brief description (1-2 sentences)
+- Make episodes progressive (build on each other)
+- Titles should be catchy and YouTube-friendly
 
-      let content = response.choices[0].message.content;
-      content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+Output JSON format:
+{
+  "episodes": [
+    { "title": "Episode Title", "description": "Brief description" },
+    ...
+  ]
+}`;
 
-      const result = JSON.parse(content);
+      const result = await callGemini(prompt, systemPrompt);
       return { episodes: result.episodes };
     } catch (error) {
       console.error('Error generating episodes:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
-
-// Function: Expand Episode to Full Prompts (Episode + Mode Template + Expander)
-exports.expandEpisodeToPrompts = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 120, memory: '1GB' })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    const userId = context.auth.uid;
-    const { projectId, episodeId } = data;
-
-    if (!projectId || !episodeId) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing projectId or episodeId');
-    }
-
-    try {
-      const db = admin.firestore();
-
-      // 1. Get Episode
-      const episodeDoc = await db
-        .collection('users').doc(userId)
-        .collection('projects').doc(projectId)
-        .collection('episodes').doc(episodeId)
-        .get();
-
-      if (!episodeDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Episode not found');
-      }
-      const episode = episodeDoc.data();
-
-      // 2. Get Project (to get modeId and expanderId)
-      const projectDoc = await db
-        .collection('users').doc(userId)
-        .collection('projects').doc(projectId)
-        .get();
-
-      if (!projectDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Project not found');
-      }
-      const project = projectDoc.data();
-
-      // 3. Get Mode Template
-      let modeBlocks = [];
-      if (project.executionModeId) {
-        const modeDoc = await db
-          .collection('users').doc(userId)
-          .collection('modes').doc(project.executionModeId)
-          .get();
-
-        if (modeDoc.exists) {
-          const mode = modeDoc.data();
-          modeBlocks = mode.blocks || [];
-        }
-      }
-
-      // 4. Get Expander Blocks
-      let expanderBlocks = [];
-      if (project.expanderId) {
-        // Check user's expanders first
-        let expanderDoc = await db
-          .collection('users').doc(userId)
-          .collection('expanders').doc(project.expanderId)
-          .get();
-
-        // If not found, check purchased expanders
-        if (!expanderDoc.exists) {
-          expanderDoc = await db
-            .collection('users').doc(userId)
-            .collection('purchasedExpanders').doc(project.expanderId)
-            .get();
-        }
-
-        if (expanderDoc.exists) {
-          const expander = expanderDoc.data();
-          expanderBlocks = expander.blocks || [];
-        }
-      }
-
-      // 5. Build Scene Templates (replace [TOPIC] with episode title)
-      const sceneTemplates = modeBlocks.map((block, idx) => {
-        const evolution = block.evolution || [];
-        return evolution.map((step, stepIdx) => {
-          // Replace [TOPIC] placeholder with actual episode title
-          let template = step.rawPrompt || '';
-          template = template.replace(/\[TOPIC\]/gi, episode.title);
-          return {
-            sceneNumber: idx + 1,
-            stepNumber: stepIdx + 1,
-            simplePrompt: template || `${episode.title} - ฉาก ${idx + 1}`,
-            percentage: step.stepPercentage || 0
-          };
-        });
-      }).flat();
-
-      // 6. Build Expander Block Instructions (same format as expandPrompt function)
-      const blockInstructions = expanderBlocks.map((b, i) =>
-        `${i + 1}. ${b.name}: ${b.instruction || b.description || ''}`
-      ).join('\n');
-
-      // 7. Expand EACH scene using Expander (same logic as expandPrompt)
-      const openai = getOpenAI();
-      const expandedPrompts = [];
-
-      for (let i = 0; i < sceneTemplates.length; i++) {
-        const scene = sceneTemplates[i];
-
-        const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
-
-Your job is to expand a simple prompt into a detailed, cinematic prompt.
-
-=== ACTIVE BLOCKS (User selected these rules) ===
-${blockInstructions || 'Standard cinematic style'}
-
-=== OUTPUT RULES ===
-1. Write in English (required for Google Flow)
-2. For Thai names, include original in parentheses: "Bas (บาส)"
-3. Include: character descriptions, emotions, lighting, camera angles, ambient sounds
-4. Be cinematic and detailed
-5. Keep it under 500 words
-6. Apply ALL the block instructions above
-
-=== FORMAT ===
-Return ONLY the expanded prompt, no explanations.`;
-
-        const response = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Expand this prompt: "${scene.simplePrompt}"` }
-          ],
-          temperature: 0.8,
-          max_tokens: 1000
-        });
-
-        const expandedPrompt = response.choices[0].message.content.trim();
-
-        expandedPrompts.push({
-          sceneNumber: scene.sceneNumber,
-          stepNumber: scene.stepNumber,
-          originalPrompt: scene.simplePrompt,
-          prompt: expandedPrompt,
-          percentage: scene.percentage
-        });
-      }
-
-      // 8. Generate title and caption
-      const titleResponse = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: 'Generate a catchy video title and social media caption in Thai. Output JSON: {"title": "...", "caption": "..."}' },
-          { role: 'user', content: `Topic: ${episode.title}\nDescription: ${episode.description || ''}` }
-        ],
-        temperature: 0.7,
-        max_tokens: 200
-      });
-
-      let titleContent = titleResponse.choices[0].message.content;
-      titleContent = titleContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      const titleData = JSON.parse(titleContent);
-
-      const result = {
-        prompts: expandedPrompts,
-        title: titleData.title,
-        caption: titleData.caption
-      };
-
-      // 8. Mark Episode as Completed
-      await db
-        .collection('users').doc(userId)
-        .collection('projects').doc(projectId)
-        .collection('episodes').doc(episodeId)
-        .update({
-          status: 'completed',
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
-          generatedPrompts: result.prompts
-        });
-
-      return result;
-    } catch (error) {
-      console.error('Error expanding episode:', error);
       throw new functions.https.HttpsError('internal', error.message);
     }
   });
@@ -2813,7 +982,7 @@ Return ONLY the expanded prompt, no explanations.`;
 // Function: Test full prompt pipeline (Expander-based → Full Prompts + Titles + Tags)
 // MODE SYSTEM REMOVED - Now uses Expander's scenesCount and instructions
 exports.testPromptPipeline = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 300, memory: '1GB' })
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 300, memory: '1GB' })
   .https.onCall(async (data, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -2828,7 +997,6 @@ exports.testPromptPipeline = functions
 
     try {
       const db = admin.firestore();
-      const openai = getOpenAI();
 
       // 1. Get Project
       const projectDoc = await db
@@ -2885,45 +1053,95 @@ exports.testPromptPipeline = functions
         console.log(`⚠️ No pending episodes, using Expander name as topic`);
       }
 
-      // 4. Generate scenes based on Expander's scenesCount (Mode System removed)
-      const rawScenes = [];
-      for (let i = 1; i <= expanderScenesCount; i++) {
-        rawScenes.push({
-          sceneNumber: i,
-          rawPrompt: `Scene ${i}`,
-          blockTitle: `Scene ${i} of ${expanderScenesCount}`
-        });
-      }
-      const characters = []; // No characters from Mode
-
       // Build Episode context
       const episodeTopic = episodeData?.title || expanderData.name || 'Untitled Video';
       const episodeDesc = episodeData?.description || expanderData.description || '';
 
-      console.log(`📋 testPromptPipeline: Using Expander-based logic`);
+      console.log(`📋 testPromptPipeline: Using Expander Instructions directly`);
       console.log(`   Episode Topic: "${episodeTopic}"`);
       console.log(`   Scenes Count: ${expanderScenesCount}`);
-      console.log(`   Expander Blocks: ${expanderBlocks.length}`);
+      console.log(`   Expander Instructions: ${expanderInstructions ? expanderInstructions.substring(0, 100) + '...' : 'NONE'}`);
 
-      // 5. Use Expander instructions for expansion
-      const expandedPrompts = await expandScenesWithTopic({
-        rawScenes,
-        expanderBlocks,
-        episodeTopic,
-        episodeDesc,
-        characters,
-        sceneDuration,
-        modeCategory: expanderData.categoryId || 'General',
-        systemInstruction: expanderInstructions
-      });
+      // 4. Use Expander Instructions directly (same logic as expandPromptWithInstructions)
+      const systemPrompt = `You are a Premium Prompt Expander for AI video generation (Google Flow / Veo).
 
-      // 6. Generate Titles and Tags using SHARED HELPER
-      const titlesAndTags = await generateTitlesAndTags({
-        episodeTopic,
-        episodeDesc,
-        modeCategory: expanderData.categoryId || 'General',
-        expandedPrompts
-      });
+Your job is to expand a simple prompt into detailed, cinematic prompts.
+
+=== CUSTOM INSTRUCTIONS (User-defined rules for this Expander) ===
+${expanderInstructions}
+
+=== SCENE COUNT ===
+Generate exactly ${expanderScenesCount} video scenes (not counting image and social).
+
+=== OUTPUT RULES ===
+1. Write in English (required for Google Flow)
+2. For Thai names, include original in parentheses: "Bas (บาส)"
+3. Include: character descriptions, emotions, lighting, camera angles, ambient sounds
+4. Be cinematic and detailed
+5. Follow ALL the custom instructions above strictly
+
+=== CRITICAL: OUTPUT FORMAT (MUST BE VALID JSON) ===
+You MUST return a valid JSON object with this exact structure:
+
+{
+  "prompts": [
+    {
+      "index": 1,
+      "type": "image",
+      "title": "Master Image (ภาพนิ่ง)",
+      "prompt": "Full detailed prompt for generating the master image..."
+    },
+    {
+      "index": 2,
+      "type": "video",
+      "title": "Scene title here",
+      "duration": "${sceneDuration} seconds",
+      "action": "What happens in this scene",
+      "script": "Character dialogue/narration",
+      "technical": "Camera angles, effects",
+      "audio": "Voice style, sound effects"
+    },
+    ... ${expanderScenesCount} video scenes total ...
+    {
+      "index": "last",
+      "type": "social",
+      "title": "Social Media",
+      "description": "Post description",
+      "hashtags": ["#hashtag1", "#hashtag2", ...]
+    }
+  ]
+}
+
+RULES:
+- First prompt (index 1) is ALWAYS type "image"
+- Last prompt is ALWAYS type "social" with hashtags
+- Middle prompts are type "video" (exactly ${expanderScenesCount} video scenes)
+- Return ONLY valid JSON, no markdown, no explanations, no code blocks`;
+
+      const structuredPrompts = await callGemini(
+        `Expand this prompt into structured JSON with ${expanderScenesCount} video scenes: "${episodeTopic}"`,
+        systemPrompt
+      );
+
+      // Convert to expandedPrompts format for compatibility
+      const expandedPrompts = structuredPrompts.prompts || [];
+
+      // 5. Extract titles and tags from structured response
+      const socialPrompt = expandedPrompts.find(p => p.type === 'social');
+      const titlesAndTags = {
+        titles: {
+          tiktok: socialPrompt?.description || episodeTopic,
+          facebook: socialPrompt?.description || episodeTopic,
+          instagram: socialPrompt?.description || episodeTopic,
+          youtube: socialPrompt?.description || episodeTopic
+        },
+        tags: {
+          tiktok: socialPrompt?.hashtags || [],
+          facebook: socialPrompt?.hashtags?.slice(0, 3) || [],
+          instagram: socialPrompt?.hashtags || [],
+          youtube: socialPrompt?.hashtags?.slice(0, 10) || []
+        }
+      };
 
       // 7. Combine results
       const result = {
@@ -2945,9 +1163,9 @@ exports.testPromptPipeline = functions
         expanderId: expanderId,
         expanderName: expanderData.name || 'Unknown',
         expanderBlockCount: expanderBlocks.length,
-        sceneCount: rawScenes.length,
+        sceneCount: expanderScenesCount,
         sceneDuration: sceneDuration,
-        totalDuration: rawScenes.length * sceneDuration,
+        totalDuration: expanderScenesCount * sceneDuration,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         expiresAt: admin.firestore.Timestamp.fromDate(expiresAt) // TTL field for cleanup
       };
@@ -2972,7 +1190,7 @@ exports.testPromptPipeline = functions
             testedAt: admin.firestore.FieldValue.serverTimestamp(),
             expanderId: expanderId,
             expanderName: expanderData.name || 'Unknown',
-            sceneCount: rawScenes.length,
+            sceneCount: expanderScenesCount,
             episodeId: episodeData?.id || null,
             episodeTitle: episodeData?.title || null
           }
@@ -2988,9 +1206,9 @@ exports.testPromptPipeline = functions
           platform: 'SYSTEM',
           type: 'test',
           testLogId: testLogRef.id,
-          sceneCount: rawScenes.length,
+          sceneCount: expanderScenesCount,
           sceneDuration: sceneDuration,
-          totalLength: rawScenes.length * sceneDuration,
+          totalLength: expanderScenesCount * sceneDuration,
           topic: episodeTopic,
           expanderId: expanderId,
           expanderName: expanderData.name || 'Unknown'
@@ -3069,7 +1287,6 @@ exports.textToSpeechThai = functions
 async function autoGenerateEpisodesInternal(params) {
   const { projectRef, userId, projectId, count = 10, prompt = '', historyContext = [] } = params;
   
-  const openai = getOpenAI();
   const db = admin.firestore();
 
   // Build context from history
@@ -3097,25 +1314,10 @@ Generate ${count} NEW episode ideas that:
   "episodes": [
     { "title": "Episode Title", "description": "Brief 1-2 sentence description" }
   ]
-}
-
-IMPORTANT: Output valid JSON only, no markdown.`;
+}`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate ${count} new episodes` }
-      ],
-      temperature: 0.8,
-      max_tokens: 2000
-    });
-
-    let content = response.choices[0].message.content.trim();
-    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const result = JSON.parse(content);
+    const result = await callGemini(`Generate ${count} new episodes`, systemPrompt);
     const episodes = result.episodes || [];
 
     if (episodes.length === 0) {
@@ -3449,57 +1651,6 @@ exports.cleanupUsedEpisodes = functions.pubsub.schedule('0 5 * * *')
     }
   });
 
-// Callable function for manual trigger
-exports.autoGenerateEpisodes = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    const userId = context.auth.uid;
-    const { projectId, count = 10, prompt = '' } = data;
-
-    if (!projectId) {
-      throw new functions.https.HttpsError('invalid-argument', 'Missing projectId');
-    }
-
-    const db = admin.firestore();
-    const projectRef = db.collection('users').doc(userId).collection('projects').doc(projectId);
-
-    // Check project exists
-    const projectDoc = await projectRef.get();
-    if (!projectDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Project not found');
-    }
-
-    // Get history for context
-    const historySnap = await projectRef.collection('episodeHistory')
-      .orderBy('usedAt', 'desc')
-      .limit(20)
-      .get();
-    
-    const historyContext = historySnap.docs.map(d => ({
-      title: d.data().title,
-      description: d.data().description
-    }));
-
-    const result = await autoGenerateEpisodesInternal({
-      projectRef,
-      userId,
-      projectId,
-      count,
-      prompt,
-      historyContext
-    });
-
-    if (!result.success) {
-      throw new functions.https.HttpsError('internal', result.error || 'Failed to generate episodes');
-    }
-
-    return result;
-  });
-
 // ============================================
 // MANUAL CLEANUP: Callable function for Admin
 // Allows manual trigger of cleanup for a specific project
@@ -3725,101 +1876,6 @@ exports.getStorageStats = functions
 
     } catch (error) {
       console.error('Get storage stats error:', error);
-      throw new functions.https.HttpsError('internal', error.message);
-    }
-  });
-
-// ============================================
-// AI BLOCK EDITOR: Chat with AI to edit Blocks
-// ============================================
-exports.aiBlockEditor = functions
-  .runWith({ secrets: ['OPENAI_API_KEY'], timeoutSeconds: 60, memory: '512MB' })
-  .https.onCall(async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
-    }
-
-    const { message, blockData, chatHistory, editMode } = data;
-    const openai = getOpenAI();
-
-    const systemPrompt = `คุณคือ AI ผู้ช่วยแก้ไข Automation Block สำหรับ Chrome Extension
-คุณต้องพูดคุยกับ Admin เป็นภาษาไทยเพื่อเก็บข้อมูลให้ครบถ้วนก่อนทำการแก้ไข
-
-**หน้าที่ของคุณ:**
-1. ถามคำถามเพื่อเข้าใจปัญหาและความต้องการของ Admin
-2. วิเคราะห์ Block Data ที่ได้รับ
-3. เสนอแนะการแก้ไขที่เหมาะสม
-4. เมื่อ Admin ยืนยัน ให้ส่ง JSON สำหรับแก้ไข Block
-
-**ตัวแปรที่ใช้ได้:**
-- {{prompt}} - ข้อความ Prompt ของซีน
-- {{title}} - ชื่อเรื่อง
-- {{tags}} - แท็ก/คีย์เวิร์ด
-- {{sceneIndex}} - ลำดับของซีน (1, 2, 3...)
-
-**รูปแบบ Block Step:**
-{
-  "action": "click" | "type" | "select",
-  "selector": "CSS selector ของ element",
-  "value": "ข้อความที่จะพิมพ์ (สำหรับ type)",
-  "description": "คำอธิบาย step นี้"
-}
-
-**กฎสำคัญ:**
-- ห้ามเดาการแก้ไข ต้องถามข้อมูลให้ครบก่อน
-- เมื่อพร้อมแก้ไข ให้ส่ง JSON ในรูปแบบ:
-\`\`\`json
-{"action": "UPDATE_BLOCK", "steps": [...], "changes": "สรุปการเปลี่ยนแปลง"}
-\`\`\`
-- ถ้ายังไม่พร้อม ให้ถามคำถามเพิ่มเติม`;
-
-    try {
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Block Data:\n${JSON.stringify(blockData, null, 2)}\n\nEdit Mode: ${editMode}` }
-      ];
-
-      // Add chat history
-      if (chatHistory && Array.isArray(chatHistory)) {
-        chatHistory.forEach(msg => {
-          messages.push({ role: msg.role, content: msg.content });
-        });
-      }
-
-      // Add current message
-      messages.push({ role: 'user', content: message });
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 1500
-      });
-
-      const aiResponse = response.choices[0].message.content;
-
-      // Check if AI wants to update block
-      let updateAction = null;
-      const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed.action === 'UPDATE_BLOCK') {
-            updateAction = parsed;
-          }
-        } catch (e) {
-          // JSON parse failed, just return text response
-        }
-      }
-
-      return {
-        success: true,
-        response: aiResponse,
-        updateAction: updateAction
-      };
-
-    } catch (error) {
-      console.error('AI Block Editor error:', error);
       throw new functions.https.HttpsError('internal', error.message);
     }
   });

@@ -16,7 +16,6 @@ import PlatformSetupUser from './pages/PlatformSetupUser';
 import OAuthCallback from './pages/OAuthCallback';
 import Admin from './pages/Admin';
 
-// import ModeCreator from './pages/ModeCreator'; // REMOVED: Mode System replaced by Expander
 import Marketplace from './pages/Marketplace';
 import Characters from './pages/Characters';
 import ExpanderCreator from './pages/ExpanderCreator';
@@ -332,7 +331,6 @@ return (
           <Route path="/platforms/setup/:platform/:accountId" element={<PlatformSetupUser />} />
           {isAdmin && <Route path="/platforms/setup-admin/:platform/:accountId" element={<PlatformSetup />} />}
           <Route path="/oauth/callback" element={<OAuthCallback />} />
-          {/* <Route path="/mode-creator" element={<ModeCreator />} /> REMOVED: Mode System */}
           <Route path="/expander" element={<ExpanderCreator />} />
           <Route path="/characters" element={<Characters />} />
           <Route path="/marketplace" element={<Marketplace />} />

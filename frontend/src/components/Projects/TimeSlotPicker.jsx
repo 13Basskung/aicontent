@@ -375,7 +375,7 @@ export default function TimeSlotPicker({ projectId, expanderScenes = null, userT
         setEditingSlotId(slot._docId);
         setNewSlot({
             start: slot.start,
-            scenes: slot.scenes,
+            scenes: expanderScenes || slot.scenes, // ใช้ค่าจาก Expander ถ้ามี
             sceneDuration: slot.sceneDuration || 8,
             platforms: slot.platforms || [] // Ensure array
         });
@@ -386,7 +386,7 @@ export default function TimeSlotPicker({ projectId, expanderScenes = null, userT
         setEditingSlotId(null);
         setNewSlot({
             start: '09:00',
-            scenes: 1,
+            scenes: expanderScenes || 1, // ใช้ค่าจาก Expander ถ้ามี
             sceneDuration: 8,
             platforms: []
         });
@@ -859,8 +859,13 @@ export default function TimeSlotPicker({ projectId, expanderScenes = null, userT
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 text-xs font-medium">
-                                        <span className="px-2 py-1 bg-blue-500/10 text-blue-300 rounded border border-blue-500/20">
-                                            {slot.scenes} Scenes
+                                        <span className={twMerge(
+                                            "px-2 py-1 rounded border",
+                                            expanderScenes 
+                                                ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/20" 
+                                                : "bg-blue-500/10 text-blue-300 border-blue-500/20"
+                                        )}>
+                                            {expanderScenes || slot.scenes} Scenes
                                         </span>
                                         <span className="px-2 py-1 bg-green-500/10 text-green-300 rounded border border-green-500/20">
                                             {/* Count Objects */}
