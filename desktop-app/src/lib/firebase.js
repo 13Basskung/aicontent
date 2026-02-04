@@ -284,18 +284,23 @@ export async function fetchExpander(userId, expanderId) {
 export async function fetchSlots(userId, projectId) {
   try {
     const url = `${FIRESTORE_BASE}/users/${userId}/projects/${projectId}/slots?key=${API_KEY}`;
+    console.log(`🔍 fetchSlots URL: ${url}`);
     const response = await fetch(url);
     const data = await response.json();
+    console.log(`📥 fetchSlots response for ${projectId}:`, data);
     
     if (data.error) {
       throw new Error(data.error.message);
     }
     
     if (!data.documents) {
+      console.log(`⚠️ No slots documents for project ${projectId}`);
       return [];
     }
     
-    return data.documents.map(parseDocument);
+    const slots = data.documents.map(parseDocument);
+    console.log(`✅ Parsed slots for ${projectId}:`, slots);
+    return slots;
   } catch (error) {
     console.error('fetchSlots error:', error);
     throw error;
