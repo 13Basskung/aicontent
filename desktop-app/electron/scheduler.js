@@ -30,6 +30,10 @@ function initScheduler(win, runBlockFn, instMgr, pwBridge) {
   instanceManager = instMgr;
   playwrightBridge = pwBridge;
   console.log('✅ Scheduler initialized');
+  console.log(`   - playwrightBridge received: ${!!pwBridge}`);
+  console.log(`   - playwrightBridge.launchInstance: ${!!(pwBridge && pwBridge.launchInstance)}`);
+  console.log(`   - playwrightBridge.runBlock: ${!!(pwBridge && pwBridge.runBlock)}`);
+  console.log(`   - playwrightBridge keys: ${pwBridge ? Object.keys(pwBridge).join(', ') : 'N/A'}`);
 }
 
 /**
