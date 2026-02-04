@@ -79,9 +79,12 @@ function initPlaywrightBridge(mainWindow) {
         page = await browser.newPage();
       }
       
-      // ✅ FIX: Clear old URL from restored session
+      // ✅ FIX: ใช้ JavaScript บังคับ Navigate ไป about:blank
       try {
-        await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 5000 });
+        await page.evaluate(() => {
+          window.location.href = 'about:blank';
+        });
+        await page.waitForLoadState('domcontentloaded');
         console.log(`🧹 Cleared old session URL - now on about:blank`);
       } catch (e) {
         console.warn(`⚠️ Could not clear old URL: ${e.message}`);
@@ -381,8 +384,13 @@ function initPlaywrightBridge(mainWindow) {
       
       const page = debugContext.pages()[0] || await debugContext.newPage();
       
-      // Navigate to URL
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      // ✅ FIX: ใช้ JavaScript บังคับ Navigate เพื่อให้แน่ใจว่าไปถูก URL
+      console.log(`🌐 [DEBUG] Navigating to: ${url}`);
+      await page.evaluate((targetUrl) => {
+        window.location.href = targetUrl;
+      }, url);
+      await page.waitForLoadState('domcontentloaded');
+      console.log(`✅ [DEBUG] Current URL: ${page.url()}`);
 
       // If no selector provided, just open browser for user to explore
       if (!selector || !selector.trim()) {
