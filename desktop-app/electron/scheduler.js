@@ -629,31 +629,51 @@ async function executeScheduledRun(slot, instances, userId) {
     console.log(`📂 Project: ${slot.projectName} (${slot.projectId})`);
     console.log(`⏰ Time: ${slot.start}`);
     
-    // Find or create instance for this project
-    let instance = instances.find(i => i.projectId === slot.projectId);
+    // ✅ FIX: Find instance from UI list OR check if already running in playwrightBridge
+    let instance = instances?.find(i => i.projectId === slot.projectId);
+    let instanceId = instance?.id;
     
-    if (!instance && instanceManager) {
-      // Create new instance for this project
-      console.log(`🚀 Creating new instance for project: ${slot.projectName}`);
-      const result = await instanceManager.launchInstance(slot.projectId, slot.projectName);
-      if (result.success) {
-        instance = { id: result.instanceId, projectId: slot.projectId };
-        // Wait for Chrome to be ready
-        await new Promise(r => setTimeout(r, 5000));
-      } else {
-        console.error(`❌ Failed to create instance: ${result.error}`);
-        notifyUI('error', slot, result.error);
-        return { success: false, error: result.error };
+    // Generate instanceId if not found
+    if (!instanceId) {
+      instanceId = `scheduler-${slot.projectId}-${Date.now()}`;
+    }
+    
+    // ✅ FIX: Use playwrightBridge.launchInstance to ensure Chrome is running
+    if (playwrightBridge && playwrightBridge.launchInstance) {
+      console.log(`🚀 Launching/checking Chrome instance: ${instanceId}`);
+      const launchResult = await playwrightBridge.launchInstance(instanceId, slot.projectId, slot.projectName);
+      
+      if (!launchResult.success) {
+        console.error(`❌ Failed to launch instance: ${launchResult.error}`);
+        notifyUI('error', slot, launchResult.error);
+        
+        await saveExecutionLogFromScheduler(userId, {
+          status: 'failed',
+          projectId: slot.projectId,
+          projectName: slot.projectName,
+          error: `Failed to launch Chrome: ${launchResult.error}`
+        });
+        
+        return { success: false, error: launchResult.error };
       }
+      
+      instanceId = launchResult.instanceId;
+      // Wait for Chrome to be ready
+      await new Promise(r => setTimeout(r, 3000));
+    } else {
+      console.error(`❌ playwrightBridge.launchInstance not available`);
+      
+      await saveExecutionLogFromScheduler(userId, {
+        status: 'failed',
+        projectId: slot.projectId,
+        projectName: slot.projectName,
+        error: 'playwrightBridge.launchInstance not available'
+      });
+      
+      return { success: false, error: 'playwrightBridge not initialized properly' };
     }
     
-    if (!instance) {
-      console.log(`⚠️ No instance available for project: ${slot.projectName}`);
-      notifyUI('error', slot, 'No instance available');
-      return { success: false, error: 'No instance available' };
-    }
-    
-    console.log(`✅ Instance ready: ${instance.id}`);
+    console.log(`✅ Instance ready: ${instanceId}`);
     
     // ✅ FIX: Fetch readyPrompts from Firebase
     const readyPromptData = await fetchReadyPrompts(userId, slot.projectId);
@@ -720,7 +740,7 @@ async function executeScheduledRun(slot, instances, userId) {
     
     // Execute the block
     if (playwrightBridge) {
-      const result = await playwrightBridge.runBlock(instance.id, block, variables);
+      const result = await playwrightBridge.runBlock(instanceId, block, variables);
       const endTime = new Date();
       const duration = endTime - startTime;
       
@@ -729,8 +749,8 @@ async function executeScheduledRun(slot, instances, userId) {
         status: result.success ? 'success' : 'failed',
         projectId: slot.projectId,
         projectName: slot.projectName,
-        instanceId: instance.id,
-        instanceName: instance.name || '',
+        instanceId: instanceId,
+        instanceName: slot.projectName || '',
         blockId: block.id || '',
         blockName: block.name || '',
         startTime,

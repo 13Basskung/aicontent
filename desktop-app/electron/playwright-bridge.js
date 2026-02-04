@@ -913,6 +913,79 @@ async function closeAllInstances() {
 }
 
 /**
+ * ✅ NEW: Launch Instance directly (for scheduler use)
+ * Same logic as IPC handler but callable directly
+ */
+async function launchInstance(instanceId, projectId, projectName) {
+  console.log(`🚀 [Direct] Launching Chrome instance: ${instanceId}`);
+  
+  try {
+    // Check if instance already exists
+    if (instances.has(instanceId)) {
+      console.log(`✅ Instance ${instanceId} already running`);
+      return { success: true, instanceId };
+    }
+    
+    const profilePath = path.join(PROFILES_DIR, instanceId);
+    
+    // Ensure profile directory exists
+    if (!fs.existsSync(profilePath)) {
+      fs.mkdirSync(profilePath, { recursive: true });
+    }
+
+    // Launch persistent context (keeps login state)
+    const browser = await chromium.launchPersistentContext(profilePath, {
+      headless: false,
+      viewport: { width: 1280, height: 720 },
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        '--no-first-run',
+        '--no-default-browser-check'
+      ],
+      ignoreDefaultArgs: ['--enable-automation']
+    });
+
+    // Get the first page or create new one
+    let page = browser.pages()[0];
+    if (!page) {
+      page = await browser.newPage();
+    }
+
+    // Store instance
+    instances.set(instanceId, {
+      browser,
+      page,
+      projectId,
+      projectName,
+      status: 'running',
+      createdAt: Date.now()
+    });
+
+    // Listen for page close
+    browser.on('close', () => {
+      console.log(`🔴 Browser closed: ${instanceId}`);
+      instances.delete(instanceId);
+      if (storedMainWindow) {
+        sendStatusUpdate(storedMainWindow, instanceId, 'closed');
+      }
+    });
+
+    // Send status update
+    if (storedMainWindow) {
+      sendStatusUpdate(storedMainWindow, instanceId, 'running');
+    }
+
+    console.log(`✅ Chrome instance launched: ${instanceId}`);
+    return { success: true, instanceId };
+
+  } catch (error) {
+    console.error(`❌ Failed to launch Chrome: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * ✅ NEW: Run Block directly (for scheduler use)
  * This is the same logic as IPC handler but callable directly
  */
@@ -1074,5 +1147,6 @@ module.exports = {
   initPlaywrightBridge,
   closeAllInstances,
   getInstances: () => instances,
-  runBlock  // ✅ Export for scheduler use
+  launchInstance,  // ✅ Export for scheduler use
+  runBlock         // ✅ Export for scheduler use
 };
