@@ -410,6 +410,13 @@ function stopScheduler() {
 }
 
 /**
+ * Check if scheduler is currently running
+ */
+function isSchedulerRunning() {
+  return schedulerInterval !== null;
+}
+
+/**
  * Get upcoming schedules for today
  */
 async function getTodaySchedule(userId) {
@@ -546,6 +553,7 @@ module.exports = {
   initScheduler,
   startScheduler,
   stopScheduler,
+  isSchedulerRunning,
   fetchUserSchedule,
   getTodaySchedule,
   checkScheduleNow,

@@ -102,10 +102,18 @@ function SchedulerPanel({ keyData, instances }) {
     return () => clearInterval(timer);
   }, [lastDay]);
 
-  // Load schedules on mount + fetch timezone
+  // Load schedules on mount + fetch timezone + check scheduler status
   useEffect(() => {
     loadSchedules();
     loadTimezone();
+    // Check if scheduler is already running (persist state across refreshes)
+    async function checkSchedulerStatus() {
+      if (window.electronAPI?.scheduler?.isRunning) {
+        const running = await window.electronAPI.scheduler.isRunning();
+        setIsRunning(running);
+      }
+    }
+    checkSchedulerStatus();
   }, [keyData]);
 
   // Smart-refresh: check for changes every 30 seconds

@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scheduler: {
     start: (userId, instances) => ipcRenderer.invoke('scheduler:start', { userId, instances }),
     stop: () => ipcRenderer.invoke('scheduler:stop'),
+    isRunning: () => ipcRenderer.invoke('scheduler:is-running'),
     getToday: (userId) => ipcRenderer.invoke('scheduler:get-today', userId),
     getAll: (userId) => ipcRenderer.invoke('scheduler:get-all', userId),
     getTimezone: (userId) => ipcRenderer.invoke('scheduler:get-timezone', userId),
