@@ -629,14 +629,10 @@ async function executeScheduledRun(slot, instances, userId) {
     console.log(`📂 Project: ${slot.projectName} (${slot.projectId})`);
     console.log(`⏰ Time: ${slot.start}`);
     
-    // ✅ FIX: Find instance from UI list OR check if already running in playwrightBridge
-    let instance = instances?.find(i => i.projectId === slot.projectId);
-    let instanceId = instance?.id;
-    
-    // Generate instanceId if not found
-    if (!instanceId) {
-      instanceId = `scheduler-${slot.projectId}-${Date.now()}`;
-    }
+    // ✅ FIX: Always use consistent instanceId based on projectId (not from UI)
+    // This ensures scheduler uses its own browser profiles in AppData
+    const instanceId = `scheduler-${slot.projectId}`;
+    console.log(`📋 Using scheduler instanceId: ${instanceId}`);
     
     // ✅ FIX: Use playwrightBridge.launchInstance to ensure Chrome is running
     console.log(`\n🔍 [DEBUG] Checking playwrightBridge...`);
