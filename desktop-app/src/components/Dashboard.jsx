@@ -231,7 +231,9 @@ function Dashboard({ keyData }) {
         if (project?.id) {
           // Load slots
           try {
+            console.log(`🔄 Fetching slots for project "${project.name}" (${project.id})...`);
             const slots = await fetchSlots(keyData.userId, project.id);
+            console.log(`✅ Slots loaded for "${project.name}":`, slots);
             newSlotsCache[project.id] = slots;
           } catch (err) {
             console.error(`Failed to load slots for project ${project.id}:`, err);
