@@ -12,17 +12,27 @@ let debugContext = null;
 // Store mainWindow reference for runBlock function
 let storedMainWindow = null;
 
-// ✅ FIX: Profile directory in userData (survives app updates!)
-// Windows: C:\Users\<user>\AppData\Roaming\content-auto-post-desktop\profiles
-// macOS: ~/Library/Application Support/content-auto-post-desktop/profiles
-const PROFILES_DIR = path.join(app.getPath('userData'), 'browser-profiles');
+// ✅ FIX: Profile directory - will be set after app ready
+let PROFILES_DIR = null;
 
-console.log(`📁 Browser profiles directory: ${PROFILES_DIR}`);
-
-// Ensure profiles directory exists
-if (!fs.existsSync(PROFILES_DIR)) {
-  fs.mkdirSync(PROFILES_DIR, { recursive: true });
-  console.log(`📁 Created profiles directory: ${PROFILES_DIR}`);
+/**
+ * Get profiles directory (lazy initialization)
+ */
+function getProfilesDir() {
+  if (!PROFILES_DIR) {
+    // ✅ FIX: Use userData path (survives app updates!)
+    // Windows: C:\Users\<user>\AppData\Roaming\content-auto-post-desktop\browser-profiles
+    // macOS: ~/Library/Application Support/content-auto-post-desktop/browser-profiles
+    PROFILES_DIR = path.join(app.getPath('userData'), 'browser-profiles');
+    console.log(`📁 Browser profiles directory: ${PROFILES_DIR}`);
+    
+    // Ensure profiles directory exists
+    if (!fs.existsSync(PROFILES_DIR)) {
+      fs.mkdirSync(PROFILES_DIR, { recursive: true });
+      console.log(`📁 Created profiles directory: ${PROFILES_DIR}`);
+    }
+  }
+  return PROFILES_DIR;
 }
 
 /**
@@ -43,7 +53,7 @@ function initPlaywrightBridge(mainWindow) {
     console.log(`🚀 Launching Chrome instance: ${instanceId}`);
     
     try {
-      const profilePath = path.join(PROFILES_DIR, instanceId);
+      const profilePath = path.join(getProfilesDir(), instanceId);
       
       // Ensure profile directory exists
       if (!fs.existsSync(profilePath)) {
