@@ -953,7 +953,7 @@ async function launchInstance(instanceId, projectId, projectName) {
       return { success: true, instanceId };
     }
     
-    const profilePath = path.join(PROFILES_DIR, instanceId);
+    const profilePath = path.join(getProfilesDir(), instanceId);
     
     // Ensure profile directory exists
     if (!fs.existsSync(profilePath)) {
