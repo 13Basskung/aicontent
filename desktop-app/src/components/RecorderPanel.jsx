@@ -15,34 +15,37 @@ const BLOCK_PLATFORMS = [
   { id: 'instagram', name: 'Instagram', color: 'bg-gradient-to-r from-purple-600 to-pink-600', borderColor: 'border-pink-500', icon: '📷' }
 ];
 
-// Step action types with Thai labels
+// Step action types with Thai labels and hints (tooltips)
 const ACTION_TYPES = [
-  { value: 'click', label: 'คลิก', icon: '👆' },
-  { value: 'fill', label: 'พิมพ์', icon: '⌨️' },
-  { value: 'wait', label: 'รอ (ms)', icon: '⏱️' },
-  { value: 'goto', label: 'ไปที่ URL', icon: '🔗' },
-  { value: 'wait_for_element', label: 'รอให้ปรากฏ', icon: '👁️' },
-  { value: 'wait_for_disappear', label: 'รอให้หายไป', icon: '🙈' },
-  { value: 'wait_for_element_and_click', label: 'รอแล้วคลิก', icon: '👁️👆' },
-  { value: 'click_dropdown', label: 'คลิกเปิดเมนู', icon: '📋' },
-  { value: 'click_text', label: 'คลิกจากข้อความ', icon: '🔤' },
-  { value: 'wait_for_element_long', label: 'รอให้ปรากฏ (นาน)', icon: '⏳' },
-  { value: 'wait_and_click_long', label: 'รอให้ปรากฏแล้วคลิก (นาน)', icon: '⏳👆' },
-  { value: 'wait_progress_complete', label: 'รอโหลดเสร็จ (ตรวจซีนต์)', icon: '📊' },
-  // === PROMPT ACTIONS (ใช้ร่วมกันทุก User) ===
-  { value: 'fill_prompt', label: '📝 ใส่ Prompt (Full)', icon: '📝', hint: 'ใส่ Prompt ทั้งหมด (action + script)' },
-  { value: 'fill_action', label: '🎬 ใส่ Action', icon: '🎬', hint: 'ใส่เฉพาะ Action ของ Scene' },
-  { value: 'fill_script', label: '📜 ใส่ Script', icon: '📜', hint: 'ใส่เฉพาะ Script/Narration' },
-  { value: 'fill_title', label: '📌 ใส่ Title', icon: '📌', hint: 'ใส่ชื่อ Scene' },
-  { value: 'fill_duration', label: '⏱️ ใส่ Duration', icon: '⏱️', hint: 'ใส่ความยาว Scene' },
-  { value: 'fill_audio', label: '🔊 ใส่ Audio', icon: '🔊', hint: 'ใส่คำอธิบายเสียง/เพลง' },
-  { value: 'fill_master_image', label: '🖼️ ใส่ Master Image Prompt', icon: '�️', hint: 'ใส่ Prompt สำหรับภาพหลัก' },
-  { value: 'fill_social_description', label: '📱 ใส่ Social Description', icon: '📱', hint: 'ใส่คำอธิบายสำหรับโพสต์' },
-  { value: 'fill_hashtags', label: '#️⃣ ใส่ Hashtags', icon: '#️⃣', hint: 'ใส่ Hashtags (คั่นด้วย space)' },
+  // === BASIC ACTIONS ===
+  { value: 'click', label: 'คลิก', icon: '👆', hint: 'คลิกที่ Element ตาม Selector ที่กำหนด เช่น คลิกปุ่ม, ลิงก์, หรือพื้นที่ใดๆ' },
+  { value: 'fill', label: 'พิมพ์', icon: '⌨️', hint: 'พิมพ์ข้อความลงในช่อง Input หรือ Textarea ตาม Selector ที่กำหนด' },
+  { value: 'wait', label: 'รอ (ms)', icon: '⏱️', hint: 'หยุดรอตามเวลาที่กำหนด (มิลลิวินาที) เช่น 2000 = 2 วินาที' },
+  { value: 'goto', label: 'ไปที่ URL', icon: '🔗', hint: 'เปิดหน้าเว็บใหม่ตาม URL ที่กำหนด เช่น https://vidu.com' },
+  // === WAIT ACTIONS ===
+  { value: 'wait_for_element', label: 'รอให้ปรากฏ', icon: '👁️', hint: 'รอจนกว่า Element จะปรากฏบนหน้าจอ (timeout 30 วินาที)' },
+  { value: 'wait_for_disappear', label: 'รอให้หายไป', icon: '🙈', hint: 'รอจนกว่า Element จะหายไป เหมาะใช้รอ Loading หรือ Progress Bar' },
+  { value: 'wait_for_element_and_click', label: 'รอแล้วคลิก', icon: '👁️👆', hint: 'รอจนกว่า Element จะปรากฏ แล้วคลิกทันที (timeout 30 วินาที)' },
+  { value: 'wait_for_element_long', label: 'รอให้ปรากฏ (นาน)', icon: '⏳', hint: 'รอจนกว่า Element จะปรากฏ (timeout 10 นาที) เหมาะสำหรับงานที่ใช้เวลานาน' },
+  { value: 'wait_and_click_long', label: 'รอให้ปรากฏแล้วคลิก (นาน)', icon: '⏳👆', hint: 'รอจนกว่า Element จะปรากฏแล้วคลิก (timeout 10 นาที) เหมาะสำหรับรอ Generate เสร็จ' },
+  { value: 'wait_progress_complete', label: 'รอโหลดเสร็จ (ตรวจซีนต์)', icon: '📊', hint: 'รอจนกว่า Progress Bar จะหายไป และตรวจสอบว่า Scene เพิ่มขึ้น ป้องกัน Error' },
+  // === CLICK VARIANTS ===
+  { value: 'click_dropdown', label: 'คลิกเปิดเมนู', icon: '📋', hint: 'คลิกเปิด Dropdown Menu แล้วรอให้เมนูเปิด 0.5 วินาที' },
+  { value: 'click_text', label: 'คลิกจากข้อความ', icon: '🔤', hint: 'คลิกจากข้อความที่เห็นบนปุ่ม ไม่ต้องหา Selector เช่น "Generate" หรือ "Export"' },
+  // === PROMPT ACTIONS (ใช้ร่วมกันทุก User - ดึงค่าจาก Prompt อัตโนมัติ) ===
+  { value: 'fill_prompt', label: '📝 ใส่ Prompt (Full)', icon: '📝', hint: '🔄 ใส่ Prompt ทั้งหมด (action + script รวมกัน) ลงในช่อง Input\n📋 ใช้ใน Loop เพื่อวน Prompt ทุกอัน\n⚡ ไม่ต้องพิมพ์เอง ดึงจาก readyPrompts อัตโนมัติ' },
+  { value: 'fill_action', label: '🎬 ใส่ Action', icon: '🎬', hint: '🔄 ใส่เฉพาะ Action (การกระทำ) ของ Scene\n📝 เช่น "คนเดินบนชายหาด ท้องฟ้าสีส้ม"\n⚡ ใช้เมื่อเว็บแยกช่อง Action กับ Script' },
+  { value: 'fill_script', label: '📜 ใส่ Script', icon: '📜', hint: '🔄 ใส่เฉพาะ Script/Narration (บทพูด/คำบรรยาย)\n📝 เช่น "วันนี้อากาศดีมาก ท้องฟ้าแจ่มใส"\n⚡ ใช้เมื่อเว็บแยกช่อง Script ต่างหาก' },
+  { value: 'fill_title', label: '📌 ใส่ Title', icon: '📌', hint: '🔄 ใส่ชื่อ Scene อัตโนมัติ\n📝 เช่น "Scene 1", "Opening Scene"\n⚡ ใช้เมื่อเว็บมีช่องใส่ชื่อ Scene' },
+  { value: 'fill_duration', label: '⏱️ ใส่ Duration', icon: '⏱️', hint: '🔄 ใส่ความยาวของ Scene อัตโนมัติ\n📝 เช่น "8 seconds", "10s"\n⚡ ใช้เมื่อเว็บมีช่องกำหนดความยาว' },
+  { value: 'fill_audio', label: '🔊 ใส่ Audio', icon: '🔊', hint: '🔄 ใส่คำอธิบายเสียง/เพลงประกอบ\n📝 เช่น "เสียงคลื่นทะเล นกร้อง"\n⚡ ใช้เมื่อเว็บมีช่องใส่ Audio Description' },
+  { value: 'fill_master_image', label: '🖼️ ใส่ Master Image', icon: '🖼️', hint: '🔄 ใส่ Prompt สำหรับสร้างภาพหลัก (Thumbnail)\n📝 ใช้ครั้งเดียวก่อนเริ่ม Loop\n⚡ ไม่ต้องอยู่ใน Loop' },
+  { value: 'fill_social_description', label: '📱 ใส่ Social Description', icon: '📱', hint: '🔄 ใส่คำอธิบายสำหรับโพสต์ Social Media\n📝 ใช้ตอนท้ายหลังสร้างวีดีโอเสร็จ\n⚡ สำหรับ TikTok, Facebook, YouTube' },
+  { value: 'fill_hashtags', label: '#️⃣ ใส่ Hashtags', icon: '#️⃣', hint: '🔄 ใส่ Hashtags อัตโนมัติ (คั่นด้วย space)\n📝 เช่น "#travel #nature #beautiful"\n⚡ ใช้ตอนโพสต์ Social Media' },
   // === LOOP & CONTROL ===
-  { value: 'loop_start', label: '🔄 เริ่ม Loop', icon: '🔄' },
-  { value: 'loop_end', label: '🏁 จบ Loop', icon: '🏁' },
-  { value: 'inject_prompt', label: 'ดึง Prompt (Legacy)', icon: '📝' },
+  { value: 'loop_start', label: '🔄 เริ่ม Loop', icon: '🔄', hint: '🔁 เริ่มวน Loop ตามจำนวน Prompt/Scene\n📋 Steps ระหว่าง loop_start และ loop_end จะวนซ้ำ\n⚡ ใช้คู่กับ fill_prompt, fill_action ฯลฯ' },
+  { value: 'loop_end', label: '🏁 จบ Loop', icon: '🏁', hint: '🔁 จบการวน Loop\n📋 Steps หลัง loop_end จะทำครั้งเดียว\n⚡ เช่น Export, Download, Post' },
+  { value: 'inject_prompt', label: 'ดึง Prompt (Legacy)', icon: '📝', hint: '⚠️ Action เก่า - แนะนำให้ใช้ fill_prompt แทน' },
 ];
 
 // Step action icons
@@ -602,26 +605,37 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                     // Edit mode
                     <div className="space-y-2">
                       <div className="flex gap-2 flex-wrap">
-                        <select
-                          value={step.action}
-                          onChange={(e) => handleEditStep(index, { action: e.target.value })}
-                          className="px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm min-w-[140px]"
-                        >
-                          {ACTION_TYPES.map(type => (
-                            <option key={type.value} value={type.value}>
-                              {type.icon} {type.label}
-                            </option>
-                          ))}
-                          {customActions.length > 0 && (
-                            <optgroup label="── Custom Actions ──">
-                              {customActions.map(action => (
-                                <option key={action.value} value={action.value}>
-                                  {action.icon} {action.label}
-                                </option>
-                              ))}
-                            </optgroup>
+                        <div className="relative group">
+                          <select
+                            value={step.action}
+                            onChange={(e) => handleEditStep(index, { action: e.target.value })}
+                            className="px-2 py-1 bg-white/10 border border-white/20 rounded text-white text-sm min-w-[140px]"
+                            title={ACTION_TYPES.find(t => t.value === step.action)?.hint || ''}
+                          >
+                            {ACTION_TYPES.map(type => (
+                              <option key={type.value} value={type.value} title={type.hint}>
+                                {type.icon} {type.label}
+                              </option>
+                            ))}
+                            {customActions.length > 0 && (
+                              <optgroup label="── Custom Actions ──">
+                                {customActions.map(action => (
+                                  <option key={action.value} value={action.value}>
+                                    {action.icon} {action.label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                          {/* Tooltip แสดงคำอธิบาย Action */}
+                          {ACTION_TYPES.find(t => t.value === step.action)?.hint && (
+                            <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block w-72 p-2 rounded-lg bg-gray-900/95 border border-white/20 shadow-xl">
+                              <div className="text-xs text-white/90 whitespace-pre-line">
+                                {ACTION_TYPES.find(t => t.value === step.action)?.hint}
+                              </div>
+                            </div>
                           )}
-                        </select>
+                        </div>
                         {/* Input field based on action type */}
                         {!['loop_start', 'loop_end', 'inject_prompt'].includes(step.action) && (
                           <input
@@ -949,7 +963,10 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                 <span className="text-green-400">✅</span> ตัวเลือกเสริม (Options)
               </h4>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                <label 
+                  className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer group relative"
+                  title="ถ้า Step นี้ทำไม่สำเร็จ ระบบจะลองทำใหม่อีก 3 ครั้ง ก่อนจะยอมแพ้ เหมาะกับปุ่มที่บางทีคลิกไม่ติด"
+                >
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'retry_on_fail') || false}
@@ -967,8 +984,12 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                     className="rounded"
                   />
                   <span className="text-white/80">🔄 ลองใหม่ถ้าล้มเหลว (3 รอบ)</span>
+                  <span className="ml-auto text-white/40 text-xs">ℹ️</span>
                 </label>
-                <div className="flex items-center gap-2 p-2 rounded bg-white/5">
+                <div 
+                  className="flex items-center gap-2 p-2 rounded bg-white/5 group relative"
+                  title="รอจนกว่า Progress Bar จะหายไป ใช้ตอนรอ Generate หรือ Upload เสร็จ"
+                >
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'wait_progress') || false}
@@ -1002,7 +1023,10 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                     placeholder="selector"
                   />
                 </div>
-                <div className="flex items-center gap-2 p-2 rounded bg-white/5">
+                <div 
+                  className="flex items-center gap-2 p-2 rounded bg-white/5"
+                  title="รอเวลาที่กำหนดหลังทำ Step นี้เสร็จ ใช้เมื่อต้องการรอให้หน้าเว็บโหลดหรือ Animation เล่นจบ"
+                >
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'wait_after') || false}
@@ -1039,7 +1063,10 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                 </div>
                 
                 {/* Count & Validate Scenes */}
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                <label 
+                  className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer"
+                  title="นับจำนวน Scene ที่มีอยู่ก่อนทำ Step นี้ ใช้คู่กับ 'ตรวจสอบ Scene เพิ่ม' เพื่อยืนยันว่า Generate สำเร็จ"
+                >
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'count_scenes') || false}
@@ -1057,8 +1084,12 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                     className="rounded"
                   />
                   <span className="text-white/80">📊 นับ Scene ก่อนทำ (Pre)</span>
+                  <span className="ml-auto text-white/40 text-xs">ℹ️</span>
                 </label>
-                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                <label 
+                  className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer"
+                  title="ตรวจสอบว่า Scene เพิ่มขึ้นหลังจากทำ Step นี้ ถ้าไม่เพิ่ม = Generate ล้มเหลว จะข้ามไป Scene ถัดไป"
+                >
                   <input 
                     type="checkbox" 
                     checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'validate_scene') || false}
@@ -1076,6 +1107,7 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                     className="rounded"
                   />
                   <span className="text-white/80">✅ ตรวจสอบ Scene เพิ่ม (Post)</span>
+                  <span className="ml-auto text-white/40 text-xs">ℹ️</span>
                 </label>
               </div>
             </div>
