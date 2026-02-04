@@ -102,15 +102,22 @@ function Dashboard({ keyData }) {
 
   // Load today schedules separately (ensure it runs after initial load)
   useEffect(() => {
+    console.log('🚀 useEffect triggered, keyData.userId:', keyData?.userId);
+    console.log('🔍 scheduler API available:', !!window.electronAPI?.scheduler?.getToday);
+    
     async function loadTodaySchedules() {
       if (keyData?.userId && window.electronAPI?.scheduler?.getToday) {
         try {
+          console.log('📅 Calling scheduler.getToday...');
           const today = await window.electronAPI.scheduler.getToday(keyData.userId);
-          console.log('📅 Today schedules (useEffect):', today);
+          console.log('📅 Today schedules loaded:', today?.length, 'slots');
+          console.log('📅 Today schedules detail:', today);
           setTodaySchedules(today || []);
         } catch (err) {
-          console.error('Failed to load today schedules:', err);
+          console.error('❌ Failed to load today schedules:', err);
         }
+      } else {
+        console.log('⚠️ Cannot load schedules - missing userId or API');
       }
     }
     loadTodaySchedules();
@@ -995,10 +1002,19 @@ function Dashboard({ keyData }) {
                 )}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <span className={`w-2 h-2 rounded-full ${project.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                  {project.status === 'active' ? 'มีงานวันนี้' : 'ไม่มีงานวันนี้'}
-                </span>
+                {(() => {
+                  // ใช้ todaySchedules จาก Scheduler API (แสดงถูกต้องใน Scheduler tab)
+                  const todaySlots = todaySchedules.filter(s => s.projectId === project.id);
+                  const hasTaskToday = todaySlots.length > 0;
+                  const isRunning = project.status === 'running';
+                  return (
+                    <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                      {hasTaskToday ? `มีงานวันนี้ (${todaySlots.length} slots)` : 'ไม่มีงานวันนี้'}
+                      {isRunning && <span className="ml-1 text-green-400">▶</span>}
+                    </span>
+                  );
+                })()}
               </div>
             </button>
           ))}
