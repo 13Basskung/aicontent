@@ -550,9 +550,13 @@ async function executeStep(page, step, variables = {}) {
         // ใส่ Prompt ทั้งหมด (action + script) - ใช้ {{prompt}} variable
         // prompt = action + " " + script (combined)
         if (selector) {
-          const fullPrompt = variables.prompt || variables.action + ' ' + variables.script || '';
-          console.log(`📝 Fill Prompt: "${fullPrompt.substring(0, 50)}..."`);
-          await page.fill(selector, fullPrompt, { timeout: 15000 });
+          const fullPrompt = variables.prompt || `${variables.action || ''} ${variables.script || ''}`.trim() || '';
+          console.log(`📝 Fill Prompt: "${(fullPrompt || '').substring(0, 50)}..."`);
+          if (fullPrompt) {
+            await page.fill(selector, fullPrompt, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_prompt: No prompt data available');
+          }
         }
         break;
 
@@ -560,8 +564,12 @@ async function executeStep(page, step, variables = {}) {
         // ใส่เฉพาะ Action ของ Scene - ใช้ {{action}} variable
         if (selector) {
           const actionText = variables.action || '';
-          console.log(`🎬 Fill Action: "${actionText.substring(0, 50)}..."`);
-          await page.fill(selector, actionText, { timeout: 15000 });
+          console.log(`🎬 Fill Action: "${(actionText || '').substring(0, 50)}..."`);
+          if (actionText) {
+            await page.fill(selector, actionText, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_action: No action data available');
+          }
         }
         break;
 
@@ -569,8 +577,12 @@ async function executeStep(page, step, variables = {}) {
         // ใส่เฉพาะ Script/Narration - ใช้ {{script}} variable
         if (selector) {
           const scriptText = variables.script || '';
-          console.log(`📜 Fill Script: "${scriptText.substring(0, 50)}..."`);
-          await page.fill(selector, scriptText, { timeout: 15000 });
+          console.log(`📜 Fill Script: "${(scriptText || '').substring(0, 50)}..."`);
+          if (scriptText) {
+            await page.fill(selector, scriptText, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_script: No script data available');
+          }
         }
         break;
 
@@ -596,8 +608,12 @@ async function executeStep(page, step, variables = {}) {
         // ใส่คำอธิบายเสียง/เพลง - ใช้ {{audio}} variable
         if (selector) {
           const audioText = variables.audio || '';
-          console.log(`🔊 Fill Audio: "${audioText.substring(0, 50)}..."`);
-          await page.fill(selector, audioText, { timeout: 15000 });
+          console.log(`🔊 Fill Audio: "${(audioText || '').substring(0, 50)}..."`);
+          if (audioText) {
+            await page.fill(selector, audioText, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_audio: No audio data available');
+          }
         }
         break;
 
@@ -605,8 +621,12 @@ async function executeStep(page, step, variables = {}) {
         // ใส่ Prompt สำหรับภาพหลัก - ใช้ {{masterImage}} variable
         if (selector) {
           const masterImagePrompt = variables.masterImage || '';
-          console.log(`🖼️ Fill Master Image: "${masterImagePrompt.substring(0, 50)}..."`);
-          await page.fill(selector, masterImagePrompt, { timeout: 15000 });
+          console.log(`🖼️ Fill Master Image: "${(masterImagePrompt || '').substring(0, 50)}..."`);
+          if (masterImagePrompt) {
+            await page.fill(selector, masterImagePrompt, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_master_image: No master image prompt available');
+          }
         }
         break;
 
@@ -614,8 +634,12 @@ async function executeStep(page, step, variables = {}) {
         // ใส่คำอธิบายสำหรับโพสต์ - ใช้ {{socialDescription}} variable
         if (selector) {
           const descText = variables.socialDescription || '';
-          console.log(`📱 Fill Social Description: "${descText.substring(0, 50)}..."`);
-          await page.fill(selector, descText, { timeout: 15000 });
+          console.log(`📱 Fill Social Description: "${(descText || '').substring(0, 50)}..."`);
+          if (descText) {
+            await page.fill(selector, descText, { timeout: 15000 });
+          } else {
+            console.warn('⚠️ fill_social_description: No social description available');
+          }
         }
         break;
 
@@ -747,12 +771,38 @@ async function executeStep(page, step, variables = {}) {
 }
 
 /**
- * Execute step with Post-Actions (Options)
- * Post-Actions: retry_on_fail, wait_progress, wait_after
+ * Execute step with Pre-Actions and Post-Actions (Options)
+ * Pre-Actions: count_scenes
+ * Post-Actions: retry_on_fail, wait_progress, wait_after, validate_scene
  */
 async function executeStepWithModifiers(page, step, variables = {}, context = {}) {
   const { modifiers } = step;
+  const preActions = modifiers?.preActions || [];
   const postActions = modifiers?.postActions || [];
+  
+  // เก็บ context สำหรับ validate_scene
+  let sceneCountBefore = 0;
+  
+  // ============================================
+  // PRE-ACTIONS: ทำก่อน Step หลัก
+  // ============================================
+  for (const preAction of preActions.sort((a, b) => (a.order || 0) - (b.order || 0))) {
+    try {
+      switch (preAction.type) {
+        case 'count_scenes':
+          // นับ Scene ก่อนทำ (สำหรับ validate ทีหลัง)
+          const countSelector = preAction.selector || '[role="listitem"]';
+          sceneCountBefore = await page.locator(countSelector).count();
+          console.log(`📊 Pre-Option: Scene count before = ${sceneCountBefore}`);
+          break;
+          
+        default:
+          console.warn(`⚠️ Unknown pre-option: ${preAction.type}`);
+      }
+    } catch (preErr) {
+      console.error(`❌ Pre-Option ${preAction.type} failed:`, preErr.message);
+    }
+  }
   
   // ============================================
   // MAIN STEP: ทำ Step หลัก
@@ -797,6 +847,23 @@ async function executeStepWithModifiers(page, step, variables = {}, context = {}
           const waitMs = postAction.duration || 2000;
           console.log(`⏰ Option: Waiting ${waitMs}ms...`);
           await page.waitForTimeout(waitMs);
+          break;
+          
+        case 'validate_scene':
+          // ตรวจสอบว่า Scene เพิ่มขึ้นหรือไม่
+          const validateSelector = postAction.selector || '[role="listitem"]';
+          await page.waitForTimeout(2000); // รอให้ DOM update
+          const sceneCountAfter = await page.locator(validateSelector).count();
+          console.log(`📊 Post-Option: Scene count after = ${sceneCountAfter}`);
+          
+          if (sceneCountAfter > sceneCountBefore) {
+            console.log(`✅ Validation: Scene increased ${sceneCountBefore} → ${sceneCountAfter}`);
+            result.sceneValidation = { before: sceneCountBefore, after: sceneCountAfter, success: true };
+          } else {
+            console.log(`❌ Validation: Scene NOT increased (${sceneCountBefore} → ${sceneCountAfter})`);
+            result.sceneValidation = { before: sceneCountBefore, after: sceneCountAfter, success: false };
+            // ไม่ fail step แต่ log ไว้
+          }
           break;
           
         default:

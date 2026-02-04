@@ -558,10 +558,21 @@ export async function updateBlock(blockId, blockData) {
 
 /**
  * Save execution log to Firebase
+ * รองรับ error details สำหรับ Steps และ Actions ที่ผิดพลาด
  */
 export async function saveExecutionLog(userId, logData) {
   try {
     const url = `${FIRESTORE_BASE}/users/${userId}/executionLogs?key=${API_KEY}`;
+    
+    // สรุป steps ที่ผิดพลาด (เฉพาะ step ที่ failed)
+    const failedSteps = (logData.stepResults || [])
+      .filter(r => !r.success)
+      .map(r => ({
+        step: r.stepIndex || 0,
+        action: r.action || 'unknown',
+        error: r.error || 'Unknown error',
+        loopIteration: r.loopIteration || null
+      }));
     
     const fields = {
       status: toFirestoreValue(logData.status), // 'success' | 'failed'
@@ -578,6 +589,13 @@ export async function saveExecutionLog(userId, logData) {
       totalSteps: toFirestoreValue(logData.totalSteps || 0),
       failedStep: toFirestoreValue(logData.failedStep || null),
       error: toFirestoreValue(logData.error || null),
+      // === NEW: Error Details สำหรับ Steps/Actions ===
+      failedSteps: toFirestoreValue(failedSteps.length > 0 ? failedSteps : null),
+      failedAction: toFirestoreValue(logData.failedAction || null),
+      failedSelector: toFirestoreValue(logData.failedSelector || null),
+      optionErrors: toFirestoreValue(logData.optionErrors || null), // Options ที่ผิดพลาด
+      loopIteration: toFirestoreValue(logData.loopIteration || null), // Loop รอบที่ผิดพลาด
+      sceneValidation: toFirestoreValue(logData.sceneValidation || null), // ผล validate_scene
       createdAt: toFirestoreValue(new Date())
     };
     

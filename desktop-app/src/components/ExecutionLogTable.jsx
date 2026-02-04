@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Trash2, Download, Filter, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Trash2, Download, Filter, RefreshCw, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { fetchExecutionLogs, clearExecutionLogs } from '../lib/firebase';
 
 function ExecutionLogTable({ userId, onRefresh }) {
@@ -7,6 +7,7 @@ function ExecutionLogTable({ userId, onRefresh }) {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [clearing, setClearing] = useState(false);
+  const [expandedLog, setExpandedLog] = useState(null); // สำหรับแสดง error details
 
   // Fetch logs on mount and when filter changes
   useEffect(() => {
@@ -179,61 +180,145 @@ function ExecutionLogTable({ userId, onRefresh }) {
               </div>
             ) : (
               logs.map((log, index) => (
-                <div
-                  key={log.id || index}
-                  className={`grid grid-cols-[60px_1fr_1fr_100px_90px_80px_100px_1fr] gap-2 px-3 py-2 text-sm hover:bg-white/5 transition ${
-                    log.status === 'failed' ? 'bg-red-500/5' : ''
-                  }`}
-                >
-                  {/* Status */}
-                  <div className="flex items-center">
-                    {log.status === 'success' ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-400" />
-                    )}
-                  </div>
-                  
-                  {/* Project */}
-                  <div className="text-white/90 truncate" title={log.projectName}>
-                    {log.projectName || '-'}
-                  </div>
-                  
-                  {/* Block */}
-                  <div className="text-white/90 truncate" title={log.blockName}>
-                    {log.blockName || '-'}
-                  </div>
-                  
-                  {/* Instance */}
-                  <div className="text-white/70 truncate" title={log.instanceName}>
-                    {log.instanceName || '-'}
-                  </div>
-                  
-                  {/* Time */}
-                  <div className="text-white/60 text-xs">
-                    {formatTime(log.createdAt)}
-                  </div>
-                  
-                  {/* Duration */}
-                  <div className="text-white/60">
-                    {formatDuration(log.duration)}
-                  </div>
-                  
-                  {/* Step */}
-                  <div className={`${log.failedStep ? 'text-red-400' : 'text-white/60'}`}>
-                    {log.failedStep 
-                      ? `Step ${log.failedStep}/${log.totalSteps}`
-                      : `${log.totalSteps} steps`
-                    }
-                  </div>
-                  
-                  {/* Error */}
-                  <div 
-                    className="text-red-400/80 text-xs truncate" 
-                    title={log.error || ''}
+                <div key={log.id || index}>
+                  {/* Main Row */}
+                  <div
+                    onClick={() => log.status === 'failed' && setExpandedLog(expandedLog === log.id ? null : log.id)}
+                    className={`grid grid-cols-[60px_1fr_1fr_100px_90px_80px_100px_1fr] gap-2 px-3 py-2 text-sm hover:bg-white/5 transition cursor-pointer ${
+                      log.status === 'failed' ? 'bg-red-500/5' : ''
+                    }`}
                   >
-                    {log.error || '-'}
+                    {/* Status */}
+                    <div className="flex items-center gap-1">
+                      {log.status === 'success' ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <>
+                          <XCircle className="w-4 h-4 text-red-400" />
+                          {expandedLog === log.id ? (
+                            <ChevronUp className="w-3 h-3 text-white/50" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3 text-white/50" />
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Project */}
+                    <div className="text-white/90 truncate" title={log.projectName}>
+                      {log.projectName || '-'}
+                    </div>
+                    
+                    {/* Block */}
+                    <div className="text-white/90 truncate" title={log.blockName}>
+                      {log.blockName || '-'}
+                    </div>
+                    
+                    {/* Instance */}
+                    <div className="text-white/70 truncate" title={log.instanceName}>
+                      {log.instanceName || '-'}
+                    </div>
+                    
+                    {/* Time */}
+                    <div className="text-white/60 text-xs">
+                      {formatTime(log.createdAt)}
+                    </div>
+                    
+                    {/* Duration */}
+                    <div className="text-white/60">
+                      {formatDuration(log.duration)}
+                    </div>
+                    
+                    {/* Step */}
+                    <div className={`${log.failedStep ? 'text-red-400' : 'text-white/60'}`}>
+                      {log.failedStep 
+                        ? `Step ${log.failedStep}/${log.totalSteps}`
+                        : `${log.totalSteps} steps`
+                      }
+                    </div>
+                    
+                    {/* Error */}
+                    <div 
+                      className="text-red-400/80 text-xs truncate" 
+                      title={log.error || ''}
+                    >
+                      {log.error || '-'}
+                    </div>
                   </div>
+                  
+                  {/* Error Details (Expanded) */}
+                  {expandedLog === log.id && log.status === 'failed' && (
+                    <div className="px-3 py-3 bg-red-500/10 border-t border-red-500/20">
+                      <div className="text-xs space-y-2">
+                        <div className="flex items-center gap-2 text-red-400 font-medium">
+                          <AlertTriangle className="w-4 h-4" />
+                          รายละเอียดข้อผิดพลาด
+                        </div>
+                        
+                        {/* Failed Action */}
+                        {log.failedAction && (
+                          <div className="flex gap-2">
+                            <span className="text-white/50 w-24">Action:</span>
+                            <span className="text-red-300 font-mono">{log.failedAction}</span>
+                          </div>
+                        )}
+                        
+                        {/* Failed Selector */}
+                        {log.failedSelector && (
+                          <div className="flex gap-2">
+                            <span className="text-white/50 w-24">Selector:</span>
+                            <span className="text-red-300 font-mono text-xs break-all">{log.failedSelector}</span>
+                          </div>
+                        )}
+                        
+                        {/* Loop Iteration */}
+                        {log.loopIteration && (
+                          <div className="flex gap-2">
+                            <span className="text-white/50 w-24">Loop รอบที่:</span>
+                            <span className="text-yellow-300">{log.loopIteration}</span>
+                          </div>
+                        )}
+                        
+                        {/* Scene Validation */}
+                        {log.sceneValidation && (
+                          <div className="flex gap-2">
+                            <span className="text-white/50 w-24">Scene Check:</span>
+                            <span className={log.sceneValidation.success ? 'text-green-300' : 'text-red-300'}>
+                              {log.sceneValidation.before} → {log.sceneValidation.after}
+                              {log.sceneValidation.success ? ' ✓' : ' ✗ (ไม่เพิ่ม)'}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Failed Steps List */}
+                        {log.failedSteps && log.failedSteps.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-red-500/20">
+                            <div className="text-white/50 mb-1">Steps ที่ผิดพลาด:</div>
+                            <div className="space-y-1 pl-2">
+                              {log.failedSteps.map((fs, i) => (
+                                <div key={i} className="flex gap-2 text-red-300">
+                                  <span className="text-white/40">Step {fs.step}:</span>
+                                  <span className="font-mono">{fs.action}</span>
+                                  {fs.loopIteration && <span className="text-yellow-400">(Loop {fs.loopIteration})</span>}
+                                  <span className="text-red-400/70">- {fs.error}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Full Error Message */}
+                        {log.error && (
+                          <div className="mt-2 pt-2 border-t border-red-500/20">
+                            <div className="text-white/50 mb-1">Error Message:</div>
+                            <div className="text-red-300/80 font-mono text-xs break-all bg-black/20 p-2 rounded">
+                              {log.error}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}

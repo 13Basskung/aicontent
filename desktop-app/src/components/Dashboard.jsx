@@ -505,12 +505,28 @@ function Dashboard({ keyData }) {
         console.warn('⚠️ Could not fetch prompts:', fetchErr.message);
       }
 
+      // แยก prompts ตาม type: image, video, social
+      const masterImagePrompt = prompts.find(p => p.type === 'image');
+      const videoPrompts = prompts.filter(p => p.type === 'video');
+      const socialPrompt = prompts.find(p => p.type === 'social');
+      
       // ส่ง prompts array ไปยัง playwright-bridge.js
       const variables = {
-        prompts: prompts,  // Array of prompts for loop
-        prompt: prompts[0] || '',
-        sceneIndex: 0
+        prompts: videoPrompts.length > 0 ? videoPrompts : prompts,  // ใช้เฉพาะ video prompts สำหรับ loop
+        prompt: videoPrompts[0] || prompts[0] || '',
+        sceneIndex: 0,
+        // === EXTRA VARIABLES (ใช้นอก Loop) ===
+        masterImage: masterImagePrompt?.prompt || '',
+        socialDescription: socialPrompt?.description || '',
+        hashtags: socialPrompt?.hashtags || [],
+        totalScenes: videoPrompts.length || prompts.length
       };
+      
+      console.log(`📋 Variables prepared:`, {
+        videoPrompts: videoPrompts.length,
+        hasMasterImage: !!masterImagePrompt,
+        hasSocial: !!socialPrompt
+      });
 
       let result = await window.electronAPI.playwright.runBlock(instanceId, block, variables);
       
@@ -573,8 +589,20 @@ function Dashboard({ keyData }) {
       const endTime = new Date();
       const completedSteps = result.results?.filter(r => r.success).length || 0;
       const failedStepIndex = result.results?.findIndex(r => !r.success);
+      const failedResult = failedStepIndex >= 0 ? result.results[failedStepIndex] : null;
       
-      // Save execution log to Firebase
+      // รวบรวม error details จาก results
+      const stepResults = (result.results || []).map((r, i) => ({
+        stepIndex: i + 1,
+        action: r.action || 'unknown',
+        success: r.success,
+        error: r.error || null,
+        loopIteration: r.loopIteration || null,
+        sceneValidation: r.sceneValidation || null,
+        retryCount: r.retryCount || 0
+      }));
+      
+      // Save execution log to Firebase with error details
       await saveExecutionLog(keyData?.userId, {
         status: result.success ? 'success' : 'failed',
         projectId: instance.projectId,
@@ -589,7 +617,13 @@ function Dashboard({ keyData }) {
         currentStep: completedSteps,
         totalSteps,
         failedStep: failedStepIndex >= 0 ? failedStepIndex + 1 : null,
-        error: result.error || null
+        error: result.error || null,
+        // === NEW: Error Details ===
+        stepResults: stepResults,
+        failedAction: failedResult?.action || null,
+        failedSelector: failedResult?.selector || null,
+        loopIteration: failedResult?.loopIteration || null,
+        sceneValidation: failedResult?.sceneValidation || null
       });
       
       setBlockResultModal({
