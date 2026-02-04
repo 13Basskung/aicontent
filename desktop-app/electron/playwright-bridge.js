@@ -78,6 +78,14 @@ function initPlaywrightBridge(mainWindow) {
       if (!page) {
         page = await browser.newPage();
       }
+      
+      // ✅ FIX: Clear old URL from restored session
+      try {
+        await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 5000 });
+        console.log(`🧹 Cleared old session URL - now on about:blank`);
+      } catch (e) {
+        console.warn(`⚠️ Could not clear old URL: ${e.message}`);
+      }
 
       // Store instance
       instances.set(instanceId, {
@@ -969,6 +977,15 @@ async function launchInstance(instanceId, projectId, projectName) {
     let page = browser.pages()[0];
     if (!page) {
       page = await browser.newPage();
+    }
+    
+    // ✅ FIX: Clear old URL from restored session
+    // Persistent context remembers last URL - navigate to blank first
+    try {
+      await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 5000 });
+      console.log(`🧹 Cleared old session URL - now on about:blank`);
+    } catch (e) {
+      console.warn(`⚠️ Could not clear old URL: ${e.message}`);
     }
 
     // Store instance
