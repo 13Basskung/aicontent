@@ -71,7 +71,8 @@ function createWindow() {
     }, 1000);
     
     // Initialize Scheduler (Phase 8)
-    initScheduler(mainWindow);
+    // ✅ FIX: Pass all required parameters including playwrightBridge
+    initScheduler(mainWindow, null, instanceManager, playwrightBridge);
     
     // Initialize Recorder (Phase 6)
     initRecorder(mainWindow);
