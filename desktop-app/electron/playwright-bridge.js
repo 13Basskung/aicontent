@@ -12,27 +12,17 @@ let debugContext = null;
 // Store mainWindow reference for runBlock function
 let storedMainWindow = null;
 
-// ✅ FIX: Profile directory - will be set after app ready
-let PROFILES_DIR = null;
+// ✅ FIX: Profile directory in userData (survives app updates!)
+// Windows: C:\Users\<user>\AppData\Roaming\content-auto-post-desktop\profiles
+// macOS: ~/Library/Application Support/content-auto-post-desktop/profiles
+const PROFILES_DIR = path.join(app.getPath('userData'), 'browser-profiles');
 
-/**
- * Get profiles directory (lazy initialization)
- */
-function getProfilesDir() {
-  if (!PROFILES_DIR) {
-    // ✅ FIX: Use userData path (survives app updates!)
-    // Windows: C:\Users\<user>\AppData\Roaming\content-auto-post-desktop\browser-profiles
-    // macOS: ~/Library/Application Support/content-auto-post-desktop/browser-profiles
-    PROFILES_DIR = path.join(app.getPath('userData'), 'browser-profiles');
-    console.log(`📁 Browser profiles directory: ${PROFILES_DIR}`);
-    
-    // Ensure profiles directory exists
-    if (!fs.existsSync(PROFILES_DIR)) {
-      fs.mkdirSync(PROFILES_DIR, { recursive: true });
-      console.log(`📁 Created profiles directory: ${PROFILES_DIR}`);
-    }
-  }
-  return PROFILES_DIR;
+console.log(`📁 Browser profiles directory: ${PROFILES_DIR}`);
+
+// Ensure profiles directory exists
+if (!fs.existsSync(PROFILES_DIR)) {
+  fs.mkdirSync(PROFILES_DIR, { recursive: true });
+  console.log(`📁 Created profiles directory: ${PROFILES_DIR}`);
 }
 
 /**
@@ -53,7 +43,7 @@ function initPlaywrightBridge(mainWindow) {
     console.log(`🚀 Launching Chrome instance: ${instanceId}`);
     
     try {
-      const profilePath = path.join(getProfilesDir(), instanceId);
+      const profilePath = path.join(PROFILES_DIR, instanceId);
       
       // Ensure profile directory exists
       if (!fs.existsSync(profilePath)) {
@@ -77,14 +67,6 @@ function initPlaywrightBridge(mainWindow) {
       let page = browser.pages()[0];
       if (!page) {
         page = await browser.newPage();
-      }
-      
-      // ✅ FIX: Clear old URL from restored session
-      try {
-        await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 5000 });
-        console.log(`🧹 Cleared old session URL - now on about:blank`);
-      } catch (e) {
-        console.warn(`⚠️ Could not clear old URL: ${e.message}`);
       }
 
       // Store instance
@@ -953,7 +935,7 @@ async function launchInstance(instanceId, projectId, projectName) {
       return { success: true, instanceId };
     }
     
-    const profilePath = path.join(getProfilesDir(), instanceId);
+    const profilePath = path.join(PROFILES_DIR, instanceId);
     
     // Ensure profile directory exists
     if (!fs.existsSync(profilePath)) {
@@ -977,15 +959,6 @@ async function launchInstance(instanceId, projectId, projectName) {
     let page = browser.pages()[0];
     if (!page) {
       page = await browser.newPage();
-    }
-    
-    // ✅ FIX: Clear old URL from restored session
-    // Persistent context remembers last URL - navigate to blank first
-    try {
-      await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 5000 });
-      console.log(`🧹 Cleared old session URL - now on about:blank`);
-    } catch (e) {
-      console.warn(`⚠️ Could not clear old URL: ${e.message}`);
     }
 
     // Store instance

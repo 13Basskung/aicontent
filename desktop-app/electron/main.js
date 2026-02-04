@@ -6,7 +6,7 @@ const playwrightBridge = require('./playwright-bridge');
 const { initPlaywrightBridge, closeAllInstances, getInstances } = playwrightBridge;
 const instanceManager = require('./instance-manager');
 const { initInstanceManager } = instanceManager;
-const { initScheduler, startScheduler, stopScheduler, isSchedulerRunning, getSavedSchedulerState, getTodaySchedule, fetchUserSchedule, fetchUserTimezone, getUserTimezone, saveUserTimezone, createScheduleHash, hasScheduleChanged } = require('./scheduler');
+const { initScheduler, startScheduler, stopScheduler, isSchedulerRunning, getTodaySchedule, fetchUserSchedule, fetchUserTimezone, getUserTimezone, saveUserTimezone, createScheduleHash, hasScheduleChanged } = require('./scheduler');
 const { initRecorder, startRecording, stopRecording, getRecordedSteps, clearSteps, addCustomStep } = require('./recorder');
 
 // Initialize electron-store for persistent config
@@ -73,20 +73,6 @@ function createWindow() {
     // Initialize Scheduler (Phase 8)
     // ✅ FIX: Pass all required parameters including playwrightBridge
     initScheduler(mainWindow, null, instanceManager, playwrightBridge);
-    
-    // ✅ FIX: Auto-start scheduler if it was running before update
-    setTimeout(() => {
-      const savedState = getSavedSchedulerState();
-      console.log('📋 Saved scheduler state:', savedState);
-      if (savedState && savedState.running && savedState.userId) {
-        console.log('🔄 Auto-restarting scheduler (was running before update)');
-        startScheduler(savedState.userId, []);
-        // Notify UI that scheduler is running
-        if (mainWindow) {
-          mainWindow.webContents.send('scheduler:auto-started', { userId: savedState.userId });
-        }
-      }
-    }, 3000); // Wait for app to fully initialize
     
     // Initialize Recorder (Phase 6)
     initRecorder(mainWindow);

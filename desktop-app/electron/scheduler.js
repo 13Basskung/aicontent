@@ -5,10 +5,8 @@
  */
 
 const https = require('https');
-const Store = require('electron-store');
 
 const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE';
-const store = new Store();
 const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents';
 
 // Store active schedules
@@ -516,10 +514,6 @@ function startScheduler(userId, instances) {
     clearInterval(schedulerInterval);
   }
   
-  // ✅ FIX: Save scheduler state to persist across updates
-  store.set('schedulerState', { running: true, userId, timestamp: Date.now() });
-  console.log('💾 Scheduler state saved to electron-store');
-  
   console.log('\n🕐 ========== SCHEDULER STARTED ==========');
   console.log(`👤 User: ${userId}`);
   console.log(`🌍 Timezone: ${userTimezone}`);
@@ -604,9 +598,6 @@ function stopScheduler() {
     schedulerInterval = null;
     console.log('🛑 Scheduler stopped');
   }
-  // ✅ FIX: Clear scheduler state
-  store.set('schedulerState', { running: false, timestamp: Date.now() });
-  console.log('💾 Scheduler state cleared from electron-store');
 }
 
 /**
@@ -614,13 +605,6 @@ function stopScheduler() {
  */
 function isSchedulerRunning() {
   return schedulerInterval !== null;
-}
-
-/**
- * Get saved scheduler state (for auto-restart after update)
- */
-function getSavedSchedulerState() {
-  return store.get('schedulerState', { running: false });
 }
 
 /**
@@ -645,18 +629,20 @@ async function executeScheduledRun(slot, instances, userId) {
     console.log(`📂 Project: ${slot.projectName} (${slot.projectId})`);
     console.log(`⏰ Time: ${slot.start}`);
     
-    // ✅ FIX: Always use consistent instanceId based on projectId (not from UI)
-    // This ensures scheduler uses its own browser profiles in AppData
-    const instanceId = `scheduler-${slot.projectId}`;
-    console.log(`📋 Using scheduler instanceId: ${instanceId}`);
+    // ✅ FIX: Find instance from UI list OR check if already running in playwrightBridge
+    let instance = instances?.find(i => i.projectId === slot.projectId);
+    let instanceId = instance?.id;
+    
+    // Generate instanceId if not found
+    if (!instanceId) {
+      instanceId = `scheduler-${slot.projectId}-${Date.now()}`;
+    }
     
     // ✅ FIX: Use playwrightBridge.launchInstance to ensure Chrome is running
     console.log(`\n🔍 [DEBUG] Checking playwrightBridge...`);
     console.log(`   - playwrightBridge exists: ${!!playwrightBridge}`);
     console.log(`   - launchInstance exists: ${!!(playwrightBridge && playwrightBridge.launchInstance)}`);
     console.log(`   - runBlock exists: ${!!(playwrightBridge && playwrightBridge.runBlock)}`);
-    console.log(`   - typeof playwrightBridge: ${typeof playwrightBridge}`);
-    console.log(`   - playwrightBridge keys: ${playwrightBridge ? Object.keys(playwrightBridge).join(', ') : 'N/A'}`);
     
     if (playwrightBridge && playwrightBridge.launchInstance) {
       console.log(`🚀 Calling playwrightBridge.launchInstance("${instanceId}", "${slot.projectId}", "${slot.projectName}")`);
@@ -677,7 +663,7 @@ async function executeScheduledRun(slot, instances, userId) {
         return { success: false, error: launchResult.error };
       }
       
-      // instanceId is already set correctly, no need to reassign
+      instanceId = launchResult.instanceId;
       // Wait for Chrome to be ready
       await new Promise(r => setTimeout(r, 3000));
     } else {
@@ -716,9 +702,6 @@ async function executeScheduledRun(slot, instances, userId) {
     }
     
     console.log(`📦 Block loaded: "${block.name}" with ${block.steps?.length || 0} steps`);
-    console.log(`🌐 [DEBUG] Block startUrl: ${block.startUrl}`);
-    console.log(`🆔 [DEBUG] Block projectId: ${block.projectId}`);
-    console.log(`🆔 [DEBUG] Slot projectId: ${slot.projectId}`);
     
     // ✅ FIX: Parse prompts by type (same logic as Dashboard.jsx)
     const allPrompts = readyPromptData.prompts || [];
@@ -758,24 +741,12 @@ async function executeScheduledRun(slot, instances, userId) {
     });
     
     console.log(`▶️ Running block "${block.name}" for ${slot.projectName}`);
-    console.log(`🌐 [DEBUG] About to call runBlock with:`);
-    console.log(`   - instanceId: ${instanceId}`);
-    console.log(`   - block.name: ${block.name}`);
-    console.log(`   - block.startUrl: ${block.startUrl}`);
-    console.log(`   - block.steps.length: ${block.steps?.length || 0}`);
-    
-    // ⚠️ Warn if no startUrl
-    if (!block.startUrl) {
-      console.warn(`⚠️ WARNING: Block "${block.name}" has NO startUrl! Browser will stay on about:blank`);
-    }
     
     const startTime = new Date();
     
     // Execute the block
     if (playwrightBridge) {
-      console.log(`🚀 Calling playwrightBridge.runBlock...`);
       const result = await playwrightBridge.runBlock(instanceId, block, variables);
-      console.log(`📋 runBlock result:`, JSON.stringify(result).substring(0, 500));
       const endTime = new Date();
       const duration = endTime - startTime;
       
@@ -842,24 +813,16 @@ async function getAutomationBlock(projectId, userId) {
     // ✅ Try to get blocks from Firebase first
     if (userId) {
       const firebaseBlocks = await fetchBlocksFromFirebase(userId);
-      console.log(`🔍 [DEBUG] Found ${firebaseBlocks?.length || 0} blocks in Firebase`);
-      
-      // Debug: Log all blocks
-      firebaseBlocks?.forEach((b, i) => {
-        console.log(`   Block[${i}]: "${b.name}" projectId=${b.projectId} startUrl=${b.startUrl}`);
-      });
-      
       if (firebaseBlocks && firebaseBlocks.length > 0) {
         // Find block assigned to this project
         const projectBlock = firebaseBlocks.find(b => b.projectId === projectId);
         if (projectBlock) {
-          console.log(`📦 Block from Firebase (matched projectId): "${projectBlock.name}"`);
+          console.log(`📦 Block from Firebase: "${projectBlock.name}"`);
           return projectBlock;
         }
         
-        // ⚠️ WARNING: Using fallback block - projectId doesn't match!
-        console.log(`⚠️ No block matched projectId "${projectId}" - using first block as fallback`);
-        console.log(`📦 Fallback block: "${firebaseBlocks[0].name}" (startUrl: ${firebaseBlocks[0].startUrl})`);
+        // Use first available block as fallback
+        console.log(`📦 Using first Firebase block: "${firebaseBlocks[0].name}"`);
         return firebaseBlocks[0];
       }
     }
@@ -922,7 +885,6 @@ module.exports = {
   startScheduler,
   stopScheduler,
   isSchedulerRunning,
-  getSavedSchedulerState,
   fetchUserSchedule,
   getTodaySchedule,
   checkScheduleNow,
