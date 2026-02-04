@@ -971,10 +971,8 @@ function Dashboard({ keyData }) {
                 {(() => {
                   const slots = projectSlotsCache[project.id] || [];
                   const today = new Date();
-                  const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
                   const todayCode = dayNames[today.getDay()];
-                  // Debug: ดูว่า slot.day เป็นอะไร
-                  console.log(`📅 ${project.name}: todayCode=${todayCode}, slots=`, slots.map(s => ({ day: s.day, time: s.time })));
                   const hasTaskToday = slots.some(slot => slot.day === todayCode);
                   const todaySlots = slots.filter(s => s.day === todayCode);
                   return (
