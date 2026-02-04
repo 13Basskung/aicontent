@@ -222,5 +222,10 @@ service cloud.firestore {
     match /users/{userId}/projects/{projectId}/execution_logs/{logId} {
       allow read: if true; // Allow Desktop Agent to read execution logs
     }
+
+    // 🟢 DESKTOP APP: Allow Agent to read/write executionLogs (camelCase path)
+    match /users/{userId}/executionLogs/{logId} {
+      allow read, write: if true; // Allow Desktop Agent to manage execution logs
+    }
   }
 }

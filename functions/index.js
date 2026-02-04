@@ -322,9 +322,11 @@ exports.generateUserKey = functions.https.onCall(async (data, context) => {
 });
 
 // --- 5. Central Scheduler (The Station Master) ---
-exports.scheduleJobs = functions.pubsub.schedule('every 1 minutes')
+exports.scheduleJobs = functions
+  .runWith({ secrets: ['GEMINI_API_KEY'], timeoutSeconds: 300, memory: '1GB' })
+  .pubsub.schedule('every 1 minutes')
   .timeZone('UTC') // Run in UTC to handle all offsets manually
-  // Force Deploy Change: v3.1 (Debug)
+  // Force Deploy Change: v3.2 (Add GEMINI_API_KEY secret)
   .onRun(async (context) => {
     const db = admin.firestore();
     const now = new Date();
