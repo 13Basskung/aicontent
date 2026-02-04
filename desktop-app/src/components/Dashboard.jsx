@@ -100,6 +100,25 @@ function Dashboard({ keyData }) {
     loadData();
   }, [keyData]);
 
+  // Load today schedules separately (ensure it runs after initial load)
+  useEffect(() => {
+    async function loadTodaySchedules() {
+      if (keyData?.userId && window.electronAPI?.scheduler?.getToday) {
+        try {
+          const today = await window.electronAPI.scheduler.getToday(keyData.userId);
+          console.log('📅 Today schedules (useEffect):', today);
+          setTodaySchedules(today || []);
+        } catch (err) {
+          console.error('Failed to load today schedules:', err);
+        }
+      }
+    }
+    loadTodaySchedules();
+    // Refresh every 30 seconds
+    const interval = setInterval(loadTodaySchedules, 30000);
+    return () => clearInterval(interval);
+  }, [keyData?.userId]);
+
   // Fetch slots for a project (NO cache - always fresh)
   async function loadProjectSlots(projectId) {
     try {
@@ -980,6 +999,7 @@ function Dashboard({ keyData }) {
                   // ใช้ข้อมูลจาก todaySchedules (จาก Scheduler API)
                   const todaySlots = todaySchedules.filter(s => s.projectId === project.id);
                   const hasTaskToday = todaySlots.length > 0;
+                  console.log(`🎯 ${project.name}: todaySchedules.length=${todaySchedules.length}, todaySlots=`, todaySlots);
                   return (
                     <span className="flex items-center gap-1.5 text-xs text-gray-400">
                       <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
