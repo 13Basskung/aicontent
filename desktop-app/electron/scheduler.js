@@ -1,11 +1,13 @@
 /**
  * Scheduler - Auto-run automation based on Posting Schedule
  * Phase 8: Desktop App
+ * ✅ v1.6.54: Fixed interval logging and added saveExecutionLog
  */
 
 const https = require('https');
 
 const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE';
+const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents';
 
 // Store active schedules
 let activeSchedules = [];
@@ -178,6 +180,90 @@ async function fetchBlocksFromFirebase(userId) {
   } catch (error) {
     console.error('❌ fetchBlocksFromFirebase error:', error.message);
     return [];
+  }
+}
+
+/**
+ * ✅ NEW: Save execution log to Firebase from scheduler
+ * Uses REST API directly since we're in main process
+ */
+async function saveExecutionLogFromScheduler(userId, logData) {
+  try {
+    const url = `${FIRESTORE_BASE}/users/${userId}/executionLogs?key=${API_KEY}`;
+    
+    // Convert to Firestore format
+    const toFirestoreValue = (value) => {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (typeof value === 'string') return { stringValue: value };
+      if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+      if (typeof value === 'boolean') return { booleanValue: value };
+      if (value instanceof Date) return { timestampValue: value.toISOString() };
+      if (Array.isArray(value)) return { arrayValue: { values: value.map(toFirestoreValue) } };
+      if (typeof value === 'object') {
+        const mapValue = {};
+        for (const [k, v] of Object.entries(value)) {
+          mapValue[k] = toFirestoreValue(v);
+        }
+        return { mapValue: { fields: mapValue } };
+      }
+      return { stringValue: String(value) };
+    };
+    
+    const fields = {
+      status: toFirestoreValue(logData.status),
+      projectId: toFirestoreValue(logData.projectId || ''),
+      projectName: toFirestoreValue(logData.projectName || ''),
+      instanceId: toFirestoreValue(logData.instanceId || ''),
+      instanceName: toFirestoreValue(logData.instanceName || ''),
+      blockId: toFirestoreValue(logData.blockId || ''),
+      blockName: toFirestoreValue(logData.blockName || ''),
+      startTime: toFirestoreValue(logData.startTime || new Date()),
+      endTime: toFirestoreValue(logData.endTime || new Date()),
+      duration: toFirestoreValue(logData.duration || 0),
+      currentStep: toFirestoreValue(logData.currentStep || 0),
+      totalSteps: toFirestoreValue(logData.totalSteps || 0),
+      failedStep: toFirestoreValue(logData.failedStep || null),
+      error: toFirestoreValue(logData.error || null),
+      source: toFirestoreValue('scheduler'), // Mark as from scheduler
+      createdAt: toFirestoreValue(new Date())
+    };
+    
+    // Use https POST
+    return new Promise((resolve, reject) => {
+      const urlObj = new URL(url);
+      const postData = JSON.stringify({ fields });
+      
+      const options = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.log('✅ Execution log saved to Firebase (from scheduler)');
+            resolve({ success: true });
+          } else {
+            console.error('❌ Failed to save log:', data);
+            reject(new Error(data));
+          }
+        });
+      });
+      
+      req.on('error', reject);
+      req.write(postData);
+      req.end();
+    });
+  } catch (error) {
+    console.error('❌ saveExecutionLogFromScheduler error:', error.message);
+    return { success: false, error: error.message };
   }
 }
 
@@ -428,16 +514,26 @@ function startScheduler(userId, instances) {
     clearInterval(schedulerInterval);
   }
   
-  console.log('🕐 Scheduler started for user:', userId);
-  console.log(`🌍 User timezone: ${userTimezone}`);
+  console.log('\n🕐 ========== SCHEDULER STARTED ==========');
+  console.log(`👤 User: ${userId}`);
+  console.log(`🌍 Timezone: ${userTimezone}`);
+  console.log(`📦 Instances passed: ${instances?.length || 0}`);
   
   // Store userId for use in interval
   const schedulerUserId = userId;
   
+  // ✅ FIX: Log every interval check
+  let checkCount = 0;
+  
   // Check every minute
   schedulerInterval = setInterval(async () => {
+    checkCount++;
+    const now = new Date();
+    console.log(`\n⏱️ [Scheduler Check #${checkCount}] ${now.toLocaleTimeString('th-TH', { timeZone: userTimezone })}`);
+    
     try {
       const schedules = await fetchUserSchedule(schedulerUserId);
+      console.log(`📅 Found ${schedules.length} total slots`);
       
       // Collect all slots that should run now
       const slotsToRun = schedules.filter(slot => shouldRunNow(slot));
@@ -466,13 +562,16 @@ function startScheduler(userId, instances) {
         // Wait for all to complete (but they run in parallel)
         const results = await Promise.allSettled(runPromises);
         console.log(`📊 Execution results:`, results.map(r => r.status));
+      } else {
+        console.log(`⏸️ No slots to run at this time`);
       }
     } catch (error) {
       console.error('Scheduler check error:', error);
     }
   }, 60000); // Check every minute
   
-  // Also do initial check
+  // Also do initial check immediately
+  console.log('🔄 Running initial check...');
   checkScheduleNow(schedulerUserId, instances);
 }
 
@@ -617,12 +716,34 @@ async function executeScheduledRun(slot, instances, userId) {
     
     console.log(`▶️ Running block "${block.name}" for ${slot.projectName}`);
     
+    const startTime = new Date();
+    
     // Execute the block
     if (playwrightBridge) {
       const result = await playwrightBridge.runBlock(instance.id, block, variables);
+      const endTime = new Date();
+      const duration = endTime - startTime;
+      
+      // ✅ NEW: Save execution log to Firebase
+      await saveExecutionLogFromScheduler(userId, {
+        status: result.success ? 'success' : 'failed',
+        projectId: slot.projectId,
+        projectName: slot.projectName,
+        instanceId: instance.id,
+        instanceName: instance.name || '',
+        blockId: block.id || '',
+        blockName: block.name || '',
+        startTime,
+        endTime,
+        duration,
+        currentStep: result.currentStep || 0,
+        totalSteps: block.steps?.length || 0,
+        failedStep: result.failedStep || null,
+        error: result.error || null
+      });
       
       if (result.success) {
-        console.log(`✅ Completed: ${slot.projectName}`);
+        console.log(`✅ Completed: ${slot.projectName} (${Math.round(duration/1000)}s)`);
         notifyUI('success', slot);
         return { success: true };
       } else {
@@ -632,10 +753,27 @@ async function executeScheduledRun(slot, instances, userId) {
       }
     }
     
+    // ✅ Save error log when no playwright bridge
+    await saveExecutionLogFromScheduler(userId, {
+      status: 'failed',
+      projectId: slot.projectId,
+      projectName: slot.projectName,
+      error: 'No playwright bridge available'
+    });
+    
     return { success: false, error: 'No playwright bridge' };
   } catch (error) {
     console.error(`❌ Execute error: ${error.message}`);
     notifyUI('error', slot, error.message);
+    
+    // ✅ Save error log on exception
+    await saveExecutionLogFromScheduler(userId, {
+      status: 'failed',
+      projectId: slot.projectId,
+      projectName: slot.projectName,
+      error: error.message
+    });
+    
     return { success: false, error: error.message };
   }
 }
