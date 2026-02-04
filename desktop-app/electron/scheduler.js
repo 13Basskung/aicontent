@@ -113,6 +113,75 @@ function getDayCode(date) {
 }
 
 /**
+ * Fetch ready prompts from Firebase for a project
+ * Returns the latest ready prompt with all variables
+ */
+async function fetchReadyPrompts(userId, projectId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}/projects/${projectId}/readyPrompts?key=${API_KEY}`;
+    const data = await fetchJSON(url);
+    
+    if (!data.documents || data.documents.length === 0) {
+      console.log(`⚠️ No readyPrompts found for project: ${projectId}`);
+      return null;
+    }
+    
+    // Parse all documents
+    const prompts = data.documents.map(doc => {
+      const fields = doc.fields || {};
+      return {
+        id: doc.name.split('/').pop(),
+        status: parseFirestoreValue(fields.status),
+        prompts: parseFirestoreValue(fields.prompts) || [],
+        episodeTopic: parseFirestoreValue(fields.episodeTopic),
+        createdAt: parseFirestoreValue(fields.createdAt)
+      };
+    });
+    
+    // Find the latest 'ready' prompt
+    const readyPrompt = prompts.find(p => p.status === 'ready') || prompts[0];
+    
+    if (readyPrompt) {
+      console.log(`📝 Found readyPrompt: ${readyPrompt.id} with ${readyPrompt.prompts?.length || 0} prompts`);
+      return readyPrompt;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ fetchReadyPrompts error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Fetch blocks from Firebase for a user
+ */
+async function fetchBlocksFromFirebase(userId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents/users/${userId}/blocks?key=${API_KEY}`;
+    const data = await fetchJSON(url);
+    
+    if (!data.documents || data.documents.length === 0) {
+      return [];
+    }
+    
+    return data.documents.map(doc => {
+      const fields = doc.fields || {};
+      return {
+        id: doc.name.split('/').pop(),
+        name: parseFirestoreValue(fields.name),
+        projectId: parseFirestoreValue(fields.projectId),
+        startUrl: parseFirestoreValue(fields.startUrl),
+        steps: parseFirestoreValue(fields.steps) || []
+      };
+    });
+  } catch (error) {
+    console.error('❌ fetchBlocksFromFirebase error:', error.message);
+    return [];
+  }
+}
+
+/**
  * Fetch user timezone from Firestore
  * Note: Web App stores timezone in users/{Firebase UID}
  * But Desktop App uses email as userId, so we need to query by email
@@ -305,17 +374,35 @@ async function fetchUserSchedule(userId) {
 
 /**
  * Check if a slot should run now
- * Checks: day, time, project status, and expander
+ * Checks: day, time (in user's timezone), project status, and expander
  */
 function shouldRunNow(slot) {
+  // ✅ FIX: Convert current time to user's timezone
+  const timezone = slot.timezone || userTimezone || 'Asia/Bangkok';
   const now = new Date();
-  const currentDay = getDayCode(now);
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  // Get current day and time in user's timezone
+  const options = { timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(now);
+  
+  const dayMap = { 'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue', 'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat' };
+  const weekdayPart = parts.find(p => p.type === 'weekday')?.value || '';
+  const currentDay = dayMap[weekdayPart] || getDayCode(now);
+  
+  const hourPart = parts.find(p => p.type === 'hour')?.value || '00';
+  const minutePart = parts.find(p => p.type === 'minute')?.value || '00';
+  const currentTime = `${hourPart.padStart(2, '0')}:${minutePart.padStart(2, '0')}`;
+  
+  // Debug logging
+  console.log(`🕐 Checking slot: ${slot.projectName} | Slot: ${slot.day} ${slot.start} | Current (${timezone}): ${currentDay} ${currentTime}`);
   
   // Check if it's the right day and time
   if (slot.day !== currentDay || slot.start !== currentTime) {
     return false;
   }
+  
+  console.log(`✅ TIME MATCH! ${slot.projectName} @ ${slot.start}`);
   
   // ✅ Check if project is running
   if (slot.projectStatus !== 'running') {
@@ -334,6 +421,7 @@ function shouldRunNow(slot) {
 
 /**
  * Start scheduler loop
+ * ✅ FIX: Pass userId to executeScheduledRun for fetching prompts
  */
 function startScheduler(userId, instances) {
   if (schedulerInterval) {
@@ -341,18 +429,21 @@ function startScheduler(userId, instances) {
   }
   
   console.log('🕐 Scheduler started for user:', userId);
+  console.log(`🌍 User timezone: ${userTimezone}`);
+  
+  // Store userId for use in interval
+  const schedulerUserId = userId;
   
   // Check every minute
   schedulerInterval = setInterval(async () => {
     try {
-      const schedules = await fetchUserSchedule(userId);
-      const now = new Date();
+      const schedules = await fetchUserSchedule(schedulerUserId);
       
       // Collect all slots that should run now
       const slotsToRun = schedules.filter(slot => shouldRunNow(slot));
       
       if (slotsToRun.length > 0) {
-        console.log(`⏰ ${slotsToRun.length} slot(s) ready to run`);
+        console.log(`\n⏰ ========== ${slotsToRun.length} SLOT(S) READY TO RUN ==========`);
         
         // Run all slots in parallel (each has its own browser instance)
         const runPromises = slotsToRun.map(async (slot) => {
@@ -368,12 +459,13 @@ function startScheduler(userId, instances) {
             });
           }
           
-          // Execute in parallel
-          return executeScheduledRun(slot, instances);
+          // ✅ FIX: Pass userId for fetching prompts
+          return executeScheduledRun(slot, instances, schedulerUserId);
         });
         
         // Wait for all to complete (but they run in parallel)
-        await Promise.allSettled(runPromises);
+        const results = await Promise.allSettled(runPromises);
+        console.log(`📊 Execution results:`, results.map(r => r.status));
       }
     } catch (error) {
       console.error('Scheduler check error:', error);
@@ -381,7 +473,7 @@ function startScheduler(userId, instances) {
   }, 60000); // Check every minute
   
   // Also do initial check
-  checkScheduleNow(userId, instances);
+  checkScheduleNow(schedulerUserId, instances);
 }
 
 /**
@@ -430,52 +522,98 @@ async function getTodaySchedule(userId) {
 
 /**
  * Execute scheduled automation run
+ * ✅ FIX: Fetch readyPrompts and pass complete variables
  */
-async function executeScheduledRun(slot, instances) {
+async function executeScheduledRun(slot, instances, userId) {
   try {
+    console.log(`\n🎯 ========== EXECUTING SCHEDULED RUN ==========`);
+    console.log(`📂 Project: ${slot.projectName} (${slot.projectId})`);
+    console.log(`⏰ Time: ${slot.start}`);
+    
     // Find or create instance for this project
     let instance = instances.find(i => i.projectId === slot.projectId);
     
     if (!instance && instanceManager) {
       // Create new instance for this project
       console.log(`🚀 Creating new instance for project: ${slot.projectName}`);
-      const result = await instanceManager.launchInstance(slot.projectId);
+      const result = await instanceManager.launchInstance(slot.projectId, slot.projectName);
       if (result.success) {
         instance = { id: result.instanceId, projectId: slot.projectId };
         // Wait for Chrome to be ready
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 5000));
       } else {
         console.error(`❌ Failed to create instance: ${result.error}`);
         notifyUI('error', slot, result.error);
-        return;
+        return { success: false, error: result.error };
       }
     }
     
     if (!instance) {
       console.log(`⚠️ No instance available for project: ${slot.projectName}`);
       notifyUI('error', slot, 'No instance available');
-      return;
+      return { success: false, error: 'No instance available' };
     }
     
-    // Find automation block for this project
-    // For now, we'll use a default block or the first available
-    const block = await getAutomationBlock(slot.projectId);
+    console.log(`✅ Instance ready: ${instance.id}`);
+    
+    // ✅ FIX: Fetch readyPrompts from Firebase
+    const readyPromptData = await fetchReadyPrompts(userId, slot.projectId);
+    
+    if (!readyPromptData || !readyPromptData.prompts || readyPromptData.prompts.length === 0) {
+      console.log(`⚠️ No ready prompts found for project: ${slot.projectName}`);
+      notifyUI('error', slot, 'No ready prompts available - Cloud Function may not have generated them yet');
+      return { success: false, error: 'No ready prompts' };
+    }
+    
+    console.log(`📝 Ready prompts loaded: ${readyPromptData.prompts.length} items`);
+    
+    // ✅ FIX: Get block from Firebase or local store
+    const block = await getAutomationBlock(slot.projectId, userId);
     
     if (!block) {
       console.log(`⚠️ No automation block found for project: ${slot.projectName}`);
       notifyUI('error', slot, 'No automation block configured');
-      return;
+      return { success: false, error: 'No automation block' };
     }
     
-    // Prepare variables
+    console.log(`📦 Block loaded: "${block.name}" with ${block.steps?.length || 0} steps`);
+    
+    // ✅ FIX: Parse prompts by type (same logic as Dashboard.jsx)
+    const allPrompts = readyPromptData.prompts || [];
+    const masterImagePrompt = allPrompts.find(p => p.type === 'image');
+    const videoPrompts = allPrompts.filter(p => p.type === 'video');
+    const socialPrompt = allPrompts.find(p => p.type === 'social');
+    
+    // Prepare complete variables (matching Dashboard.jsx format)
     const variables = {
+      // Basic info
       projectId: slot.projectId,
       projectName: slot.projectName,
       platforms: slot.platforms,
       scenes: slot.scenes,
       sceneDuration: slot.sceneDuration,
-      sceneIndex: 0
+      sceneIndex: 0,
+      
+      // ✅ FIX: Prompts for loop
+      prompts: videoPrompts.length > 0 ? videoPrompts : allPrompts,
+      prompt: (videoPrompts[0] || allPrompts[0]) || '',
+      
+      // ✅ FIX: Extra variables (outside loop)
+      masterImage: masterImagePrompt?.prompt || '',
+      socialDescription: socialPrompt?.description || '',
+      hashtags: socialPrompt?.hashtags || [],
+      totalScenes: videoPrompts.length || allPrompts.length,
+      
+      // Episode info
+      episodeTopic: readyPromptData.episodeTopic || ''
     };
+    
+    console.log(`📋 Variables prepared:`, {
+      videoPrompts: videoPrompts.length,
+      hasMasterImage: !!masterImagePrompt,
+      hasSocial: !!socialPrompt,
+      totalScenes: variables.totalScenes
+    });
     
     console.log(`▶️ Running block "${block.name}" for ${slot.projectName}`);
     
@@ -486,33 +624,62 @@ async function executeScheduledRun(slot, instances) {
       if (result.success) {
         console.log(`✅ Completed: ${slot.projectName}`);
         notifyUI('success', slot);
+        return { success: true };
       } else {
         console.error(`❌ Failed: ${result.error}`);
         notifyUI('error', slot, result.error);
+        return { success: false, error: result.error };
       }
     }
+    
+    return { success: false, error: 'No playwright bridge' };
   } catch (error) {
     console.error(`❌ Execute error: ${error.message}`);
     notifyUI('error', slot, error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
  * Get automation block for project
+ * ✅ FIX: Try Firebase first, then fall back to local store
  */
-async function getAutomationBlock(projectId) {
-  // Try to get blocks from store or default
+async function getAutomationBlock(projectId, userId) {
   try {
+    // ✅ Try to get blocks from Firebase first
+    if (userId) {
+      const firebaseBlocks = await fetchBlocksFromFirebase(userId);
+      if (firebaseBlocks && firebaseBlocks.length > 0) {
+        // Find block assigned to this project
+        const projectBlock = firebaseBlocks.find(b => b.projectId === projectId);
+        if (projectBlock) {
+          console.log(`📦 Block from Firebase: "${projectBlock.name}"`);
+          return projectBlock;
+        }
+        
+        // Use first available block as fallback
+        console.log(`📦 Using first Firebase block: "${firebaseBlocks[0].name}"`);
+        return firebaseBlocks[0];
+      }
+    }
+    
+    // Fallback to local electron-store
     const Store = require('electron-store');
     const store = new Store();
     const blocks = store.get('blocks', []);
     
     // Find block assigned to this project or use default
     const projectBlock = blocks.find(b => b.projectId === projectId);
-    if (projectBlock) return projectBlock;
+    if (projectBlock) {
+      console.log(`📦 Block from local store: "${projectBlock.name}"`);
+      return projectBlock;
+    }
     
     // Use first available block as fallback
-    if (blocks.length > 0) return blocks[0];
+    if (blocks.length > 0) {
+      console.log(`📦 Using first local block: "${blocks[0].name}"`);
+      return blocks[0];
+    }
     
     return null;
   } catch (error) {
