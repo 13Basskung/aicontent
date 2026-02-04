@@ -722,6 +722,12 @@ async function executeScheduledRun(slot, instances, userId) {
     console.log(`🆔 [DEBUG] Block projectId: ${block.projectId}`);
     console.log(`🆔 [DEBUG] Slot projectId: ${slot.projectId}`);
     
+    // ⚠️ WARNING: ถ้า projectId ไม่ตรงกัน แสดงว่าใช้ block ผิดตัว!
+    if (block.projectId !== slot.projectId) {
+      console.warn(`⚠️⚠️⚠️ WARNING: Block projectId (${block.projectId}) ≠ Slot projectId (${slot.projectId})`);
+      console.warn(`⚠️ กำลังใช้ Block "${block.name}" กับ Project "${slot.projectName}" ซึ่งอาจไม่ถูกต้อง!`);
+    }
+    
     // ✅ FIX: Parse prompts by type (same logic as Dashboard.jsx)
     const allPrompts = readyPromptData.prompts || [];
     const masterImagePrompt = allPrompts.find(p => p.type === 'image');
