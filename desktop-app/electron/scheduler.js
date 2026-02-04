@@ -702,6 +702,9 @@ async function executeScheduledRun(slot, instances, userId) {
     }
     
     console.log(`📦 Block loaded: "${block.name}" with ${block.steps?.length || 0} steps`);
+    console.log(`🌐 [DEBUG] Block startUrl: ${block.startUrl}`);
+    console.log(`🆔 [DEBUG] Block projectId: ${block.projectId}`);
+    console.log(`🆔 [DEBUG] Slot projectId: ${slot.projectId}`);
     
     // ✅ FIX: Parse prompts by type (same logic as Dashboard.jsx)
     const allPrompts = readyPromptData.prompts || [];
@@ -813,16 +816,24 @@ async function getAutomationBlock(projectId, userId) {
     // ✅ Try to get blocks from Firebase first
     if (userId) {
       const firebaseBlocks = await fetchBlocksFromFirebase(userId);
+      console.log(`🔍 [DEBUG] Found ${firebaseBlocks?.length || 0} blocks in Firebase`);
+      
+      // Debug: Log all blocks
+      firebaseBlocks?.forEach((b, i) => {
+        console.log(`   Block[${i}]: "${b.name}" projectId=${b.projectId} startUrl=${b.startUrl}`);
+      });
+      
       if (firebaseBlocks && firebaseBlocks.length > 0) {
         // Find block assigned to this project
         const projectBlock = firebaseBlocks.find(b => b.projectId === projectId);
         if (projectBlock) {
-          console.log(`📦 Block from Firebase: "${projectBlock.name}"`);
+          console.log(`📦 Block from Firebase (matched projectId): "${projectBlock.name}"`);
           return projectBlock;
         }
         
-        // Use first available block as fallback
-        console.log(`📦 Using first Firebase block: "${firebaseBlocks[0].name}"`);
+        // ⚠️ WARNING: Using fallback block - projectId doesn't match!
+        console.log(`⚠️ No block matched projectId "${projectId}" - using first block as fallback`);
+        console.log(`📦 Fallback block: "${firebaseBlocks[0].name}" (startUrl: ${firebaseBlocks[0].startUrl})`);
         return firebaseBlocks[0];
       }
     }
