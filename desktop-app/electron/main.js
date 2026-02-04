@@ -76,8 +76,13 @@ function createWindow() {
     
     // ✅ FIX: Auto-start scheduler if it was running before update
     setTimeout(() => {
+      console.log('🔍 [DEBUG] Checking auto-start scheduler...');
       const savedState = getSavedSchedulerState();
-      console.log('📋 Saved scheduler state:', savedState);
+      console.log('📋 Saved scheduler state:', JSON.stringify(savedState));
+      console.log(`   - savedState exists: ${!!savedState}`);
+      console.log(`   - savedState.running: ${savedState?.running}`);
+      console.log(`   - savedState.userId: ${savedState?.userId}`);
+      
       if (savedState && savedState.running && savedState.userId) {
         console.log('🔄 Auto-restarting scheduler (was running before update)');
         startScheduler(savedState.userId, []);
@@ -85,6 +90,8 @@ function createWindow() {
         if (mainWindow) {
           mainWindow.webContents.send('scheduler:auto-started', { userId: savedState.userId });
         }
+      } else {
+        console.log('⏸️ Scheduler NOT auto-started - conditions not met');
       }
     }, 3000); // Wait for app to fully initialize
     
