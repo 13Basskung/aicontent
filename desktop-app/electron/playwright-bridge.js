@@ -1048,8 +1048,15 @@ async function runBlock(instanceId, block, variables) {
     // Navigate to start URL if provided
     if (block.startUrl) {
       console.log(`🌐 Navigating to: ${block.startUrl}`);
-      await page.goto(block.startUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      
+      // ✅ FIX: ใช้ JavaScript บังคับ Navigate เพื่อให้แน่ใจว่าไปถูก URL
+      await page.evaluate((url) => {
+        window.location.href = url;
+      }, block.startUrl);
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
+      
+      console.log(`✅ Current URL: ${page.url()}`);
     }
 
     // ตรวจสอบว่ามี Loop หรือไม่
