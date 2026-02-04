@@ -1,6 +1,6 @@
 {
   "name": "content-auto-post-desktop",
-  "version": "1.6.62",
+  "version": "1.6.63",
   "description": "Desktop Agent for Content Auto Post - Automate content creation with Playwright",
   "main": "electron/main.js",
   "author": "Content Auto Post",

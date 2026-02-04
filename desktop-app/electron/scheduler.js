@@ -5,8 +5,10 @@
  */
 
 const https = require('https');
+const Store = require('electron-store');
 
 const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE';
+const store = new Store();
 const FIRESTORE_BASE = 'https://firestore.googleapis.com/v1/projects/content-auto-post/databases/(default)/documents';
 
 // Store active schedules
@@ -514,6 +516,10 @@ function startScheduler(userId, instances) {
     clearInterval(schedulerInterval);
   }
   
+  // ✅ FIX: Save scheduler state to persist across updates
+  store.set('schedulerState', { running: true, userId, timestamp: Date.now() });
+  console.log('💾 Scheduler state saved to electron-store');
+  
   console.log('\n🕐 ========== SCHEDULER STARTED ==========');
   console.log(`👤 User: ${userId}`);
   console.log(`🌍 Timezone: ${userTimezone}`);
@@ -598,6 +604,9 @@ function stopScheduler() {
     schedulerInterval = null;
     console.log('🛑 Scheduler stopped');
   }
+  // ✅ FIX: Clear scheduler state
+  store.set('schedulerState', { running: false, timestamp: Date.now() });
+  console.log('💾 Scheduler state cleared from electron-store');
 }
 
 /**
@@ -605,6 +614,13 @@ function stopScheduler() {
  */
 function isSchedulerRunning() {
   return schedulerInterval !== null;
+}
+
+/**
+ * Get saved scheduler state (for auto-restart after update)
+ */
+function getSavedSchedulerState() {
+  return store.get('schedulerState', { running: false });
 }
 
 /**
@@ -904,6 +920,7 @@ module.exports = {
   startScheduler,
   stopScheduler,
   isSchedulerRunning,
+  getSavedSchedulerState,
   fetchUserSchedule,
   getTodaySchedule,
   checkScheduleNow,

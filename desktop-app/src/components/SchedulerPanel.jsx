@@ -163,6 +163,12 @@ function SchedulerPanel({ keyData, instances }) {
         // Clear status after 10 seconds
         setTimeout(() => setExecutionStatus(null), 10000);
       });
+      
+      // ✅ FIX: Listen for auto-start after update
+      window.electronAPI.scheduler.onAutoStarted?.((data) => {
+        console.log('🔄 Scheduler auto-started after update:', data);
+        setIsRunning(true);
+      });
     }
   }, []);
 
