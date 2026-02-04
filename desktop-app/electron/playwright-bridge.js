@@ -168,14 +168,38 @@ function initPlaywrightBridge(mainWindow) {
         for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
           console.log(`🔄 Loop iteration ${promptIndex + 1}/${prompts.length}`);
           
+          // ดึงข้อมูลจาก Prompt object (รองรับทั้ง object และ string)
+          const currentPrompt = prompts[promptIndex];
+          const isPromptObject = typeof currentPrompt === 'object' && currentPrompt !== null;
+          
           // อัปเดต variables สำหรับ iteration นี้
+          // รองรับ Prompt structure: { index, type, title, duration, action, script, technical, audio }
           const loopVariables = {
             ...variables,
-            prompt: prompts[promptIndex],
+            // === PROMPT VARIABLES (ใช้กับ fill_* actions) ===
+            prompt: isPromptObject 
+              ? `${currentPrompt.action || ''} ${currentPrompt.script || ''}`.trim() 
+              : currentPrompt,
+            action: isPromptObject ? (currentPrompt.action || '') : '',
+            script: isPromptObject ? (currentPrompt.script || '') : '',
+            title: isPromptObject ? (currentPrompt.title || `Scene ${promptIndex + 1}`) : '',
+            duration: isPromptObject ? (currentPrompt.duration || '') : '',
+            audio: isPromptObject ? (currentPrompt.audio || '') : '',
+            technical: isPromptObject ? (currentPrompt.technical || '') : '',
+            // === LOOP VARIABLES ===
             sceneIndex: promptIndex + 1,
             currentPromptIndex: promptIndex,
-            totalPrompts: prompts.length
+            totalPrompts: prompts.length,
+            // === RAW PROMPT (for advanced usage) ===
+            rawPrompt: currentPrompt
           };
+          
+          console.log(`📋 Scene ${promptIndex + 1} Variables:`, {
+            title: loopVariables.title,
+            duration: loopVariables.duration,
+            actionPreview: loopVariables.action?.substring(0, 30) + '...',
+            scriptPreview: loopVariables.script?.substring(0, 30) + '...'
+          });
           
           // Execute steps INSIDE loop (between loop_start and loop_end)
           for (let i = loopStartIndex + 1; i < loopEndIndex; i++) {
@@ -514,6 +538,95 @@ async function executeStep(page, step, variables = {}) {
         // Special action - inject prompt into a specific element
         if (selector && processedValue) {
           await page.fill(selector, processedValue, { timeout: 15000 });
+        }
+        break;
+
+      // ============================================
+      // PROMPT ACTIONS v1.6.50 (ใช้ร่วมกันทุก User)
+      // Variables: {{action}}, {{script}}, {{title}}, {{duration}}, {{audio}}, {{prompt}}, {{masterImage}}, {{socialDescription}}, {{hashtags}}
+      // ============================================
+      
+      case 'fill_prompt':
+        // ใส่ Prompt ทั้งหมด (action + script) - ใช้ {{prompt}} variable
+        // prompt = action + " " + script (combined)
+        if (selector) {
+          const fullPrompt = variables.prompt || variables.action + ' ' + variables.script || '';
+          console.log(`📝 Fill Prompt: "${fullPrompt.substring(0, 50)}..."`);
+          await page.fill(selector, fullPrompt, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_action':
+        // ใส่เฉพาะ Action ของ Scene - ใช้ {{action}} variable
+        if (selector) {
+          const actionText = variables.action || '';
+          console.log(`🎬 Fill Action: "${actionText.substring(0, 50)}..."`);
+          await page.fill(selector, actionText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_script':
+        // ใส่เฉพาะ Script/Narration - ใช้ {{script}} variable
+        if (selector) {
+          const scriptText = variables.script || '';
+          console.log(`📜 Fill Script: "${scriptText.substring(0, 50)}..."`);
+          await page.fill(selector, scriptText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_title':
+        // ใส่ชื่อ Scene - ใช้ {{title}} variable
+        if (selector) {
+          const titleText = variables.title || '';
+          console.log(`📌 Fill Title: "${titleText}"`);
+          await page.fill(selector, titleText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_duration':
+        // ใส่ความยาว Scene - ใช้ {{duration}} variable
+        if (selector) {
+          const durationText = variables.duration || '';
+          console.log(`⏱️ Fill Duration: "${durationText}"`);
+          await page.fill(selector, durationText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_audio':
+        // ใส่คำอธิบายเสียง/เพลง - ใช้ {{audio}} variable
+        if (selector) {
+          const audioText = variables.audio || '';
+          console.log(`🔊 Fill Audio: "${audioText.substring(0, 50)}..."`);
+          await page.fill(selector, audioText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_master_image':
+        // ใส่ Prompt สำหรับภาพหลัก - ใช้ {{masterImage}} variable
+        if (selector) {
+          const masterImagePrompt = variables.masterImage || '';
+          console.log(`🖼️ Fill Master Image: "${masterImagePrompt.substring(0, 50)}..."`);
+          await page.fill(selector, masterImagePrompt, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_social_description':
+        // ใส่คำอธิบายสำหรับโพสต์ - ใช้ {{socialDescription}} variable
+        if (selector) {
+          const descText = variables.socialDescription || '';
+          console.log(`📱 Fill Social Description: "${descText.substring(0, 50)}..."`);
+          await page.fill(selector, descText, { timeout: 15000 });
+        }
+        break;
+
+      case 'fill_hashtags':
+        // ใส่ Hashtags (คั่นด้วย space) - ใช้ {{hashtags}} variable
+        if (selector) {
+          const hashtagsText = Array.isArray(variables.hashtags) 
+            ? variables.hashtags.join(' ') 
+            : (variables.hashtags || '');
+          console.log(`#️⃣ Fill Hashtags: "${hashtagsText}"`);
+          await page.fill(selector, hashtagsText, { timeout: 15000 });
         }
         break;
 

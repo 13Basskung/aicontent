@@ -29,9 +29,20 @@ const ACTION_TYPES = [
   { value: 'wait_for_element_long', label: 'รอให้ปรากฏ (นาน)', icon: '⏳' },
   { value: 'wait_and_click_long', label: 'รอให้ปรากฏแล้วคลิก (นาน)', icon: '⏳👆' },
   { value: 'wait_progress_complete', label: 'รอโหลดเสร็จ (ตรวจซีนต์)', icon: '📊' },
-  { value: 'inject_prompt', label: 'ดึง Prompt', icon: '📝' },
+  // === PROMPT ACTIONS (ใช้ร่วมกันทุก User) ===
+  { value: 'fill_prompt', label: '📝 ใส่ Prompt (Full)', icon: '📝', hint: 'ใส่ Prompt ทั้งหมด (action + script)' },
+  { value: 'fill_action', label: '🎬 ใส่ Action', icon: '🎬', hint: 'ใส่เฉพาะ Action ของ Scene' },
+  { value: 'fill_script', label: '📜 ใส่ Script', icon: '📜', hint: 'ใส่เฉพาะ Script/Narration' },
+  { value: 'fill_title', label: '📌 ใส่ Title', icon: '📌', hint: 'ใส่ชื่อ Scene' },
+  { value: 'fill_duration', label: '⏱️ ใส่ Duration', icon: '⏱️', hint: 'ใส่ความยาว Scene' },
+  { value: 'fill_audio', label: '🔊 ใส่ Audio', icon: '🔊', hint: 'ใส่คำอธิบายเสียง/เพลง' },
+  { value: 'fill_master_image', label: '🖼️ ใส่ Master Image Prompt', icon: '�️', hint: 'ใส่ Prompt สำหรับภาพหลัก' },
+  { value: 'fill_social_description', label: '📱 ใส่ Social Description', icon: '📱', hint: 'ใส่คำอธิบายสำหรับโพสต์' },
+  { value: 'fill_hashtags', label: '#️⃣ ใส่ Hashtags', icon: '#️⃣', hint: 'ใส่ Hashtags (คั่นด้วย space)' },
+  // === LOOP & CONTROL ===
   { value: 'loop_start', label: '🔄 เริ่ม Loop', icon: '🔄' },
   { value: 'loop_end', label: '🏁 จบ Loop', icon: '🏁' },
+  { value: 'inject_prompt', label: 'ดึง Prompt (Legacy)', icon: '📝' },
 ];
 
 // Step action icons
@@ -1026,6 +1037,60 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
                   />
                   <span className="text-white/50 text-sm">ms</span>
                 </div>
+                
+                {/* Count & Validate Scenes */}
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.preActions?.some(a => a.type === 'count_scenes') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.preActions = [...(step.modifiers.preActions || []), { type: 'count_scenes', selector: '[role="listitem"]', order: 1 }];
+                      } else {
+                        step.modifiers.preActions = (step.modifiers.preActions || []).filter(a => a.type !== 'count_scenes');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">📊 นับ Scene ก่อนทำ (Pre)</span>
+                </label>
+                <label className="flex items-center gap-2 p-2 rounded bg-white/5 hover:bg-white/10 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={steps[showModifiersModal]?.modifiers?.postActions?.some(a => a.type === 'validate_scene') || false}
+                    onChange={(e) => {
+                      const newSteps = [...steps];
+                      const step = newSteps[showModifiersModal];
+                      if (!step.modifiers) step.modifiers = { preActions: [], postActions: [] };
+                      if (e.target.checked) {
+                        step.modifiers.postActions = [...(step.modifiers.postActions || []), { type: 'validate_scene', selector: '[role="listitem"]', order: 5 }];
+                      } else {
+                        step.modifiers.postActions = (step.modifiers.postActions || []).filter(a => a.type !== 'validate_scene');
+                      }
+                      setSteps(newSteps);
+                    }}
+                    className="rounded"
+                  />
+                  <span className="text-white/80">✅ ตรวจสอบ Scene เพิ่ม (Post)</span>
+                </label>
+              </div>
+            </div>
+            
+            {/* Variables Help */}
+            <div className="mb-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+              <h4 className="text-cyan-400 font-medium mb-2">📋 Variables ที่ใช้ได้ (Loop Mode)</h4>
+              <div className="text-xs text-white/70 space-y-1">
+                <div><code className="bg-white/10 px-1 rounded">{'{{prompt}}'}</code> - Prompt ทั้งหมด (action + script)</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{action}}'}</code> - Action ของ Scene</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{script}}'}</code> - Script/Narration</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{title}}'}</code> - ชื่อ Scene</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{duration}}'}</code> - ความยาว Scene</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{audio}}'}</code> - คำอธิบายเสียง</div>
+                <div><code className="bg-white/10 px-1 rounded">{'{{sceneIndex}}'}</code> - ลำดับ Scene (1, 2, 3...)</div>
               </div>
             </div>
             
