@@ -9,6 +9,9 @@ const instances = new Map();
 // Store debug selector context (to close before opening new one)
 let debugContext = null;
 
+// Store mainWindow reference for runBlock function
+let storedMainWindow = null;
+
 // Profile directory
 const PROFILES_DIR = path.join(process.cwd(), 'profiles');
 
@@ -22,6 +25,9 @@ if (!fs.existsSync(PROFILES_DIR)) {
  */
 function initPlaywrightBridge(mainWindow) {
   console.log('🎭 Initializing Playwright Bridge...');
+  
+  // ✅ Store mainWindow for runBlock function
+  storedMainWindow = mainWindow;
 
   // ============================================
   // Launch Chrome Instance
@@ -906,8 +912,167 @@ async function closeAllInstances() {
   instances.clear();
 }
 
+/**
+ * ✅ NEW: Run Block directly (for scheduler use)
+ * This is the same logic as IPC handler but callable directly
+ */
+async function runBlock(instanceId, block, variables) {
+  console.log(`▶️ [Direct] Running block "${block.name}" on instance: ${instanceId}`);
+  
+  const instance = instances.get(instanceId);
+  if (!instance) {
+    return { success: false, error: 'Instance not found' };
+  }
+
+  try {
+    const { page } = instance;
+    const mainWindow = storedMainWindow;
+    
+    // Navigate to start URL if provided
+    if (block.startUrl) {
+      console.log(`🌐 Navigating to: ${block.startUrl}`);
+      await page.goto(block.startUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2000);
+    }
+
+    // ตรวจสอบว่ามี Loop หรือไม่
+    const steps = block.steps || [];
+    const hasLoop = steps.some(s => ['loop_start', 'loop_end'].includes(s.action));
+    const prompts = variables.prompts || [];
+    
+    const results = [];
+    
+    if (hasLoop && prompts.length > 0) {
+      console.log(`🔄 Loop mode: ${prompts.length} prompts to process`);
+      
+      const loopStartIndex = steps.findIndex(s => s.action === 'loop_start');
+      const loopEndIndex = steps.findIndex(s => s.action === 'loop_end');
+      
+      // Execute steps BEFORE loop_start (once)
+      for (let i = 0; i < loopStartIndex; i++) {
+        const step = steps[i];
+        console.log(`📍 Pre-loop Step ${i + 1}: ${step.action}`);
+        sendStatusUpdate(mainWindow, instanceId, 'running', {
+          currentStep: i + 1,
+          totalSteps: steps.length,
+          stepAction: step.action
+        });
+        const result = await executeStepWithModifiers(page, step, variables);
+        results.push(result);
+        if (!result.success) {
+          console.error(`❌ Pre-loop Step ${i + 1} failed: ${result.error}`);
+          sendStatusUpdate(mainWindow, instanceId, 'idle');
+          return { success: false, results, error: result.error, currentStep: i + 1, failedStep: step };
+        }
+      }
+      
+      // Execute LOOP steps for each prompt
+      for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+        console.log(`🔄 Loop iteration ${promptIndex + 1}/${prompts.length}`);
+        
+        const currentPrompt = prompts[promptIndex];
+        const isPromptObject = typeof currentPrompt === 'object' && currentPrompt !== null;
+        
+        const loopVariables = {
+          ...variables,
+          prompt: isPromptObject 
+            ? `${currentPrompt.action || ''} ${currentPrompt.script || ''}`.trim() 
+            : currentPrompt,
+          action: isPromptObject ? (currentPrompt.action || '') : '',
+          script: isPromptObject ? (currentPrompt.script || '') : '',
+          title: isPromptObject ? (currentPrompt.title || `Scene ${promptIndex + 1}`) : '',
+          duration: isPromptObject ? (currentPrompt.duration || '') : '',
+          audio: isPromptObject ? (currentPrompt.audio || '') : '',
+          technical: isPromptObject ? (currentPrompt.technical || '') : '',
+          sceneIndex: promptIndex + 1,
+          currentPromptIndex: promptIndex,
+          totalPrompts: prompts.length,
+          rawPrompt: currentPrompt
+        };
+        
+        // Execute steps INSIDE loop
+        for (let i = loopStartIndex + 1; i < loopEndIndex; i++) {
+          const step = steps[i];
+          console.log(`📍 Loop[${promptIndex + 1}] Step ${i + 1}: ${step.action}`);
+          sendStatusUpdate(mainWindow, instanceId, 'running', {
+            currentStep: i + 1,
+            totalSteps: steps.length,
+            stepAction: step.action,
+            loopIteration: promptIndex + 1,
+            totalIterations: prompts.length
+          });
+          
+          const result = await executeStepWithModifiers(page, step, loopVariables);
+          results.push({ ...result, loopIteration: promptIndex + 1 });
+          
+          if (!result.success) {
+            console.error(`❌ Loop[${promptIndex + 1}] Step ${i + 1} failed: ${result.error}`);
+            console.log(`⏭️ Skipping to next prompt...`);
+            break;
+          }
+        }
+        
+        console.log(`✅ Completed prompt ${promptIndex + 1}/${prompts.length}`);
+      }
+      
+      // Execute steps AFTER loop_end (once)
+      for (let i = loopEndIndex + 1; i < steps.length; i++) {
+        const step = steps[i];
+        console.log(`📍 Post-loop Step ${i + 1}: ${step.action}`);
+        sendStatusUpdate(mainWindow, instanceId, 'running', {
+          currentStep: i + 1,
+          totalSteps: steps.length,
+          stepAction: step.action
+        });
+        const result = await executeStepWithModifiers(page, step, variables);
+        results.push(result);
+        if (!result.success) {
+          console.error(`❌ Post-loop Step ${i + 1} failed: ${result.error}`);
+          break;
+        }
+      }
+      
+    } else {
+      // NORMAL MODE: Execute all steps once
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        
+        if (['loop_start', 'loop_end'].includes(step.action)) {
+          results.push({ success: true, action: step.action, skipped: true });
+          continue;
+        }
+        
+        console.log(`📍 Step ${i + 1}/${steps.length}: ${step.action}`);
+        sendStatusUpdate(mainWindow, instanceId, 'running', {
+          currentStep: i + 1,
+          totalSteps: steps.length,
+          stepAction: step.action
+        });
+
+        const result = await executeStepWithModifiers(page, step, variables);
+        results.push(result);
+
+        if (!result.success) {
+          console.error(`❌ Step ${i + 1} failed: ${result.error}`);
+          sendStatusUpdate(mainWindow, instanceId, 'idle');
+          return { success: false, results, error: result.error, currentStep: i + 1, failedStep: step };
+        }
+      }
+    }
+
+    sendStatusUpdate(mainWindow, instanceId, 'idle');
+    return { success: true, results, currentStep: steps.length };
+
+  } catch (error) {
+    console.error(`❌ Block execution failed: ${error.message}`);
+    sendStatusUpdate(storedMainWindow, instanceId, 'error', { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   initPlaywrightBridge,
   closeAllInstances,
-  getInstances: () => instances
+  getInstances: () => instances,
+  runBlock  // ✅ Export for scheduler use
 };
