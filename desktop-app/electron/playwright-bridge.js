@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron');
+const { ipcMain, app } = require('electron');
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -12,12 +12,17 @@ let debugContext = null;
 // Store mainWindow reference for runBlock function
 let storedMainWindow = null;
 
-// Profile directory
-const PROFILES_DIR = path.join(process.cwd(), 'profiles');
+// ✅ FIX: Profile directory in userData (survives app updates!)
+// Windows: C:\Users\<user>\AppData\Roaming\content-auto-post-desktop\profiles
+// macOS: ~/Library/Application Support/content-auto-post-desktop/profiles
+const PROFILES_DIR = path.join(app.getPath('userData'), 'browser-profiles');
+
+console.log(`📁 Browser profiles directory: ${PROFILES_DIR}`);
 
 // Ensure profiles directory exists
 if (!fs.existsSync(PROFILES_DIR)) {
   fs.mkdirSync(PROFILES_DIR, { recursive: true });
+  console.log(`📁 Created profiles directory: ${PROFILES_DIR}`);
 }
 
 /**
