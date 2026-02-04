@@ -24,6 +24,7 @@ function Dashboard({ keyData }) {
   const [projects, setProjects] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [instances, setInstances] = useState([]);
+  const [todaySchedules, setTodaySchedules] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +258,13 @@ function Dashboard({ keyData }) {
       console.log('🔥 EXPANDER CACHE LOADED:', newExpanderCache);
       setProjectSlotsCache(newSlotsCache);
       setExpanderCache(newExpanderCache);
+
+      // Load today's schedules from Scheduler API (ใช้งานได้แน่นอน)
+      if (window.electronAPI?.scheduler?.getToday) {
+        const today = await window.electronAPI.scheduler.getToday(keyData.userId);
+        console.log('📅 Today schedules loaded:', today);
+        setTodaySchedules(today || []);
+      }
 
       // Fetch global blocks + user-specific settings
       const [blocksData, userBlockSettings] = await Promise.all([
@@ -969,12 +977,9 @@ function Dashboard({ keyData }) {
               </div>
               <div className="flex items-center gap-2 mt-3">
                 {(() => {
-                  const slots = projectSlotsCache[project.id] || [];
-                  const today = new Date();
-                  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-                  const todayCode = dayNames[today.getDay()];
-                  const hasTaskToday = slots.some(slot => slot.day === todayCode);
-                  const todaySlots = slots.filter(s => s.day === todayCode);
+                  // ใช้ข้อมูลจาก todaySchedules (จาก Scheduler API)
+                  const todaySlots = todaySchedules.filter(s => s.projectId === project.id);
+                  const hasTaskToday = todaySlots.length > 0;
                   return (
                     <span className="flex items-center gap-1.5 text-xs text-gray-400">
                       <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
