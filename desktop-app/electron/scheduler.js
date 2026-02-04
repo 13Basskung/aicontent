@@ -655,6 +655,8 @@ async function executeScheduledRun(slot, instances, userId) {
     console.log(`   - playwrightBridge exists: ${!!playwrightBridge}`);
     console.log(`   - launchInstance exists: ${!!(playwrightBridge && playwrightBridge.launchInstance)}`);
     console.log(`   - runBlock exists: ${!!(playwrightBridge && playwrightBridge.runBlock)}`);
+    console.log(`   - typeof playwrightBridge: ${typeof playwrightBridge}`);
+    console.log(`   - playwrightBridge keys: ${playwrightBridge ? Object.keys(playwrightBridge).join(', ') : 'N/A'}`);
     
     if (playwrightBridge && playwrightBridge.launchInstance) {
       console.log(`🚀 Calling playwrightBridge.launchInstance("${instanceId}", "${slot.projectId}", "${slot.projectName}")`);
