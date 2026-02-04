@@ -995,18 +995,10 @@ function Dashboard({ keyData }) {
                 )}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                {(() => {
-                  // ใช้ข้อมูลจาก todaySchedules (จาก Scheduler API)
-                  const todaySlots = todaySchedules.filter(s => s.projectId === project.id);
-                  const hasTaskToday = todaySlots.length > 0;
-                  console.log(`🎯 ${project.name}: todaySchedules.length=${todaySchedules.length}, todaySlots=`, todaySlots);
-                  return (
-                    <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <span className={`w-2 h-2 rounded-full ${hasTaskToday ? 'bg-green-500' : 'bg-gray-500'}`}></span>
-                      {hasTaskToday ? `มีงานวันนี้ (${todaySlots.length} slots)` : 'ไม่มีงานวันนี้'}
-                    </span>
-                  );
-                })()}
+                <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span className={`w-2 h-2 rounded-full ${project.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></span>
+                  {project.status === 'active' ? 'มีงานวันนี้' : 'ไม่มีงานวันนี้'}
+                </span>
               </div>
             </button>
           ))}
