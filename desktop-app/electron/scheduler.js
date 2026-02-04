@@ -659,7 +659,7 @@ async function executeScheduledRun(slot, instances, userId) {
         return { success: false, error: launchResult.error };
       }
       
-      instanceId = launchResult.instanceId;
+      // instanceId is already set correctly, no need to reassign
       // Wait for Chrome to be ready
       await new Promise(r => setTimeout(r, 3000));
     } else {
@@ -740,12 +740,24 @@ async function executeScheduledRun(slot, instances, userId) {
     });
     
     console.log(`▶️ Running block "${block.name}" for ${slot.projectName}`);
+    console.log(`🌐 [DEBUG] About to call runBlock with:`);
+    console.log(`   - instanceId: ${instanceId}`);
+    console.log(`   - block.name: ${block.name}`);
+    console.log(`   - block.startUrl: ${block.startUrl}`);
+    console.log(`   - block.steps.length: ${block.steps?.length || 0}`);
+    
+    // ⚠️ Warn if no startUrl
+    if (!block.startUrl) {
+      console.warn(`⚠️ WARNING: Block "${block.name}" has NO startUrl! Browser will stay on about:blank`);
+    }
     
     const startTime = new Date();
     
     // Execute the block
     if (playwrightBridge) {
+      console.log(`🚀 Calling playwrightBridge.runBlock...`);
       const result = await playwrightBridge.runBlock(instanceId, block, variables);
+      console.log(`📋 runBlock result:`, JSON.stringify(result).substring(0, 500));
       const endTime = new Date();
       const duration = endTime - startTime;
       
