@@ -639,9 +639,15 @@ async function executeScheduledRun(slot, instances, userId) {
     }
     
     // ✅ FIX: Use playwrightBridge.launchInstance to ensure Chrome is running
+    console.log(`\n🔍 [DEBUG] Checking playwrightBridge...`);
+    console.log(`   - playwrightBridge exists: ${!!playwrightBridge}`);
+    console.log(`   - launchInstance exists: ${!!(playwrightBridge && playwrightBridge.launchInstance)}`);
+    console.log(`   - runBlock exists: ${!!(playwrightBridge && playwrightBridge.runBlock)}`);
+    
     if (playwrightBridge && playwrightBridge.launchInstance) {
-      console.log(`🚀 Launching/checking Chrome instance: ${instanceId}`);
+      console.log(`🚀 Calling playwrightBridge.launchInstance("${instanceId}", "${slot.projectId}", "${slot.projectName}")`);
       const launchResult = await playwrightBridge.launchInstance(instanceId, slot.projectId, slot.projectName);
+      console.log(`📋 launchResult:`, JSON.stringify(launchResult));
       
       if (!launchResult.success) {
         console.error(`❌ Failed to launch instance: ${launchResult.error}`);

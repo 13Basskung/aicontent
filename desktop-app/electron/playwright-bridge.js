@@ -917,12 +917,16 @@ async function closeAllInstances() {
  * Same logic as IPC handler but callable directly
  */
 async function launchInstance(instanceId, projectId, projectName) {
-  console.log(`🚀 [Direct] Launching Chrome instance: ${instanceId}`);
+  console.log(`\n🚀 ========== [Direct] LAUNCHING CHROME ==========`);
+  console.log(`📋 instanceId: ${instanceId}`);
+  console.log(`📋 projectId: ${projectId}`);
+  console.log(`📋 projectName: ${projectName}`);
+  console.log(`📊 Current instances in Map: ${instances.size}`);
   
   try {
     // Check if instance already exists
     if (instances.has(instanceId)) {
-      console.log(`✅ Instance ${instanceId} already running`);
+      console.log(`✅ Instance ${instanceId} already running - reusing`);
       return { success: true, instanceId };
     }
     
@@ -992,8 +996,16 @@ async function launchInstance(instanceId, projectId, projectName) {
 async function runBlock(instanceId, block, variables) {
   console.log(`▶️ [Direct] Running block "${block.name}" on instance: ${instanceId}`);
   
+  // ✅ DEBUG: Log all available instances
+  console.log(`📊 [DEBUG] Available instances in Map: ${instances.size}`);
+  for (const [id, inst] of instances) {
+    console.log(`   - ${id}: ${inst.projectName} (status: ${inst.status})`);
+  }
+  
   const instance = instances.get(instanceId);
   if (!instance) {
+    console.error(`❌ [DEBUG] Instance "${instanceId}" NOT FOUND in Map!`);
+    console.error(`❌ [DEBUG] Available keys: [${Array.from(instances.keys()).join(', ')}]`);
     return { success: false, error: 'Instance not found' };
   }
 
