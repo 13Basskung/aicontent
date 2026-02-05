@@ -63,7 +63,8 @@ function initPlaywrightBridge(mainWindow) {
       // Launch persistent context (keeps login state)
       const browser = await chromium.launchPersistentContext(profilePath, {
         headless: false,  // Must be visible for Google Vids
-        viewport: null,  // ใช้ขนาดจอจริง
+        viewport: null,  // ใช้ขนาดจอจริง (ต้องใช้กับ deviceScaleFactor: undefined)
+        deviceScaleFactor: undefined,  // ⚠️ REQUIRED: ต้อง undefined เมื่อ viewport: null
         args: [
           '--start-maximized',  // เปิดเต็มจอ
           '--disable-blink-features=AutomationControlled',
@@ -78,15 +79,6 @@ function initPlaywrightBridge(mainWindow) {
       let page = browser.pages()[0];
       if (!page) {
         page = await browser.newPage();
-      }
-      
-      // ✅ FIX: บังคับให้ window ขยายเต็มจอ
-      try {
-        const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-        await page.setViewportSize({ width, height });
-        console.log(`🖥️ Set viewport to full screen: ${width}x${height}`);
-      } catch (e) {
-        console.warn(`⚠️ Could not set viewport: ${e.message}`);
       }
       
       // ✅ FIX: ใช้ JavaScript บังคับ Navigate ไป about:blank
@@ -999,7 +991,8 @@ async function launchInstance(instanceId, projectId, projectName) {
     // Launch persistent context (keeps login state)
     const browser = await chromium.launchPersistentContext(profilePath, {
       headless: false,
-      viewport: null,  // ใช้ขนาดจอจริง
+      viewport: null,  // ใช้ขนาดจอจริง (ต้องใช้กับ deviceScaleFactor: undefined)
+      deviceScaleFactor: undefined,  // ⚠️ REQUIRED: ต้อง undefined เมื่อ viewport: null
       args: [
         '--start-maximized',  // เปิดเต็มจอ
         '--disable-blink-features=AutomationControlled',
@@ -1014,15 +1007,6 @@ async function launchInstance(instanceId, projectId, projectName) {
     let page = browser.pages()[0];
     if (!page) {
       page = await browser.newPage();
-    }
-    
-    // ✅ FIX: บังคับให้ window ขยายเต็มจอ
-    try {
-      const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-      await page.setViewportSize({ width, height });
-      console.log(`🖥️ Set viewport to full screen: ${width}x${height}`);
-    } catch (e) {
-      console.warn(`⚠️ Could not set viewport: ${e.message}`);
     }
     
     // ✅ FIX: Clear old URL from restored session
