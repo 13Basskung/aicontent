@@ -118,12 +118,12 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
     }
   }));
   
-  // Notify parent when instance changes
+  // Notify parent when test profile changes (removed instance dependency)
   useEffect(() => {
     if (onInstanceSelect) {
-      onInstanceSelect(selectedInstance);
+      onInstanceSelect(null);  // No longer using instance selection
     }
-  }, [selectedInstance, onInstanceSelect]);
+  }, [onInstanceSelect]);
   
   // Load block for editing when blockToEdit changes
   useEffect(() => {
