@@ -709,9 +709,33 @@ async function executeStep(page, step, variables = {}) {
       case 'click_text':
         // คลิกจากข้อความ - ไม่ต้องหา selector!
         // value = ข้อความที่เห็นบนปุ่ม เช่น "Text to Video"
-        const textToClick = processedValue;
+        const textToClick = processedValue?.trim();
+        if (!textToClick) {
+          throw new Error('click_text: กรุณาระบุข้อความที่ต้องการคลิก');
+        }
         console.log(`🔍 หาและคลิกข้อความ: "${textToClick}"`);
-        await page.getByText(textToClick, { exact: false }).click({ timeout: 15000 });
+        
+        // ลองหา element ที่มีข้อความตรงกันก่อน (exact match)
+        let textElement = page.getByText(textToClick, { exact: true });
+        let count = await textElement.count();
+        
+        // ถ้าไม่เจอ exact match ให้ลองหาแบบ partial match
+        if (count === 0) {
+          console.log(`⚠️ ไม่พบข้อความตรงทั้งหมด ลองหาแบบ partial...`);
+          textElement = page.getByText(textToClick, { exact: false });
+          count = await textElement.count();
+        }
+        
+        if (count === 0) {
+          throw new Error(`click_text: ไม่พบข้อความ "${textToClick}" บนหน้าเว็บ`);
+        }
+        
+        if (count > 1) {
+          console.log(`⚠️ พบข้อความ "${textToClick}" ${count} จุด - คลิกอันแรก`);
+        }
+        
+        await textElement.first().click({ timeout: 15000 });
+        console.log(`✅ คลิกข้อความ "${textToClick}" สำเร็จ`);
         break;
 
       case 'wait_for_element_long':
