@@ -74,7 +74,7 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
   const [isRecording, setIsRecording] = useState(false);
   const [steps, setSteps] = useState([]);
   const [startUrl, setStartUrl] = useState('https://www.google.com');
-  const [selectedInstance, setSelectedInstance] = useState(null);
+  const [testProfileName, setTestProfileName] = useState('default');
   
   // State for Debug Selector shoot
   const [shootedOptionSelector, setShootedOptionSelector] = useState(null);
@@ -254,13 +254,8 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
   }, []);
 
   async function handleStartRecording() {
-    if (!selectedInstance) {
-      alert('กรุณาเลือก Instance ก่อน');
-      return;
-    }
-    
-    const profilePath = `./profiles/${selectedInstance.id}`;
-    const result = await window.electronAPI?.recorder.start(profilePath, startUrl);
+    // ✅ FIX: ใช้ Test Profile แยกจาก Instance
+    const result = await window.electronAPI?.recorder.start(testProfileName, startUrl);
     
     if (result?.success) {
       setIsRecording(true);
@@ -475,19 +470,15 @@ const RecorderPanel = forwardRef(function RecorderPanel({ keyData, instances, on
         {!isRecording && (
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-white/70 text-sm mb-1">เลือก Instance เพื่อทดสอบ</label>
-              <select
-                value={selectedInstance?.id || ''}
-                onChange={(e) => setSelectedInstance(instances.find(i => i.id === e.target.value))}
+              <label className="block text-white/70 text-sm mb-1">Test Profile (แยกจาก Instance)</label>
+              <input
+                type="text"
+                value={testProfileName}
+                onChange={(e) => setTestProfileName(e.target.value)}
+                placeholder="ชื่อ Profile สำหรับทดสอบ"
                 className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="">-- เลือก Instance --</option>
-                {instances.map(inst => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.customName || inst.projectName}
-                  </option>
-                ))}
-              </select>
+              />
+              <p className="text-white/40 text-xs mt-1">💡 Profile นี้บันทึก Login แยกจาก Instance จริง</p>
             </div>
             <div>
               <label className="block text-white/70 text-sm mb-1">URL เริ่มต้น</label>

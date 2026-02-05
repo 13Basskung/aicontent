@@ -4,8 +4,26 @@
  */
 
 const { chromium } = require('playwright');
+const { app } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
 let recorderContext = null;
+
+// ✅ FIX: Recorder ใช้ profile แยกจาก Instance (Test Profile)
+let RECORDER_PROFILES_DIR = null;
+
+function getRecorderProfilesDir() {
+  if (!RECORDER_PROFILES_DIR) {
+    RECORDER_PROFILES_DIR = path.join(app.getPath('userData'), 'recorder-profiles');
+    console.log(`📁 Recorder profiles directory: ${RECORDER_PROFILES_DIR}`);
+    
+    if (!fs.existsSync(RECORDER_PROFILES_DIR)) {
+      fs.mkdirSync(RECORDER_PROFILES_DIR, { recursive: true });
+    }
+  }
+  return RECORDER_PROFILES_DIR;
+}
 let recorderPage = null;
 let recordedSteps = [];
 let isRecording = false;
@@ -22,7 +40,7 @@ function initRecorder(win) {
 /**
  * Start recording session
  */
-async function startRecording(profilePath, startUrl = 'https://www.google.com') {
+async function startRecording(profileName, startUrl = 'https://www.google.com') {
   try {
     if (isRecording) {
       throw new Error('Recording already in progress');
@@ -31,14 +49,29 @@ async function startRecording(profilePath, startUrl = 'https://www.google.com') 
     recordedSteps = [];
     isRecording = true;
     
-    // Launch browser with persistent context
+    // ✅ FIX: ใช้ Test Profile แยกจาก Instance
+    const profilePath = path.join(getRecorderProfilesDir(), profileName || 'default');
+    console.log(`🎬 Recorder using profile: ${profilePath}`);
+    
+    // Ensure profile directory exists
+    if (!fs.existsSync(profilePath)) {
+      fs.mkdirSync(profilePath, { recursive: true });
+    }
+    
+    // ✅ FIX: Launch browser with fullscreen viewport
     recorderContext = await chromium.launchPersistentContext(profilePath, {
       headless: false,
-      viewport: { width: 1280, height: 800 },
+      viewport: null,  // ใช้ขนาดจอจริง
+      deviceScaleFactor: undefined,  // ⚠️ REQUIRED: ต้อง undefined เมื่อ viewport: null
       args: [
+        '--start-maximized',  // เปิดเต็มจอ
         '--disable-blink-features=AutomationControlled',
+        '--disable-infobars',
+        '--no-first-run',
+        '--no-default-browser-check',
         '--no-sandbox'
-      ]
+      ],
+      ignoreDefaultArgs: ['--enable-automation']
     });
     
     recorderPage = recorderContext.pages()[0] || await recorderContext.newPage();
