@@ -81,23 +81,38 @@ function initPlaywrightBridge(mainWindow) {
         page = await browser.newPage();
       }
       
-      // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window
+      // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window + ตั้ง viewport
       try {
         const cdpSession = await browser.newCDPSession(page);
         const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
+        
+        // ดึงขนาดหน้าจอจาก Electron
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+        
+        // ตั้ง window bounds ให้เต็มจอ (ไม่ใช้ maximized state)
         await cdpSession.send('Browser.setWindowBounds', {
           windowId,
-          bounds: { windowState: 'maximized' }
+          bounds: { 
+            left: 0, 
+            top: 0, 
+            width: screenW, 
+            height: screenH,
+            windowState: 'normal'
+          }
         });
-        console.log(`🖥️ Browser window maximized via CDP`);
+        console.log(`🖥️ Browser window set to ${screenW}x${screenH}`);
         
-        // รอให้ window maximize เสร็จ แล้วตั้ง viewport ตามขนาดจอจริง
-        await new Promise(r => setTimeout(r, 500));
-        const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-        await page.setViewportSize({ width: width - 16, height: height - 100 });
-        console.log(`📐 Viewport set to ${width - 16}x${height - 100}`);
+        // รอให้ window resize เสร็จ
+        await new Promise(r => setTimeout(r, 300));
+        
+        // ดึงขนาด viewport จริงจาก browser
+        const actualSize = await page.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight
+        }));
+        console.log(`📐 Actual viewport: ${actualSize.width}x${actualSize.height}`);
       } catch (e) {
-        console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
+        console.warn(`⚠️ Could not set window bounds: ${e.message}`);
       }
       
       // ✅ FIX: ใช้ JavaScript บังคับ Navigate ไป about:blank
@@ -1028,23 +1043,38 @@ async function launchInstance(instanceId, projectId, projectName) {
       page = await browser.newPage();
     }
     
-    // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window
+    // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window + ตั้ง viewport
     try {
       const cdpSession = await browser.newCDPSession(page);
       const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
+      
+      // ดึงขนาดหน้าจอจาก Electron
+      const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+      
+      // ตั้ง window bounds ให้เต็มจอ (ไม่ใช้ maximized state)
       await cdpSession.send('Browser.setWindowBounds', {
         windowId,
-        bounds: { windowState: 'maximized' }
+        bounds: { 
+          left: 0, 
+          top: 0, 
+          width: screenW, 
+          height: screenH,
+          windowState: 'normal'
+        }
       });
-      console.log(`🖥️ Browser window maximized via CDP`);
+      console.log(`🖥️ Browser window set to ${screenW}x${screenH}`);
       
-      // รอให้ window maximize เสร็จ แล้วตั้ง viewport ตามขนาดจอจริง
-      await new Promise(r => setTimeout(r, 500));
-      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-      await page.setViewportSize({ width: width - 16, height: height - 100 });
-      console.log(`📐 Viewport set to ${width - 16}x${height - 100}`);
+      // รอให้ window resize เสร็จ
+      await new Promise(r => setTimeout(r, 300));
+      
+      // ดึงขนาด viewport จริงจาก browser
+      const actualSize = await page.evaluate(() => ({
+        width: window.innerWidth,
+        height: window.innerHeight
+      }));
+      console.log(`📐 Actual viewport: ${actualSize.width}x${actualSize.height}`);
     } catch (e) {
-      console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
+      console.warn(`⚠️ Could not set window bounds: ${e.message}`);
     }
     
     // ✅ FIX: Clear old URL from restored session
