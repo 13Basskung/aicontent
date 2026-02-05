@@ -717,21 +717,21 @@ async function executeStep(page, step, variables = {}) {
         
         // ลองหา element ที่มีข้อความตรงกันก่อน (exact match)
         let textElement = page.getByText(textToClick, { exact: true });
-        let count = await textElement.count();
+        let textCount = await textElement.count();
         
         // ถ้าไม่เจอ exact match ให้ลองหาแบบ partial match
-        if (count === 0) {
+        if (textCount === 0) {
           console.log(`⚠️ ไม่พบข้อความตรงทั้งหมด ลองหาแบบ partial...`);
           textElement = page.getByText(textToClick, { exact: false });
-          count = await textElement.count();
+          textCount = await textElement.count();
         }
         
-        if (count === 0) {
+        if (textCount === 0) {
           throw new Error(`click_text: ไม่พบข้อความ "${textToClick}" บนหน้าเว็บ`);
         }
         
-        if (count > 1) {
-          console.log(`⚠️ พบข้อความ "${textToClick}" ${count} จุด - คลิกอันแรก`);
+        if (textCount > 1) {
+          console.log(`⚠️ พบข้อความ "${textToClick}" ${textCount} จุด - คลิกอันแรก`);
         }
         
         await textElement.first().click({ timeout: 15000 });
