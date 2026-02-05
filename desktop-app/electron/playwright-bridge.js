@@ -714,28 +714,22 @@ async function executeStep(page, step, variables = {}) {
         if (!textToClick) {
           throw new Error('click_text: กรุณาระบุข้อความที่ต้องการคลิก');
         }
-        console.log(`🔍 หาและคลิกข้อความ: "${textToClick}"`);
+        console.log(`🔍 หาและคลิกข้อความ (exact match): "${textToClick}"`);
         
-        // ลองหา element ที่มีข้อความตรงกันก่อน (exact match)
-        let textElement = page.getByText(textToClick, { exact: true });
-        let textCount = await textElement.count();
-        
-        // ถ้าไม่เจอ exact match ให้ลองหาแบบ partial match
-        if (textCount === 0) {
-          console.log(`⚠️ ไม่พบข้อความตรงทั้งหมด ลองหาแบบ partial...`);
-          textElement = page.getByText(textToClick, { exact: false });
-          textCount = await textElement.count();
-        }
+        // ใช้ exact match 100% เท่านั้น - ไม่ใช้ partial match
+        const textElement = page.getByText(textToClick, { exact: true });
+        const textCount = await textElement.count();
         
         if (textCount === 0) {
-          throw new Error(`click_text: ไม่พบข้อความ "${textToClick}" บนหน้าเว็บ`);
+          throw new Error(`click_text: ไม่พบข้อความ "${textToClick}" บนหน้าเว็บ (exact match)`);
         }
         
         if (textCount > 1) {
           console.log(`⚠️ พบข้อความ "${textToClick}" ${textCount} จุด - คลิกอันแรก`);
         }
         
-        await textElement.first().click({ timeout: 15000 });
+        // ใช้ force: true เพื่อบังคับคลิกแม้มี element บัง
+        await textElement.first().click({ timeout: 15000, force: true });
         console.log(`✅ คลิกข้อความ "${textToClick}" สำเร็จ`);
         break;
 
