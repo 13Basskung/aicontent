@@ -32,6 +32,7 @@ const ACTION_TYPES = [
   // === CLICK VARIANTS ===
   { value: 'click_dropdown', label: 'คลิกเปิดเมนู', icon: '📋', hint: 'คลิกเปิด Dropdown Menu แล้วรอให้เมนูเปิด 0.5 วินาที' },
   { value: 'click_text', label: 'คลิกจากข้อความ', icon: '🔤', hint: 'คลิกจากข้อความที่เห็นบนปุ่ม ไม่ต้องหา Selector เช่น "Generate" หรือ "Export"' },
+  { value: 'hover', label: 'ชี้เมาส์ (Hover)', icon: '🖱️', hint: 'เลื่อนเมาส์ไปชี้ที่ Element เพื่อให้ปุ่มที่ซ่อนอยู่ปรากฏ แล้วค่อยคลิกด้วย click_text' },
   // === PROMPT ACTIONS (ใช้ร่วมกันทุก User - ดึงค่าจาก Prompt อัตโนมัติ) ===
   { value: 'fill_prompt', label: '📝 ใส่ Prompt (Full)', icon: '📝', hint: '🔄 ใส่ Prompt ทั้งหมด (action + script รวมกัน) ลงในช่อง Input\n📋 ใช้ใน Loop เพื่อวน Prompt ทุกอัน\n⚡ ไม่ต้องพิมพ์เอง ดึงจาก readyPrompts อัตโนมัติ' },
   { value: 'fill_action', label: '🎬 ใส่ Action', icon: '🎬', hint: '🔄 ใส่เฉพาะ Action (การกระทำ) ของ Scene\n📝 เช่น "คนเดินบนชายหาด ท้องฟ้าสีส้ม"\n⚡ ใช้เมื่อเว็บแยกช่อง Action กับ Script' },
@@ -60,6 +61,7 @@ const ACTION_ICONS = {
   wait_for_element_and_click: Eye,
   click_dropdown: ChevronDown,
   click_text: Type,
+  hover: MousePointer,
   wait_for_element_long: Clock,
   wait_and_click_long: Clock,
   wait_progress_complete: RefreshCw,
