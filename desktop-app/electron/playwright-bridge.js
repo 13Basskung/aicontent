@@ -63,8 +63,9 @@ function initPlaywrightBridge(mainWindow) {
       // Launch persistent context (keeps login state)
       const browser = await chromium.launchPersistentContext(profilePath, {
         headless: false,  // Must be visible for Google Vids
-        viewport: { width: 1280, height: 720 },
+        viewport: null,  // ใช้ขนาดจอจริง
         args: [
+          '--start-maximized',  // เปิดเต็มจอ
           '--disable-blink-features=AutomationControlled',
           '--disable-infobars',
           '--no-first-run',
@@ -995,8 +996,9 @@ async function launchInstance(instanceId, projectId, projectName) {
     // Launch persistent context (keeps login state)
     const browser = await chromium.launchPersistentContext(profilePath, {
       headless: false,
-      viewport: { width: 1280, height: 720 },
+      viewport: null,  // ใช้ขนาดจอจริง
       args: [
+        '--start-maximized',  // เปิดเต็มจอ
         '--disable-blink-features=AutomationControlled',
         '--disable-infobars',
         '--no-first-run',
