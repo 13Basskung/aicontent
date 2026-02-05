@@ -80,6 +80,15 @@ function initPlaywrightBridge(mainWindow) {
         page = await browser.newPage();
       }
       
+      // ✅ FIX: บังคับให้ window ขยายเต็มจอ
+      try {
+        const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+        await page.setViewportSize({ width, height });
+        console.log(`🖥️ Set viewport to full screen: ${width}x${height}`);
+      } catch (e) {
+        console.warn(`⚠️ Could not set viewport: ${e.message}`);
+      }
+      
       // ✅ FIX: ใช้ JavaScript บังคับ Navigate ไป about:blank
       try {
         await page.evaluate(() => {
@@ -1005,6 +1014,15 @@ async function launchInstance(instanceId, projectId, projectName) {
     let page = browser.pages()[0];
     if (!page) {
       page = await browser.newPage();
+    }
+    
+    // ✅ FIX: บังคับให้ window ขยายเต็มจอ
+    try {
+      const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+      await page.setViewportSize({ width, height });
+      console.log(`🖥️ Set viewport to full screen: ${width}x${height}`);
+    } catch (e) {
+      console.warn(`⚠️ Could not set viewport: ${e.message}`);
     }
     
     // ✅ FIX: Clear old URL from restored session
