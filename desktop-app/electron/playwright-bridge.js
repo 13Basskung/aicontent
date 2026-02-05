@@ -1,4 +1,4 @@
-const { ipcMain, app } = require('electron');
+const { ipcMain, app, screen } = require('electron');
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -90,6 +90,12 @@ function initPlaywrightBridge(mainWindow) {
           bounds: { windowState: 'maximized' }
         });
         console.log(`🖥️ Browser window maximized via CDP`);
+        
+        // รอให้ window maximize เสร็จ แล้วตั้ง viewport ตามขนาดจอจริง
+        await new Promise(r => setTimeout(r, 500));
+        const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+        await page.setViewportSize({ width: width - 16, height: height - 100 });
+        console.log(`📐 Viewport set to ${width - 16}x${height - 100}`);
       } catch (e) {
         console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
       }
@@ -1031,6 +1037,12 @@ async function launchInstance(instanceId, projectId, projectName) {
         bounds: { windowState: 'maximized' }
       });
       console.log(`🖥️ Browser window maximized via CDP`);
+      
+      // รอให้ window maximize เสร็จ แล้วตั้ง viewport ตามขนาดจอจริง
+      await new Promise(r => setTimeout(r, 500));
+      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+      await page.setViewportSize({ width: width - 16, height: height - 100 });
+      console.log(`📐 Viewport set to ${width - 16}x${height - 100}`);
     } catch (e) {
       console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
     }
