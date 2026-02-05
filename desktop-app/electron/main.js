@@ -56,6 +56,7 @@ function createWindow() {
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    mainWindow.maximize(); // ⚠️ FIX: บังคับให้ Agent UI เต็มจอ
     
     // ✅ Register F12 shortcut to open DevTools (works in production too)
     globalShortcut.register('F12', () => {

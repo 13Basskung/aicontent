@@ -81,6 +81,19 @@ function initPlaywrightBridge(mainWindow) {
         page = await browser.newPage();
       }
       
+      // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window
+      try {
+        const cdpSession = await browser.newCDPSession(page);
+        const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
+        await cdpSession.send('Browser.setWindowBounds', {
+          windowId,
+          bounds: { windowState: 'maximized' }
+        });
+        console.log(`🖥️ Browser window maximized via CDP`);
+      } catch (e) {
+        console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
+      }
+      
       // ✅ FIX: ใช้ JavaScript บังคับ Navigate ไป about:blank
       try {
         await page.evaluate(() => {
@@ -1007,6 +1020,19 @@ async function launchInstance(instanceId, projectId, projectName) {
     let page = browser.pages()[0];
     if (!page) {
       page = await browser.newPage();
+    }
+    
+    // ✅ FIX: ใช้ CDP Session เพื่อ maximize browser window
+    try {
+      const cdpSession = await browser.newCDPSession(page);
+      const { windowId } = await cdpSession.send('Browser.getWindowForTarget');
+      await cdpSession.send('Browser.setWindowBounds', {
+        windowId,
+        bounds: { windowState: 'maximized' }
+      });
+      console.log(`🖥️ Browser window maximized via CDP`);
+    } catch (e) {
+      console.warn(`⚠️ Could not maximize via CDP: ${e.message}`);
     }
     
     // ✅ FIX: Clear old URL from restored session
