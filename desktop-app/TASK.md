@@ -1306,22 +1306,60 @@ npm run electron:publish
 
 ---
 
-## Phase 1: แก้ `saveBlockToFirestore` ที่จะ crash ⬜
+## Phase 1: แก้ Block System ทั้งหมด ⬜ (รวม Phase 1+1.5 เดิม)
 
-**ไฟล์:** `electron/scheduler.js` บรรทัด 916-925
-**ปัญหา:** ใช้ `db.collection()` แต่ไม่มีตัวแปร `db`
-**ผลกระทบ:** Dashboard "Shoot to Block" จะ crash
+> **สถาปัตยกรรมใหม่:** `global_recipe_blocks` เป็น **Single Source of Truth**
+> ทุก component (Recorder, Dashboard, Scheduler, Shoot to Block) อ่าน/เขียนที่เดียวกัน
+> `users/{userId}/blocks` ไม่ใช้อีกต่อไป (เก็บ Firestore Rule ไว้เพื่อ backward compat)
 
-### Checklist
+**ปัญหาที่แก้ทั้งหมด:**
+- 🔴 **Crash:** `saveBlockToFirestore` ใช้ `db.collection()` ที่ไม่มี (scheduler.js:916)
+- 🔴 **BUG-B:** Scheduler อ่าน block จาก path ผิด (`users/{userId}/blocks` ≠ `global_recipe_blocks`)
+- � **BUG-A:** Modifiers หายตอน save block (RecorderPanel.jsx:351)
+- 🟡 **BUG-F:** Shoot to Block ไม่มี projectId (Dashboard.jsx:939)
+- 🔴 **BUG-C:** Firestore Rules block `users/{userId}/blocks` (เพิ่ม rule เพื่อ backward compat)
+- 🔵 **ISSUE-H:** label/emoji หายตอน save (RecorderPanel.jsx:351)
 
-- [ ] **1.1** อ่านโค้ดฟังก์ชัน `saveBlockToFirestore` ใน scheduler.js
-- [ ] **1.2** อ่าน IPC handler `store:save-block-firestore` ใน main.js (บรรทัด 211-220)
-- [ ] **1.3** อ่าน preload.js ตรงจุด `saveBlockToFirestore` (บรรทัด 10)
-- [ ] **1.4** อ่าน Dashboard.jsx ตรงที่เรียก (บรรทัด 954)
-- [ ] **1.5** เขียนฟังก์ชันใหม่โดยใช้ REST API (เหมือน `saveExecutionLogFromScheduler`)
-- [ ] **1.6** ทดสอบ: เปิด Debug Selector → Shoot to Block → ต้องไม่ crash
-- [ ] **1.7** Build + Publish version ใหม่
-- [ ] **1.8** อัพเดท บันทึกปัญหา.md
+### Part A: แก้ Scheduler อ่าน Block จาก path ที่ถูกต้อง (BUG-B)
+
+- [ ] **1.1** อ่าน `scheduler.js` `fetchBlocksFromFirebase` (บรรทัด 167-190) — ปัจจุบันอ่านจาก `users/{userId}/blocks`
+- [ ] **1.2** อ่าน `firebase.js` `fetchBlocks` (บรรทัด 118-137) — อ่านจาก `global_recipe_blocks` ✅
+- [ ] **1.3** แก้ `fetchBlocksFromFirebase` URL เป็น `global_recipe_blocks` (ไม่ต้องใช้ userId อีก)
+- [ ] **1.4** อ่าน `scheduler.js` `getAutomationBlock` (บรรทัด 848-898) — ดู fallback chain
+- [ ] **1.5** แก้ `getAutomationBlock` ให้ match block ด้วย `instanceSettings.selectedBlockId` หรือ `block.name` แทน `projectId`
+
+### Part B: แก้ Shoot to Block ให้ใช้ `global_recipe_blocks` (Crash fix + BUG-F)
+
+- [ ] **1.6** อ่าน `Dashboard.jsx` onShootToBlock (บรรทัด 939-966) — ปัจจุบันเรียก `saveBlockToFirestore` ผ่าน IPC
+- [ ] **1.7** เปลี่ยน Shoot to Block ให้ใช้ `updateBlock()` จาก `firebase.js` โดยตรง (ไม่ต้องผ่าน IPC อีก)
+  ```javascript
+  // เดิม (ผ่าน IPC → scheduler.js → crash):
+  await window.electronAPI.store.saveBlockToFirestore(userId, blockId, updatedBlock);
+  // ใหม่ (เรียก firebase.js ตรงๆ → เขียนไป global_recipe_blocks):
+  await updateBlock(blockId, { steps: updatedSteps });
+  ```
+- [ ] **1.8** เพิ่ม `projectId` จาก instance ใน step data เมื่อ Shoot to Block (BUG-F)
+- [ ] **1.9** (Optional) Mark `saveBlockToFirestore` ใน scheduler.js เป็น deprecated
+
+### Part C: แก้ Recorder save ให้ครบทุก field (BUG-A + ISSUE-H)
+
+- [ ] **1.10** อ่าน `RecorderPanel.jsx` `handleSaveBlock` (บรรทัด 351-364)
+- [ ] **1.11** เพิ่ม `modifiers: s.modifiers || undefined` ในการ save steps (BUG-A)
+- [ ] **1.12** เพิ่ม `label: s.label || undefined, emoji: s.emoji || undefined` (ISSUE-H)
+
+### Part D: Firestore Rules (BUG-C — backward compat)
+
+- [ ] **1.13** เพิ่ม Firestore Rule สำหรับ `users/{userId}/blocks/{blockId}` (allow: true)
+- [ ] **1.14** Deploy Firestore Rules: `firebase deploy --only firestore:rules`
+
+### Part E: ทดสอบ
+
+- [ ] **1.15** ทดสอบ: Recorder → ตั้ง Options (retry/wait_progress) → Save → Load → Options ต้องยังอยู่
+- [ ] **1.16** ทดสอบ: Debug Selector → Shoot to Block → ต้องไม่ crash + step เพิ่มใน block
+- [ ] **1.17** ทดสอบ: Dashboard → โหลด blocks จาก `global_recipe_blocks` → ต้องเห็น blocks ทั้งหมด
+- [ ] **1.18** ทดสอบ: Scheduler auto-run → ต้องหา Block เจอจาก `global_recipe_blocks`
+- [ ] **1.19** Build + Publish version ใหม่
+- [ ] **1.20** อัพเดท บันทึกปัญหา.md
 
 ---
 
@@ -1358,9 +1396,15 @@ npm run electron:publish
 - [ ] **3.4** อ่าน SchedulerPanel.jsx ตรงที่เรียก setTimezone
 - [ ] **3.5** สร้าง helper `patchJSON(url, body)` ใช้ `https.request` method PATCH
 - [ ] **3.6** เปลี่ยน `saveUserTimezone` ให้ใช้ `patchJSON` แทน `fetch`
-- [ ] **3.7** ทดสอบ: เปลี่ยน Timezone ใน SchedulerPanel → ต้องบันทึกได้
-- [ ] **3.8** Build + Publish version ใหม่
-- [ ] **3.9** อัพเดท บันทึกปัญหา.md
+- [ ] **3.7** 🟡 **BUG-E:** แก้ `parseFirestoreValue` (บรรทัด 97-113) เพิ่ม 3 types ที่ขาด:
+  - `if (value.timestampValue !== undefined) return new Date(value.timestampValue);`
+  - `if (value.doubleValue !== undefined) return value.doubleValue;`
+  - `if (value.nullValue !== undefined) return null;`
+- [ ] **3.8** 🔵 **ISSUE-G:** แก้ `episodeTopic` (บรรทัด 758) เป็น `readyPromptData.episodeTitle || ''` (field name ไม่ตรงกับ Cloud Function)
+- [ ] **3.9** ทดสอบ: เปลี่ยน Timezone ใน SchedulerPanel → ต้องบันทึกได้
+- [ ] **3.10** ทดสอบ: Scheduler fetch readyPrompts → timestamps ต้อง parse เป็น Date ถูกต้อง
+- [ ] **3.11** Build + Publish version ใหม่
+- [ ] **3.12** อัพเดท บันทึกปัญหา.md
 
 ---
 
@@ -1392,6 +1436,8 @@ npm run electron:publish
 **ปัญหา:** launch browser + run block มีโค้ดซ้ำ 2 ชุด (IPC handler + Direct function)
 **ผลกระทบ:** แก้บั๊กต้องแก้ 2 ที่ ลืมที่ไหนก็พัง
 
+> 🚨 **BUG ที่พบจากการจำลอง:** IPC `playwright:run-block` มีบั๊กใน Normal Mode — เมื่อ step ล้มเหลวจะ `break` แล้ว return `success: true` (ผิด!) หลังรวมโค้ดจะถูกแก้โดยอัตโนมัติ (Direct function return `success: false` ถูกต้อง) — **Dashboard อาจแสดง "failed" มากขึ้นกว่าเดิม เพราะเดิมซ่อนไว้**
+
 ### Checklist
 
 - [ ] **5.1** อ่าน IPC `playwright:launch` (บรรทัด 50-156) ทุกบรรทัด
@@ -1402,31 +1448,40 @@ npm run electron:publish
 - [ ] **5.6** จดรายการความแตกต่างระหว่าง 2 ชุด runBlock
 - [ ] **5.7** แก้ IPC `playwright:launch` ให้เรียก `launchInstance()` แทนโค้ดซ้ำ
 - [ ] **5.8** แก้ IPC `playwright:run-block` ให้เรียก `runBlock()` แทนโค้ดซ้ำ
-- [ ] **5.9** ทดสอบ Flow A: กดปุ่ม Launch Instance จาก UI → เปิด browser ปกติ
-- [ ] **5.10** ทดสอบ Flow B: Scheduler auto-launch → เปิด browser ปกติ
-- [ ] **5.11** ทดสอบ Flow C: กดปุ่ม Test Block จาก UI → รัน Steps ปกติ
-- [ ] **5.12** ทดสอบ Flow D: Scheduler auto-run → รัน Steps ปกติ
-- [ ] **5.13** Build + Publish version ใหม่
-- [ ] **5.14** อัพเดท บันทึกปัญหา.md
+- [ ] **5.8.1** ตรวจสอบ Behavior Change: Normal mode error เดิม success:true → ใหม่ success:false (แก้ bug)
+- [ ] **5.9** 🔴 **BUG-D:** อ่าน `instance-manager.js` `executeStep` (บรรทัด 147-179) — มีแค่ 5 actions!
+- [ ] **5.10** แก้ `instance-manager.js` `runBlockOnInstance` ให้ใช้ `executeStepWithModifiers` จาก playwright-bridge.js แทน executeStep ของตัวเอง
+- [ ] **5.11** ลบ `executeStep` function ใน instance-manager.js (โค้ดซ้ำชุดที่ 3)
+- [ ] **5.12** ทดสอบ Flow A: กดปุ่ม Launch Instance จาก UI → เปิด browser ปกติ
+- [ ] **5.13** ทดสอบ Flow B: Scheduler auto-launch → เปิด browser ปกติ
+- [ ] **5.14** ทดสอบ Flow C: กดปุ่ม Test Block จาก UI → รัน Steps ปกติ
+- [ ] **5.15** ทดสอบ Flow D: Scheduler auto-run → รัน Steps ปกติ
+- [ ] **5.16** ทดสอบ Flow E: instance:run-all (Multi-Instance) → ต้องรองรับ prompt actions + loop
+- [ ] **5.17** Build + Publish version ใหม่
+- [ ] **5.18** อัพเดท บันทึกปัญหา.md
 
 ---
 
 ## Phase 6: ย้าย API Key ออกจากโค้ด ⬜
 
-**ไฟล์:** `electron/scheduler.js` + `src/lib/firebase.js` + ไฟล์ config ใหม่
-**ปัญหา:** API Key ฝังตรงๆ ใน 2 ไฟล์
+**ไฟล์:** `config/firebase.json` (ใหม่) + `electron/scheduler.js` + `src/lib/firebase.js` + `vite.config.js`
+**ปัญหา:** API Key ฝังตรงๆ ใน 2 ไฟล์ (Main + Renderer)
 **ผลกระทบ:** แกะ .exe ดูจะเห็น key
+
+> ⚠️ **จากการจำลอง:** `firebase.js` อยู่ฝั่ง Renderer (Vite bundle) ไม่สามารถ `require()` จาก `electron/` ได้
+> ต้องใช้ `config/firebase.json` + Vite `define` แทน
+> Phase 1 เพิ่ม API_KEY usage ใหม่ 1 จุด → scheduler.js = **11 จุด**หลังแก้ Phase 1
 
 ### Checklist
 
-- [ ] **6.1** อ่าน scheduler.js ทุกจุดที่ใช้ `API_KEY` (**10 จุด**: บรรทัด 10,129,169,198,284,296,342,350,417,435)
+- [ ] **6.1** อ่าน scheduler.js ทุกจุดที่ใช้ `API_KEY` (**11 จุดหลัง Phase 1**: 10 เดิม + 1 จาก saveBlockToFirestore ใหม่)
 - [ ] **6.2** อ่าน firebase.js ทุกจุดที่ใช้ `API_KEY` (**20 จุด**: บรรทัด 5,96,120,145,182,206,230,265,286,315,347,379,419,451,485,524,565,646,678,690)
 - [ ] **6.3** ตรวจสอบ Firestore Security Rules ว่าเข้มงวดพอหรือไม่
-- [ ] **6.4** สร้าง `electron/config.js` เก็บ `API_KEY`, `FIREBASE_PROJECT_ID`, `FIRESTORE_BASE`
-- [ ] **6.5** แก้ scheduler.js ให้ import จาก config.js
-- [ ] **6.6** แก้ firebase.js ให้รับ config ผ่าน environment variable / preload
-- [ ] **6.7** แก้ preload.js ให้ expose config ถ้าจำเป็น
-- [ ] **6.8** แก้ vite.config.js ให้ define env variable ถ้าจำเป็น
+- [ ] **6.4** สร้าง `config/firebase.json` เก็บ `API_KEY`, `PROJECT_ID` (ไฟล์ JSON กลาง)
+- [ ] **6.5** แก้ `scheduler.js` ให้ `require('../config/firebase.json')` (Main Process)
+- [ ] **6.6** แก้ `vite.config.js` เพิ่ม `define` จาก firebase.json (Renderer Process)
+- [ ] **6.7** แก้ `firebase.js` ให้ใช้ `__FIREBASE_API_KEY__` แทน hardcode
+- [ ] **6.8** ตรวจสอบ: `npm run build` ผ่านโดยไม่มี error จาก Vite define
 - [ ] **6.9** ทดสอบ: เปิด Agent → Login → ดู Projects → ต้องโหลดข้อมูลได้
 - [ ] **6.10** ทดสอบ: Scheduler → ต้อง fetch schedule + run ได้
 - [ ] **6.11** ทดสอบ: Recorder → ต้อง save block ได้
@@ -1435,13 +1490,68 @@ npm run electron:publish
 
 ---
 
-## 📊 สรุปสถานะ Refactor
+## Phase 7: แก้ Scheduler Block-Project Matching ⬜
 
-| Phase | ปัญหา | สถานะ | Version |
-|-------|-------|-------|---------|
-| 1 | `saveBlockToFirestore` crash | ⬜ ยังไม่เริ่ม | - |
-| 2 | Debug Selector ไม่จำ Login | ⬜ ยังไม่เริ่ม | - |
-| 3 | `fetch()` ใน Node.js | ⬜ ยังไม่เริ่ม | - |
-| 4 | Memory Leak listener | ⬜ ยังไม่เริ่ม | - |
-| 5 | โค้ดซ้ำ 400+ บรรทัด | ⬜ ยังไม่เริ่ม | - |
-| 6 | API Key ฝังในโค้ด | ⬜ ยังไม่เริ่ม | - |
+**ไฟล์:** `electron/scheduler.js` บรรทัด 848-898
+**ปัญหา:** `getAutomationBlock()` ไม่สามารถเชื่อม Block กับ Project ได้ → ใช้ block แรกเสมอ (ทุก Project ใช้ Block เดียวกัน)
+**ผลกระทบ:** ถ้ามีหลาย Block → Project อาจรัน Block ผิดตัว
+**หมายเหตุ:** ปัญหาเดิมที่มีอยู่ก่อน refactor — Phase 1 ทำให้เห็นชัดขึ้น
+
+### Checklist
+
+- [ ] **7.1** อ่าน `scheduler.js` `getAutomationBlock` (บรรทัด 848-898)
+- [ ] **7.2** อ่าน `firebase.js` `fetchInstanceSettings` (บรรทัด 440-475)
+- [ ] **7.3** อ่าน Dashboard.jsx instance creation — ดูว่า instance เก็บ projectId ไว้ที่ไหน
+- [ ] **7.4** อ่าน electron-store ว่าเก็บ instances data อย่างไร
+- [ ] **7.5** แก้ `getAutomationBlock`:
+  - อ่าน instances จาก electron-store → หา instance ที่มี `projectId` ตรง
+  - ดึง `selectedBlockId` จาก `instance_settings` ของ instance นั้น
+  - ใช้ `selectedBlockId` ค้นหา block จาก `global_recipe_blocks`
+  - ถ้าหาไม่เจอ → fallback ใช้ block แรก
+- [ ] **7.6** ทดสอบ: สร้าง 2 Project + 2 Block → Scheduler ต้องใช้ Block ถูกตัวกับแต่ละ Project
+- [ ] **7.7** ทดสอบ: Project ที่ไม่มี instance → ต้อง fallback ไม่ crash
+- [ ] **7.8** Build + Publish version ใหม่
+- [ ] **7.9** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 8: รวม toFirestoreValue ซ้ำ + แก้ Execution Logs Path ⬜
+
+**ไฟล์:** `electron/scheduler.js`, `src/lib/firebase.js`, `frontend/`
+**ปัญหา A:** `toFirestoreValue` มี 2 copy ซ้ำ (firebase.js:38-72 + scheduler.js:201-216) — แก้ที่หนึ่งลืมอีกที่
+**ปัญหา B:** Execution Logs path ไม่ตรง — Desktop เขียน `executionLogs` (camelCase, flat) แต่ Web App อาจใช้ `execution_logs` (snake_case, nested)
+**ผลกระทบ A:** Data format ไม่ตรงกันในอนาคต
+**ผลกระทบ B:** Web App อาจดู logs ไม่เจอ
+
+### Checklist
+
+- [ ] **8.1** อ่าน `firebase.js` `toFirestoreValue` (บรรทัด 38-72)
+- [ ] **8.2** อ่าน `scheduler.js` inline `toFirestoreValue` ใน `saveExecutionLogFromScheduler` (บรรทัด 201-216)
+- [ ] **8.3** เปรียบเทียบ 2 copies — จดความแตกต่าง
+- [ ] **8.4** สร้าง `electron/firestoreHelpers.js` เก็บ `toFirestoreValue` + `parseFirestoreValue` ที่เดียว
+- [ ] **8.5** แก้ `scheduler.js` ให้ import จาก `firestoreHelpers.js`
+- [ ] **8.6** ตรวจสอบ Web App (`frontend/`) ว่าใช้ execution_logs path ไหน
+- [ ] **8.7** แก้ให้ Desktop Agent + Web App ใช้ path เดียวกัน หรือเพิ่ม alias query
+- [ ] **8.8** ทดสอบ: Scheduler → save execution log → ดูใน Firebase Console ว่า format ถูกต้อง
+- [ ] **8.9** ทดสอบ: Web App → ต้องเห็น logs ที่ Desktop Agent สร้าง
+- [ ] **8.10** Build + Publish version ใหม่
+- [ ] **8.11** อัพเดท บันทึกปัญหา.md
+
+---
+
+## 📊 สรุปสถานะ Refactor (Final — 8 Phase)
+
+> **กลุ่ม A (Phase 1-4):** แก้บักร้ายแรง — crash, path ผิด, data หาย, memory leak
+> **กลุ่ม B (Phase 5-6):** ปรับโครงสร้าง — รวมโค้ดซ้ำ, ย้าย key
+> **กลุ่ม C (Phase 7-8):** ปรับปรุงคุณภาพ — matching logic, data alignment
+
+| Phase | ปัญหา | BUG ที่แก้ | สถานะ | Version |
+|-------|-------|-----------|-------|---------|
+| **1** | **Block System ทั้งหมด** (รวม 1+1.5) | BUG-A,B,C,F,H + crash | ⬜ ยังไม่เริ่ม | - |
+| 2 | Debug Selector ไม่จำ Login | — | ⬜ ยังไม่เริ่ม | - |
+| 3 | `fetch()` ใน Node.js | BUG-E, ISSUE-G | ⬜ ยังไม่เริ่ม | - |
+| 4 | Memory Leak listener | — | ⬜ ยังไม่เริ่ม | - |
+| 5 | โค้ดซ้ำ 400+ บรรทัด | BUG-D, P5 | ⬜ ยังไม่เริ่ม | - |
+| 6 | API Key ฝังในโค้ด | P6-a | ⬜ ยังไม่เริ่ม | - |
+| **7** | **Scheduler Block-Project Matching** | — | ⬜ ยังไม่เริ่ม | - |
+| **8** | **toFirestoreValue ซ้ำ + Logs Path** | — | ⬜ ยังไม่เริ่ม | - |
