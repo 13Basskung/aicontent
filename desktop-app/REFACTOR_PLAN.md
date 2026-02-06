@@ -165,11 +165,14 @@ async function saveUserTimezone(userId, timezone) {
 บรรทัด 100: ipcRenderer.on('recorder:step', ...)
 ```
 
-### 📄 Frontend ที่เรียกใช้ (ต้องตรวจสอบ)
-- **App.jsx** บรรทัด 38: `window.electronAPI.onUpdateStatus(...)`
-- **App.jsx** บรรทัด 47: `window.electronAPI.onGoogleLoginReminder(...)`
-- **SchedulerPanel.jsx**: `onTrigger`, `onUpdate`, `onStatus`, `onAutoStarted`
-- **RecorderPanel.jsx**: `onStarted`, `onStopped`, `onStep`
+### 📄 Frontend ที่เรียกใช้จริง (ตรวจแล้ว)
+- **App.jsx** บรรทัด 38: `window.electronAPI.onUpdateStatus(...)` (ใน useEffect, ไม่มี cleanup)
+- **App.jsx** บรรทัด 47: `window.electronAPI.onGoogleLoginReminder(...)` (ใน useEffect, ไม่มี cleanup)
+- **SchedulerPanel.jsx** บรรทัด 149-168: `onTrigger`, `onUpdate`, `onStatus`, `onAutoStarted` (ใน useEffect, ไม่มี cleanup)
+- **RecorderPanel.jsx** บรรทัด 268-281: `onStarted`, `onStopped`, `onStep` (ใน useEffect, ไม่มี cleanup)
+- ~~**Dashboard.jsx**~~ → ❌ **ไม่มี listener เลย** (ตรวจแล้ว)
+
+> ⚠️ **หมายเหตุ:** `onInstanceStatus` (preload.js บรรทัด 49-51) ถูก define ไว้ แต่ไม่มี component ใดเรียกใช้ → เป็น **Dead Code**
 
 ### ✅ วิธีแก้ไข
 เปลี่ยน pattern ใน `preload.js` ให้:
@@ -182,11 +185,11 @@ async function saveUserTimezone(userId, timezone) {
 3. (Optional) เพิ่ม cleanup function ให้ Frontend ใช้ `useEffect cleanup`
 
 ### ⚠️ ผลกระทบกับฟังก์ชันอื่น
-- **preload.js** → แก้ไข 10 จุด
+- **preload.js** → แก้ไข 10 จุด (เพิ่ม `removeAllListeners` ก่อน `on`)
 - **App.jsx** → ควรเพิ่ม cleanup ใน useEffect (ไม่จำเป็นแต่ดีกว่า)
-- **SchedulerPanel.jsx** → ควรเพิ่ม cleanup
-- **RecorderPanel.jsx** → ควรเพิ่ม cleanup
-- **Dashboard.jsx** → ตรวจสอบว่ามี listener หรือไม่
+- **SchedulerPanel.jsx** → ควรเพิ่ม cleanup ใน useEffect
+- **RecorderPanel.jsx** → ควรเพิ่ม cleanup ใน useEffect
+- ~~**Dashboard.jsx**~~ → ❌ ไม่มี listener (ไม่ต้องแก้)
 
 ### 🏷️ สถานะ: ⬜ ยังไม่เริ่ม
 
@@ -207,13 +210,26 @@ async function saveUserTimezone(userId, timezone) {
 |--------------------------|----------------------------------|
 | บรรทัด 182-353 (`playwright:run-block`) | บรรทัด 1126-1293 (`runBlock`) |
 
-### 📄 ความแตกต่างเล็กน้อยระหว่าง 2 ชุด
-| จุดต่าง | IPC Handler | Direct Function |
+### 📄 ความแตกต่างระหว่าง 2 ชุด (ตรวจแล้วทุกบรรทัด)
+
+**ชุด A: Launch Browser**
+| จุดต่าง | IPC Handler (50-156) | Direct `launchInstance` (1004-1120) |
 |---------|-------------|-----------------|
-| Navigate about:blank | `page.evaluate(() => window.location.href = 'about:blank')` | `page.goto('about:blank', ...)` |
-| Navigate startUrl | `page.goto(block.startUrl, ...)` | `page.evaluate((url) => window.location.href = url)` |
-| Check instance exists | ไม่มี | มี `instances.has()` |
-| Error return | `{ success: false, error }` | `{ success: false, error, currentStep, failedStep }` |
+| Check instance exists | ไม่มี | มี `instances.has()` → reuse ถ้ามีอยู่แล้ว |
+| Navigate about:blank | `page.evaluate(() => window.location.href = 'about:blank')` | `page.goto('about:blank', { timeout: 5000 })` |
+| mainWindow reference | ใช้ `mainWindow` (parameter จาก closure) | ใช้ `storedMainWindow` (global) + null check |
+
+**ชุด B: Run Block**
+| จุดต่าง | IPC Handler (182-353) | Direct `runBlock` (1126-1293) |
+|---------|-------------|-----------------|
+| Navigate startUrl | `page.goto(block.startUrl, { waitUntil, timeout: 30000 })` | `page.evaluate((url) => window.location.href = url)` + `waitForLoadState` |
+| Debug logging | มี variables preview log (บรรทัด 265-270) | มี instances Map debug log (บรรทัด 1130-1133) |
+| Pre-loop error return | `{ success: false, results, error }` | `{ success: false, results, error, currentStep, failedStep }` |
+| Normal mode error | `break` (ไม่ return ทันที) | `return { success: false, results, error, currentStep, failedStep }` |
+| Success return | `{ success: true, results }` | `{ success: true, results, currentStep: steps.length }` |
+| mainWindow reference | ใช้ `mainWindow` (parameter จาก closure) | ใช้ `storedMainWindow` (global) |
+
+> ⚠️ **สำคัญ:** เมื่อรวมโค้ด ต้องตัดสินใจว่าจะใช้ behavior ของฝั่งไหน — แนะนำใช้ Direct Function เป็นหลัก (มี error info ครบกว่า)
 
 ### ✅ วิธีแก้ไข
 1. สร้าง **1 ฟังก์ชัน `_launchBrowser`** ที่ทั้ง IPC handler และ `launchInstance` เรียกใช้
@@ -245,11 +261,14 @@ scheduler.js บรรทัด 10:  const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQv
 firebase.js  บรรทัด 5:   const API_KEY = 'AIzaSyDGEnGxtkor9PwWkgjiQvrr9SmZ_IHKapE'
 ```
 
-### 📄 ไฟล์ที่ใช้ API_KEY
+### 📄 ไฟล์ที่ใช้ API_KEY (นับแล้วทุกบรรทัด)
 | ไฟล์ | จำนวนจุดที่ใช้ | อยู่ฝั่งไหน |
 |------|--------------|-----------|
-| `scheduler.js` | 7 จุด | Main Process (Node.js) |
-| `firebase.js` | 18 จุด | Renderer Process (Browser) |
+| `scheduler.js` | **10 จุด** (1 declaration + 9 usages) | Main Process (Node.js) |
+| `firebase.js` | **20 จุด** (1 declaration + 19 usages) | Renderer Process (Browser) |
+
+**scheduler.js (10 จุด):** บรรทัด 10(decl), 129, 169, 198, 284, 296, 342, 350, 417, 435
+**firebase.js (20 จุด):** บรรทัด 5(decl), 96, 120, 145, 182, 206, 230, 265, 286, 315, 347, 379, 419, 451, 485, 524, 565, 646, 678, 690
 
 ### ✅ วิธีแก้ไข
 1. สร้างไฟล์ config กลาง (`electron/config.js`) เก็บ API Key ที่เดียว

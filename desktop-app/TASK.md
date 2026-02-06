@@ -1293,4 +1293,155 @@ npm run electron:publish
 
 ## ⏭️ Next Step
 
-พิมพ์ **`เริ่ม Phase 1`** เมื่อพร้อมสร้างโครงสร้างโปรเจค (Node.js version)
+~~พิมพ์ **`เริ่ม Phase 1`** เมื่อพร้อมสร้างโครงสร้างโปรเจค (Node.js version)~~
+
+---
+---
+
+# 🔧 Refactor Checklist - v1.6.89 → v1.7.x
+
+> **วันที่เริ่ม:** 7 กุมภาพันธ์ 2026
+> **เอกสารแผน:** ดูรายละเอียดที่ `REFACTOR_PLAN.md`
+> **หลักการ:** แก้ทีละ Phase, ทดสอบให้ผ่านก่อนไปข้อถัดไป
+
+---
+
+## Phase 1: แก้ `saveBlockToFirestore` ที่จะ crash ⬜
+
+**ไฟล์:** `electron/scheduler.js` บรรทัด 916-925
+**ปัญหา:** ใช้ `db.collection()` แต่ไม่มีตัวแปร `db`
+**ผลกระทบ:** Dashboard "Shoot to Block" จะ crash
+
+### Checklist
+
+- [ ] **1.1** อ่านโค้ดฟังก์ชัน `saveBlockToFirestore` ใน scheduler.js
+- [ ] **1.2** อ่าน IPC handler `store:save-block-firestore` ใน main.js (บรรทัด 211-220)
+- [ ] **1.3** อ่าน preload.js ตรงจุด `saveBlockToFirestore` (บรรทัด 10)
+- [ ] **1.4** อ่าน Dashboard.jsx ตรงที่เรียก (บรรทัด 954)
+- [ ] **1.5** เขียนฟังก์ชันใหม่โดยใช้ REST API (เหมือน `saveExecutionLogFromScheduler`)
+- [ ] **1.6** ทดสอบ: เปิด Debug Selector → Shoot to Block → ต้องไม่ crash
+- [ ] **1.7** Build + Publish version ใหม่
+- [ ] **1.8** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 2: แก้ Debug Selector ไม่จำ Login ⬜
+
+**ไฟล์:** `electron/playwright-bridge.js` บรรทัด 411
+**ปัญหา:** ใช้ `process.cwd()` (relative path) → Profile ไปอยู่ผิดที่
+**ผลกระทบ:** ล็อกอินแล้วครั้งหน้าหาย
+
+### Checklist
+
+- [ ] **2.1** อ่านโค้ด Debug Selector handler ใน playwright-bridge.js (บรรทัด 392-488)
+- [ ] **2.2** เปรียบเทียบกับ Instance launch (บรรทัด 56) และ Recorder (recorder.js:53)
+- [ ] **2.3** เปลี่ยน path → ใช้ `getProfilesDir()` + `'debug-selector'`
+- [ ] **2.4** เพิ่ม `deviceScaleFactor: undefined` + args ให้เหมือน Instance
+- [ ] **2.5** เพิ่ม `ignoreDefaultArgs: ['--enable-automation']`
+- [ ] **2.6** ทดสอบ: เปิด Debug Selector → Login → ปิด → เปิดใหม่ → ต้องยังล็อกอินอยู่
+- [ ] **2.7** Build + Publish version ใหม่
+- [ ] **2.8** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 3: แก้ `saveUserTimezone` ที่ใช้ `fetch()` ใน Node.js ⬜
+
+**ไฟล์:** `electron/scheduler.js` บรรทัด 339-373
+**ปัญหา:** ใช้ `fetch()` ในขณะที่ฟังก์ชันอื่นทั้งหมดใช้ `https` module
+**ผลกระทบ:** อาจพังบางเครื่องที่ Electron ไม่มี global fetch
+
+### Checklist
+
+- [ ] **3.1** อ่านฟังก์ชัน `saveUserTimezone` ใน scheduler.js (บรรทัด 339-373)
+- [ ] **3.2** อ่าน helper `postJSON` ที่มีอยู่แล้ว (บรรทัด 61-92)
+- [ ] **3.3** อ่าน IPC handler `scheduler:set-timezone` ใน main.js (บรรทัด 314-316)
+- [ ] **3.4** อ่าน SchedulerPanel.jsx ตรงที่เรียก setTimezone
+- [ ] **3.5** สร้าง helper `patchJSON(url, body)` ใช้ `https.request` method PATCH
+- [ ] **3.6** เปลี่ยน `saveUserTimezone` ให้ใช้ `patchJSON` แทน `fetch`
+- [ ] **3.7** ทดสอบ: เปลี่ยน Timezone ใน SchedulerPanel → ต้องบันทึกได้
+- [ ] **3.8** Build + Publish version ใหม่
+- [ ] **3.9** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 4: แก้ Memory Leak จาก `ipcRenderer.on` ⬜
+
+**ไฟล์:** `electron/preload.js` (10 จุด) + Frontend components
+**ปัญหา:** `ipcRenderer.on()` เพิ่ม listener ซ้ำทุกครั้งที่ mount โดยไม่ลบ
+**ผลกระทบ:** ใช้ไปนานๆ แอปกิน RAM มากขึ้น
+
+### Checklist
+
+- [ ] **4.1** อ่าน preload.js ทุกจุดที่มี `ipcRenderer.on` (10 จุด)
+- [ ] **4.2** อ่าน App.jsx ตรง `onUpdateStatus` + `onGoogleLoginReminder`
+- [ ] **4.3** อ่าน SchedulerPanel.jsx ตรง `onTrigger`, `onUpdate`, `onStatus`, `onAutoStarted`
+- [ ] **4.4** อ่าน RecorderPanel.jsx ตรง `onStarted`, `onStopped`, `onStep`
+- [ ] **4.5** ตรวจสอบ: `onInstanceStatus` (preload.js:49-51) เป็น Dead Code (ไม่มี component ใดเรียกใช้)
+- [ ] **4.6** แก้ preload.js: เพิ่ม `removeAllListeners` ก่อน `on` ทุกจุด
+- [ ] **4.7** (Optional) เพิ่ม `off` function ให้ Frontend เรียก cleanup
+- [ ] **4.8** ทดสอบ: สลับ tab ไปมาหลายรอบ → ตรวจ memory ใน Task Manager
+- [ ] **4.9** ทดสอบ: Scheduler, Recorder, Instance ยังทำงานปกติ
+- [ ] **4.10** Build + Publish version ใหม่
+- [ ] **4.11** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 5: รวมโค้ดซ้ำกัน 400+ บรรทัด ⬜
+
+**ไฟล์:** `electron/playwright-bridge.js`
+**ปัญหา:** launch browser + run block มีโค้ดซ้ำ 2 ชุด (IPC handler + Direct function)
+**ผลกระทบ:** แก้บั๊กต้องแก้ 2 ที่ ลืมที่ไหนก็พัง
+
+### Checklist
+
+- [ ] **5.1** อ่าน IPC `playwright:launch` (บรรทัด 50-156) ทุกบรรทัด
+- [ ] **5.2** อ่าน `launchInstance` direct function (บรรทัด 1004-1120) ทุกบรรทัด
+- [ ] **5.3** จดรายการความแตกต่างระหว่าง 2 ชุด launch
+- [ ] **5.4** อ่าน IPC `playwright:run-block` (บรรทัด 182-353) ทุกบรรทัด
+- [ ] **5.5** อ่าน `runBlock` direct function (บรรทัด 1126-1293) ทุกบรรทัด
+- [ ] **5.6** จดรายการความแตกต่างระหว่าง 2 ชุด runBlock
+- [ ] **5.7** แก้ IPC `playwright:launch` ให้เรียก `launchInstance()` แทนโค้ดซ้ำ
+- [ ] **5.8** แก้ IPC `playwright:run-block` ให้เรียก `runBlock()` แทนโค้ดซ้ำ
+- [ ] **5.9** ทดสอบ Flow A: กดปุ่ม Launch Instance จาก UI → เปิด browser ปกติ
+- [ ] **5.10** ทดสอบ Flow B: Scheduler auto-launch → เปิด browser ปกติ
+- [ ] **5.11** ทดสอบ Flow C: กดปุ่ม Test Block จาก UI → รัน Steps ปกติ
+- [ ] **5.12** ทดสอบ Flow D: Scheduler auto-run → รัน Steps ปกติ
+- [ ] **5.13** Build + Publish version ใหม่
+- [ ] **5.14** อัพเดท บันทึกปัญหา.md
+
+---
+
+## Phase 6: ย้าย API Key ออกจากโค้ด ⬜
+
+**ไฟล์:** `electron/scheduler.js` + `src/lib/firebase.js` + ไฟล์ config ใหม่
+**ปัญหา:** API Key ฝังตรงๆ ใน 2 ไฟล์
+**ผลกระทบ:** แกะ .exe ดูจะเห็น key
+
+### Checklist
+
+- [ ] **6.1** อ่าน scheduler.js ทุกจุดที่ใช้ `API_KEY` (**10 จุด**: บรรทัด 10,129,169,198,284,296,342,350,417,435)
+- [ ] **6.2** อ่าน firebase.js ทุกจุดที่ใช้ `API_KEY` (**20 จุด**: บรรทัด 5,96,120,145,182,206,230,265,286,315,347,379,419,451,485,524,565,646,678,690)
+- [ ] **6.3** ตรวจสอบ Firestore Security Rules ว่าเข้มงวดพอหรือไม่
+- [ ] **6.4** สร้าง `electron/config.js` เก็บ `API_KEY`, `FIREBASE_PROJECT_ID`, `FIRESTORE_BASE`
+- [ ] **6.5** แก้ scheduler.js ให้ import จาก config.js
+- [ ] **6.6** แก้ firebase.js ให้รับ config ผ่าน environment variable / preload
+- [ ] **6.7** แก้ preload.js ให้ expose config ถ้าจำเป็น
+- [ ] **6.8** แก้ vite.config.js ให้ define env variable ถ้าจำเป็น
+- [ ] **6.9** ทดสอบ: เปิด Agent → Login → ดู Projects → ต้องโหลดข้อมูลได้
+- [ ] **6.10** ทดสอบ: Scheduler → ต้อง fetch schedule + run ได้
+- [ ] **6.11** ทดสอบ: Recorder → ต้อง save block ได้
+- [ ] **6.12** Build + Publish version ใหม่
+- [ ] **6.13** อัพเดท บันทึกปัญหา.md
+
+---
+
+## 📊 สรุปสถานะ Refactor
+
+| Phase | ปัญหา | สถานะ | Version |
+|-------|-------|-------|---------|
+| 1 | `saveBlockToFirestore` crash | ⬜ ยังไม่เริ่ม | - |
+| 2 | Debug Selector ไม่จำ Login | ⬜ ยังไม่เริ่ม | - |
+| 3 | `fetch()` ใน Node.js | ⬜ ยังไม่เริ่ม | - |
+| 4 | Memory Leak listener | ⬜ ยังไม่เริ่ม | - |
+| 5 | โค้ดซ้ำ 400+ บรรทัด | ⬜ ยังไม่เริ่ม | - |
+| 6 | API Key ฝังในโค้ด | ⬜ ยังไม่เริ่ม | - |
